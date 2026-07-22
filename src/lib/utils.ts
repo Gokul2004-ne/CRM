@@ -36,6 +36,10 @@ export function getDaysUntilDue(dueDate: string | Date): number {
   return differenceInDays(new Date(dueDate), new Date());
 }
 
+export function getDaysRemaining(dueDate: string | Date): number {
+  return differenceInDays(new Date(dueDate), new Date());
+}
+
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",

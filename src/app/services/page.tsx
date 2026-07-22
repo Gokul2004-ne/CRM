@@ -3,15 +3,15 @@ import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
 import { Service } from "@/lib/types";
-import { Plus, Pencil, Trash2, Search, IndianRupee, Calendar, RefreshCw } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, IndianRupee, RefreshCw } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 
-const recurrenceColors: Record<string, string> = {
-  MONTHLY: "background:#EFF6FF;color:#1D4ED8",
-  QUARTERLY: "background:#F0FDF4;color:#15803D",
-  ANNUAL: "background:#FFF7ED;color:#C2410C",
-  CUSTOM: "background:#F5F3FF;color:#7C3AED",
+const recurrenceColors: Record<string, { bg: string; color: string }> = {
+  MONTHLY: { bg: "#EFF6FF", color: "#1D4ED8" },
+  QUARTERLY: { bg: "#F0FDF4", color: "#15803D" },
+  ANNUAL: { bg: "#FFF7ED", color: "#C2410C" },
+  CUSTOM: { bg: "#F5F3FF", color: "#7C3AED" },
 };
 
 const emptyService = (): Service => ({
@@ -42,61 +42,78 @@ export default function ServicesPage() {
     <AppShell title="Services List" subtitle={`${services.length} services configured`}>
       <div className="data-table-wrapper">
         <div className="data-table-header">
-          <div className="search-wrapper">
-            <Search className="search-icon" />
-            <input className="search-input" placeholder="Search services..." value={search} onChange={e => setSearch(e.target.value)} />
+          <div className="toolbar-controls">
+            <div className="search-wrapper">
+              <Search className="search-icon" />
+              <input className="search-input" placeholder="Search services..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
           </div>
-          <button className="btn btn-primary" onClick={openAdd}><Plus size={15} /> Add Service</button>
+          <button className="btn-slds btn-slds-primary" onClick={openAdd}><Plus size={15} /> Add Service</button>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Service Name</th>
-              <th>Due Date</th>
-              <th>Price</th>
-              <th>Recurrence</th>
-              <th>Applicable Months</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((s, i) => (
-              <tr key={s.id}>
-                <td style={{ color: "#94A3B8", fontWeight: 600 }}>{i + 1}</td>
-                <td style={{ fontWeight: 700, color: "#0F172A" }}>{s.name}</td>
-                <td>{s.dueDate ? formatDate(s.dueDate) : "-"}</td>
-                <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, fontWeight: 600, color: "#059669" }}>
-                    <IndianRupee size={13} /> {formatCurrency(s.price).replace("₹", "")}
-                  </div>
-                </td>
-                <td>
-                  <span className="badge" style={{ ...(Object.fromEntries((recurrenceColors[s.recurrence] || "").split(";").map(p => p.split(":") as [string, string]))) }}>
-                    <RefreshCw size={10} style={{ marginRight: 4 }} />
-                    {s.recurrence}
-                  </span>
-                </td>
-                <td>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    {s.applicableMonths.length === 12
-                      ? <span className="chip">All Months</span>
-                      : s.applicableMonths.map(m => (
-                        <span key={m} className="chip">{["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m-1]}</span>
-                      ))
-                    }
-                  </div>
-                </td>
-                <td>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button className="btn btn-ghost btn-icon btn-sm" onClick={() => openEdit(s)}><Pencil size={13} /></button>
-                    <button className="btn btn-danger btn-icon btn-sm" onClick={() => setDeleteConfirm(s.id)}><Trash2 size={13} /></button>
-                  </div>
-                </td>
+
+        <div className="table-scroll-container">
+          <table>
+            <thead>
+              <tr>
+                <th className="col-num">#</th>
+                <th>Service Name</th>
+                <th>Due Date</th>
+                <th className="col-right">Price</th>
+                <th>Recurrence</th>
+                <th>Applicable Months</th>
+                <th className="col-actions">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map((s, i) => {
+                const colors = recurrenceColors[s.recurrence] || { bg: "#F1F5F9", color: "#334155" };
+                return (
+                  <tr key={s.id}>
+                    <td className="col-num">{i + 1}</td>
+                    <td style={{ fontWeight: 700, color: "#0F172A" }}>{s.name}</td>
+                    <td>{s.dueDate ? formatDate(s.dueDate) : "-"}</td>
+                    <td className="col-right" style={{ fontWeight: 600, color: "#059669" }}>
+                      {formatCurrency(s.price)}
+                    </td>
+                    <td>
+                      <span className="badge" style={{ background: colors.bg, color: colors.color }}>
+                        <RefreshCw size={10} style={{ marginRight: 4 }} />
+                        {s.recurrence}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {s.applicableMonths.length === 12
+                          ? <span className="chip">All Months</span>
+                          : s.applicableMonths.map(m => (
+                            <span key={m} className="chip">{["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m-1]}</span>
+                          ))
+                        }
+                      </div>
+                    </td>
+                    <td className="col-actions">
+                      <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
+                        <button className="btn-slds btn-slds-secondary" style={{ padding: "5px 8px" }} onClick={() => openEdit(s)} title="Edit">
+                          <Pencil size={13} />
+                        </button>
+                        <button className="btn-slds btn-slds-secondary" style={{ padding: "5px 8px", color: "#DC2626", borderColor: "#FCA5A5" }} onClick={() => setDeleteConfirm(s.id)} title="Delete">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="empty-table-cell">
+                    No services found matching "{search}"
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {modal.open && (
@@ -104,7 +121,7 @@ export default function ServicesPage() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title">{modal.editing ? "Edit Service" : "Add Service"}</div>
-              <button className="btn btn-ghost btn-icon" onClick={() => setModal({ open: false, editing: null })}>✕</button>
+              <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px" }} onClick={() => setModal({ open: false, editing: null })}>✕</button>
             </div>
             <div className="modal-body">
               <div className="form-group"><label className="form-label">Service Name *</label>
@@ -134,7 +151,8 @@ export default function ServicesPage() {
                     const selected = form.applicableMonths.includes(monthNum);
                     return (
                       <button key={m} type="button"
-                        className={`btn btn-sm ${selected ? "btn-primary" : "btn-secondary"}`}
+                        className={`btn-slds ${selected ? "btn-slds-primary" : "btn-slds-secondary"}`}
+                        style={{ padding: "4px 10px", fontSize: 12 }}
                         onClick={() => setForm(f => ({
                           ...f,
                           applicableMonths: selected ? f.applicableMonths.filter(x => x !== monthNum) : [...f.applicableMonths, monthNum]
@@ -146,8 +164,8 @@ export default function ServicesPage() {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setModal({ open: false, editing: null })}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSave}>{modal.editing ? "Save Changes" : "Add Service"}</button>
+              <button className="btn-slds btn-slds-secondary" onClick={() => setModal({ open: false, editing: null })}>Cancel</button>
+              <button className="btn-slds btn-slds-primary" onClick={handleSave}>{modal.editing ? "Save Changes" : "Add Service"}</button>
             </div>
           </div>
         </div>
@@ -159,8 +177,8 @@ export default function ServicesPage() {
             <div className="modal-header"><div className="modal-title">Delete Service?</div></div>
             <div className="modal-body"><p style={{ color: "#64748B", fontSize: 14 }}>This will permanently delete this service. This action cannot be undone.</p></div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn btn-danger" onClick={() => { deleteService(deleteConfirm!); setDeleteConfirm(null); toast.success("Service deleted"); }}>Delete</button>
+              <button className="btn-slds btn-slds-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="btn-slds btn-slds-primary" style={{ background: "#DC2626" }} onClick={() => { deleteService(deleteConfirm!); setDeleteConfirm(null); toast.success("Service deleted"); }}>Delete</button>
             </div>
           </div>
         </div>

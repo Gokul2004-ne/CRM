@@ -7,17 +7,25 @@ export type ServiceStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "OVERDUE";
 export interface Client {
   id: string;
   name: string;
-  ownerName: string;
+  ownerName?: string;
+  type?: string;
   referredBy?: string;
+  phone?: string;
   mobile: string;
   email?: string;
-  registrationNo?: string;
+  pan?: string;
   panNo?: string;
+  gstin?: string;
   gstNo?: string;
+  contactPerson?: string;
+  city?: string;
+  status?: string;
+  registrationNo?: string;
   incorporationDate?: string;
-  acquiredDate: string;
+  acquiredDate?: string;
   address?: string;
   notes?: string;
+  createdAt?: string;
 }
 
 export interface Service {
@@ -52,6 +60,9 @@ export interface AssignedService {
   amountBilled: number;
   amountReceived: number;
   amountPending: number;
+  totalFee?: number;
+  paidAmount?: number;
+  pendingAmount?: number;
   status?: ServiceStatus;
   dueDate?: string;
 }
@@ -72,6 +83,7 @@ export interface Lead {
   id: string;
   name: string;
   mobile: string;
+  phone?: string;
   source: string;
   status: LeadStatus;
   convertedClientId?: string;

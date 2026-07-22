@@ -9,6 +9,25 @@ import {
   mockAssignedServices, mockBankingEntries, mockLeads, mockDrafts
 } from "./mockData";
 import { getCurrentFY } from "./utils";
+import {
+  fetchAllCRMData,
+  syncClientToSupabase,
+  removeClientFromSupabase,
+  syncServiceToSupabase,
+  removeServiceFromSupabase,
+  syncSubServiceToSupabase,
+  removeSubServiceFromSupabase,
+  syncRequiredDocToSupabase,
+  removeRequiredDocFromSupabase,
+  syncAssignedServiceToSupabase,
+  removeAssignedServiceFromSupabase,
+  syncBankingEntryToSupabase,
+  removeBankingEntryFromSupabase,
+  syncLeadToSupabase,
+  removeLeadFromSupabase,
+  syncDraftToSupabase,
+  removeDraftFromSupabase
+} from "./supabaseData";
 
 interface AppState {
   // Data
@@ -22,6 +41,10 @@ interface AppState {
   drafts: DocumentDraft[];
   selectedFY: string;
   sidebarCollapsed: boolean;
+  isLoadingSupabase: boolean;
+
+  // Supabase sync
+  loadSupabaseData: () => Promise<void>;
 
   // Actions - Clients
   setSelectedFY: (fy: string) => void;
@@ -68,7 +91,7 @@ interface AppState {
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       clients: mockClients,
       services: mockServices,
       subServices: mockSubServices,
@@ -79,44 +102,149 @@ export const useAppStore = create<AppState>()(
       drafts: mockDrafts,
       selectedFY: getCurrentFY(),
       sidebarCollapsed: false,
+      isLoadingSupabase: false,
+
+      loadSupabaseData: async () => {
+        set({ isLoadingSupabase: true });
+        const data = await fetchAllCRMData();
+        if (data) {
+          set({
+            clients: data.clients,
+            services: data.services,
+            subServices: data.subServices,
+            requiredDocs: data.requiredDocs,
+            assignedServices: data.assignedServices,
+            bankingEntries: data.bankingEntries,
+            leads: data.leads,
+            drafts: data.drafts,
+            isLoadingSupabase: false,
+          });
+        } else {
+          set({ isLoadingSupabase: false });
+        }
+      },
 
       setSelectedFY: (fy) => set({ selectedFY: fy }),
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
 
-      addClient: (c) => set((s) => ({ clients: [...s.clients, c] })),
-      updateClient: (c) => set((s) => ({ clients: s.clients.map(x => x.id === c.id ? c : x) })),
-      deleteClient: (id) => set((s) => ({ clients: s.clients.filter(x => x.id !== id) })),
+      // Clients Sync
+      addClient: (c) => {
+        set((s) => ({ clients: [...s.clients, c] }));
+        syncClientToSupabase(c);
+      },
+      updateClient: (c) => {
+        set((s) => ({ clients: s.clients.map(x => x.id === c.id ? c : x) }));
+        syncClientToSupabase(c);
+      },
+      deleteClient: (id) => {
+        set((s) => ({ clients: s.clients.filter(x => x.id !== id) }));
+        removeClientFromSupabase(id);
+      },
 
-      addService: (sv) => set((s) => ({ services: [...s.services, sv] })),
-      updateService: (sv) => set((s) => ({ services: s.services.map(x => x.id === sv.id ? sv : x) })),
-      deleteService: (id) => set((s) => ({ services: s.services.filter(x => x.id !== id) })),
+      // Services Sync
+      addService: (sv) => {
+        set((s) => ({ services: [...s.services, sv] }));
+        syncServiceToSupabase(sv);
+      },
+      updateService: (sv) => {
+        set((s) => ({ services: s.services.map(x => x.id === sv.id ? sv : x) }));
+        syncServiceToSupabase(sv);
+      },
+      deleteService: (id) => {
+        set((s) => ({ services: s.services.filter(x => x.id !== id) }));
+        removeServiceFromSupabase(id);
+      },
 
-      addSubService: (ss) => set((s) => ({ subServices: [...s.subServices, ss] })),
-      updateSubService: (ss) => set((s) => ({ subServices: s.subServices.map(x => x.id === ss.id ? ss : x) })),
-      deleteSubService: (id) => set((s) => ({ subServices: s.subServices.filter(x => x.id !== id) })),
+      // SubServices Sync
+      addSubService: (ss) => {
+        set((s) => ({ subServices: [...s.subServices, ss] }));
+        syncSubServiceToSupabase(ss);
+      },
+      updateSubService: (ss) => {
+        set((s) => ({ subServices: s.subServices.map(x => x.id === ss.id ? ss : x) }));
+        syncSubServiceToSupabase(ss);
+      },
+      deleteSubService: (id) => {
+        set((s) => ({ subServices: s.subServices.filter(x => x.id !== id) }));
+        removeSubServiceFromSupabase(id);
+      },
 
-      addRequiredDoc: (d) => set((s) => ({ requiredDocs: [...s.requiredDocs, d] })),
-      updateRequiredDoc: (d) => set((s) => ({ requiredDocs: s.requiredDocs.map(x => x.id === d.id ? d : x) })),
-      deleteRequiredDoc: (id) => set((s) => ({ requiredDocs: s.requiredDocs.filter(x => x.id !== id) })),
+      // Required Docs Sync
+      addRequiredDoc: (d) => {
+        set((s) => ({ requiredDocs: [...s.requiredDocs, d] }));
+        syncRequiredDocToSupabase(d);
+      },
+      updateRequiredDoc: (d) => {
+        set((s) => ({ requiredDocs: s.requiredDocs.map(x => x.id === d.id ? d : x) }));
+        syncRequiredDocToSupabase(d);
+      },
+      deleteRequiredDoc: (id) => {
+        set((s) => ({ requiredDocs: s.requiredDocs.filter(x => x.id !== id) }));
+        removeRequiredDocFromSupabase(id);
+      },
 
-      addAssignedService: (a) => set((s) => ({ assignedServices: [...s.assignedServices, a] })),
-      updateAssignedService: (a) => set((s) => ({ assignedServices: s.assignedServices.map(x => x.id === a.id ? a : x) })),
-      deleteAssignedService: (id) => set((s) => ({ assignedServices: s.assignedServices.filter(x => x.id !== id) })),
+      // Assigned Services Sync
+      addAssignedService: (a) => {
+        set((s) => ({ assignedServices: [...s.assignedServices, a] }));
+        syncAssignedServiceToSupabase(a);
+      },
+      updateAssignedService: (a) => {
+        set((s) => ({ assignedServices: s.assignedServices.map(x => x.id === a.id ? a : x) }));
+        syncAssignedServiceToSupabase(a);
+      },
+      deleteAssignedService: (id) => {
+        set((s) => ({ assignedServices: s.assignedServices.filter(x => x.id !== id) }));
+        removeAssignedServiceFromSupabase(id);
+      },
 
-      addBankingEntry: (b) => set((s) => ({ bankingEntries: [...s.bankingEntries, b] })),
-      updateBankingEntry: (b) => set((s) => ({ bankingEntries: s.bankingEntries.map(x => x.id === b.id ? b : x) })),
-      deleteBankingEntry: (id) => set((s) => ({ bankingEntries: s.bankingEntries.filter(x => x.id !== id) })),
+      // Banking Sync
+      addBankingEntry: (b) => {
+        set((s) => ({ bankingEntries: [...s.bankingEntries, b] }));
+        syncBankingEntryToSupabase(b);
+      },
+      updateBankingEntry: (b) => {
+        set((s) => ({ bankingEntries: s.bankingEntries.map(x => x.id === b.id ? b : x) }));
+        syncBankingEntryToSupabase(b);
+      },
+      deleteBankingEntry: (id) => {
+        set((s) => ({ bankingEntries: s.bankingEntries.filter(x => x.id !== id) }));
+        removeBankingEntryFromSupabase(id);
+      },
 
-      addLead: (l) => set((s) => ({ leads: [...s.leads, l] })),
-      updateLead: (l) => set((s) => ({ leads: s.leads.map(x => x.id === l.id ? l : x) })),
-      convertLead: (leadId, clientId) => set((s) => ({
-        leads: s.leads.map(x => x.id === leadId ? { ...x, status: "CONVERTED" as const, convertedClientId: clientId } : x)
-      })),
+      // Leads Sync
+      addLead: (l) => {
+        set((s) => ({ leads: [...s.leads, l] }));
+        syncLeadToSupabase(l);
+      },
+      updateLead: (l) => {
+        set((s) => ({ leads: s.leads.map(x => x.id === l.id ? l : x) }));
+        syncLeadToSupabase(l);
+      },
+      convertLead: (leadId, clientId) => {
+        set((s) => {
+          const updatedLeads = s.leads.map(x => x.id === leadId ? { ...x, status: "CONVERTED" as const, convertedClientId: clientId } : x);
+          const convertedLead = updatedLeads.find(x => x.id === leadId);
+          if (convertedLead) {
+            syncLeadToSupabase(convertedLead);
+          }
+          return { leads: updatedLeads };
+        });
+      },
 
-      addDraft: (d) => set((s) => ({ drafts: [...s.drafts, d] })),
-      updateDraft: (d) => set((s) => ({ drafts: s.drafts.map(x => x.id === d.id ? d : x) })),
-      deleteDraft: (id) => set((s) => ({ drafts: s.drafts.filter(x => x.id !== id) })),
+      // Drafts Sync
+      addDraft: (d) => {
+        set((s) => ({ drafts: [...s.drafts, d] }));
+        syncDraftToSupabase(d);
+      },
+      updateDraft: (d) => {
+        set((s) => ({ drafts: s.drafts.map(x => x.id === d.id ? d : x) }));
+        syncDraftToSupabase(d);
+      },
+      deleteDraft: (id) => {
+        set((s) => ({ drafts: s.drafts.filter(x => x.id !== id) }));
+        removeDraftFromSupabase(id);
+      },
     }),
-    { name: "cmaexpert-store" }
+    { name: "crmexpert-store" }
   )
 );

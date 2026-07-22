@@ -3,7 +3,7 @@ import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
 import { AssignedService } from "@/lib/types";
-import { Plus, Pencil, Trash2, Search, IndianRupee } from "lucide-react";
+import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import { formatCurrency, formatDate, getCurrentFY, getFYOptions } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -57,63 +57,85 @@ export default function AssignPage() {
   const fyOptions = getFYOptions();
 
   return (
-    <AppShell title="Assign Services" subtitle="Assign services to clients and track billing">
+    <AppShell title="Assign Services" subtitle={`Assigned services & billing for FY ${selectedFY}`}>
       <div className="data-table-wrapper">
         <div className="data-table-header">
-          <div className="search-wrapper">
-            <Search className="search-icon" />
-            <input className="search-input" placeholder="Search by client or service..." value={search} onChange={e => setSearch(e.target.value)} />
+          <div className="toolbar-controls">
+            <div className="search-wrapper">
+              <Search className="search-icon" />
+              <input className="search-input" placeholder="Search client or service..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
           </div>
-          <button className="btn btn-primary" onClick={openAdd}><Plus size={15} /> Assign Service</button>
+          <button className="btn-slds btn-slds-primary" onClick={openAdd}><Plus size={15} /> Assign Service</button>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>#</th><th>Client</th><th>Service</th><th>Sub Services</th>
-              <th>FY</th><th>Amount Billed</th><th>Amount Received</th><th>Amount Pending</th><th>Due Date</th><th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((a, i) => {
-              const client = clients.find(c => c.id === a.clientId);
-              const service = services.find(s => s.id === a.serviceId);
-              const subs = subServices.filter(ss => a.subServiceIds.includes(ss.id));
-              return (
-                <tr key={a.id}>
-                  <td style={{ color: "#94A3B8", fontWeight: 600 }}>{i + 1}</td>
-                  <td style={{ fontWeight: 700 }}>{client?.name || "-"}</td>
-                  <td>{service?.name || "-"}</td>
-                  <td>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                      {subs.map(ss => <span key={ss.id} className="chip">{ss.name}</span>)}
-                    </div>
-                  </td>
-                  <td><span className="badge" style={{ background: "#EFF6FF", color: "#1D4ED8" }}>{a.financialYear}</span></td>
-                  <td style={{ fontWeight: 600, color: "#059669" }}>{formatCurrency(a.amountBilled)}</td>
-                  <td style={{ fontWeight: 600, color: "#D97706" }}>{formatCurrency(a.amountReceived)}</td>
-                  <td>
-                    <span style={{ fontWeight: 700, color: a.amountPending > 0 ? "#DC2626" : "#059669" }}>
-                      {formatCurrency(a.amountPending)}
-                    </span>
-                  </td>
-                  <td>{a.dueDate ? formatDate(a.dueDate) : "-"}</td>
-                  <td>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button className="btn btn-ghost btn-icon btn-sm" onClick={() => openEdit(a)}><Pencil size={13} /></button>
-                      <button className="btn btn-danger btn-icon btn-sm" onClick={() => { deleteAssignedService(a.id); toast.success("Removed"); }}><Trash2 size={13} /></button>
-                    </div>
+
+        <div className="table-scroll-container">
+          <table>
+            <thead>
+              <tr>
+                <th className="col-num">#</th>
+                <th>Client</th>
+                <th>Service</th>
+                <th>Sub Services</th>
+                <th>FY</th>
+                <th className="col-right">Amount Billed</th>
+                <th className="col-right">Amount Received</th>
+                <th className="col-right">Amount Pending</th>
+                <th>Due Date</th>
+                <th className="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((a, i) => {
+                const client = clients.find(c => c.id === a.clientId);
+                const service = services.find(s => s.id === a.serviceId);
+                const subs = subServices.filter(ss => a.subServiceIds.includes(ss.id));
+                return (
+                  <tr key={a.id}>
+                    <td className="col-num">{i + 1}</td>
+                    <td style={{ fontWeight: 700, color: "#0F172A" }}>{client?.name || "-"}</td>
+                    <td>{service?.name || "-"}</td>
+                    <td>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {subs.map(ss => <span key={ss.id} className="chip">{ss.name}</span>)}
+                      </div>
+                    </td>
+                    <td><span className="badge" style={{ background: "#EFF6FF", color: "#1D4ED8" }}>{a.financialYear}</span></td>
+                    <td className="col-right" style={{ fontWeight: 600, color: "#059669" }}>{formatCurrency(a.amountBilled)}</td>
+                    <td className="col-right" style={{ fontWeight: 600, color: "#D97706" }}>{formatCurrency(a.amountReceived)}</td>
+                    <td className="col-right">
+                      <span style={{ fontWeight: 700, color: a.amountPending > 0 ? "#DC2626" : "#059669" }}>
+                        {formatCurrency(a.amountPending)}
+                      </span>
+                    </td>
+                    <td>{a.dueDate ? formatDate(a.dueDate) : "-"}</td>
+                    <td className="col-actions">
+                      <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
+                        <button className="btn-slds btn-slds-secondary" style={{ padding: "5px 8px" }} onClick={() => openEdit(a)} title="Edit">
+                          <Pencil size={13} />
+                        </button>
+                        <button className="btn-slds btn-slds-secondary" style={{ padding: "5px 8px", color: "#DC2626", borderColor: "#FCA5A5" }} onClick={() => { deleteAssignedService(a.id); toast.success("Removed"); }} title="Remove">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="empty-table-cell">
+                    No assigned services for FY {selectedFY}
                   </td>
                 </tr>
-              );
-            })}
-            {filtered.length === 0 && (
-              <tr><td colSpan={10} style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>No assigned services for FY {selectedFY}</td></tr>
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+        </div>
+
         {/* Summary Row */}
         {filtered.length > 0 && (
-          <div style={{ padding: "12px 16px", background: "#F8FAFC", borderTop: "2px solid #E2E8F0", display: "flex", gap: 24, justifyContent: "flex-end" }}>
+          <div style={{ padding: "14px 20px", background: "#F8FAFC", borderTop: "2px solid #E2E8F0", display: "flex", gap: 24, justifyContent: "flex-end" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#059669" }}>Total Billed: {formatCurrency(filtered.reduce((s, a) => s + a.amountBilled, 0))}</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#D97706" }}>Total Received: {formatCurrency(filtered.reduce((s, a) => s + a.amountReceived, 0))}</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#DC2626" }}>Total Pending: {formatCurrency(filtered.reduce((s, a) => s + a.amountPending, 0))}</div>
@@ -126,7 +148,7 @@ export default function AssignPage() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title">{modal.editing ? "Edit Assignment" : "Assign Service to Client"}</div>
-              <button className="btn btn-ghost btn-icon" onClick={() => setModal({ open: false, editing: null })}>✕</button>
+              <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px" }} onClick={() => setModal({ open: false, editing: null })}>✕</button>
             </div>
             <div className="modal-body">
               <div className="form-grid-2">
@@ -157,7 +179,8 @@ export default function AssignPage() {
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
                     {availableSubServices.map(ss => (
                       <button key={ss.id} type="button"
-                        className={`btn btn-sm ${form.subServiceIds.includes(ss.id) ? "btn-primary" : "btn-secondary"}`}
+                        className={`btn-slds ${form.subServiceIds.includes(ss.id) ? "btn-slds-primary" : "btn-slds-secondary"}`}
+                        style={{ padding: "4px 10px", fontSize: 12 }}
                         onClick={() => toggleSubService(ss.id)}
                       >{ss.name}</button>
                     ))}
@@ -178,8 +201,8 @@ export default function AssignPage() {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setModal({ open: false, editing: null })}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSave}>{modal.editing ? "Save Changes" : "Assign"}</button>
+              <button className="btn-slds btn-slds-secondary" onClick={() => setModal({ open: false, editing: null })}>Cancel</button>
+              <button className="btn-slds btn-slds-primary" onClick={handleSave}>{modal.editing ? "Save Changes" : "Assign"}</button>
             </div>
           </div>
         </div>

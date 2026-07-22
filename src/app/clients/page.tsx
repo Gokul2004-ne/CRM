@@ -1,172 +1,337 @@
 "use client";
+import { useState } from "react";
 import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
-import { useState, useMemo } from "react";
-import { formatDate, getWhatsAppLink } from "@/lib/utils";
 import { Client } from "@/lib/types";
-import { Plus, Search, Pencil, Trash2, MessageCircle, Phone, Mail, Building } from "lucide-react";
+import {
+  Users, Search, Plus, Filter, Edit, Trash2, Phone, Mail,
+  Building, Copy, CheckCircle2, Shield
+} from "lucide-react";
 import { toast } from "sonner";
-
-const emptyClient = (): Client => ({
-  id: "", name: "", ownerName: "", referredBy: "", mobile: "", email: "",
-  registrationNo: "", panNo: "", gstNo: "", incorporationDate: "", acquiredDate: "",
-  address: "", notes: ""
-});
 
 export default function ClientsPage() {
   const { clients, addClient, updateClient, deleteClient } = useAppStore();
-  const [search, setSearch] = useState("");
-  const [modal, setModal] = useState<{ open: boolean; editing: Client | null }>({ open: false, editing: null });
-  const [form, setForm] = useState<Client>(emptyClient());
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState<string>("ALL");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
 
-  const filtered = useMemo(() =>
-    clients.filter(c =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.mobile.includes(search) ||
-      c.ownerName.toLowerCase().includes(search.toLowerCase()) ||
-      (c.gstNo || "").toLowerCase().includes(search.toLowerCase())
-    ), [clients, search]);
+  const [formData, setFormData] = useState<Partial<Client>>({
+    name: "",
+    type: "PROPRIETORSHIP",
+    pan: "",
+    gstin: "",
+    contactPerson: "",
+    phone: "",
+    email: "",
+    city: "",
+    status: "ACTIVE"
+  });
 
-  const openAdd = () => { setForm(emptyClient()); setModal({ open: true, editing: null }); };
-  const openEdit = (c: Client) => { setForm({ ...c }); setModal({ open: true, editing: c }); };
+  const handleOpenAdd = () => {
+    setEditingClient(null);
+    setFormData({
+      name: "",
+      type: "PROPRIETORSHIP",
+      pan: "",
+      gstin: "",
+      contactPerson: "",
+      phone: "",
+      email: "",
+      city: "",
+      status: "ACTIVE"
+    });
+    setIsModalOpen(true);
+  };
 
-  const handleSave = () => {
-    if (!form.name || !form.mobile) { toast.error("Name and mobile are required"); return; }
-    if (modal.editing) {
-      updateClient(form);
-      toast.success("Client updated successfully");
-    } else {
-      addClient({ ...form, id: `c${Date.now()}` });
-      toast.success("Client added successfully");
+  const handleOpenEdit = (client: Client) => {
+    setEditingClient(client);
+    setFormData(client);
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.phone) {
+      toast.error("Please fill in Client Name and Phone Number");
+      return;
     }
-    setModal({ open: false, editing: null });
+
+    if (editingClient) {
+      updateClient({ ...editingClient, ...formData } as Client);
+      toast.success("Client details updated successfully!");
+    } else {
+      const newClient: Client = {
+        id: `c_${Date.now()}`,
+        name: formData.name || "",
+        ownerName: formData.name || "",
+        type: formData.type || "PROPRIETORSHIP",
+        pan: formData.pan || "",
+        gstin: formData.gstin || "",
+        contactPerson: formData.contactPerson || "",
+        phone: formData.phone || "",
+        mobile: formData.phone || "",
+        email: formData.email || "",
+        city: formData.city || "",
+        status: formData.status || "ACTIVE",
+        createdAt: new Date().toISOString().split("T")[0]
+      };
+      addClient(newClient);
+      toast.success("New Client added successfully!");
+    }
+    setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    deleteClient(id);
-    setDeleteConfirm(null);
-    toast.success("Client deleted");
-  };
-
-  const F = (k: keyof Client) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setForm(f => ({ ...f, [k]: e.target.value }));
+  const filteredClients = clients.filter(c => {
+    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          c.pan?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          c.gstin?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (c.phone || c.mobile || "").includes(searchQuery);
+    const matchesFilter = filterType === "ALL" || c.type === filterType;
+    return matchesSearch && matchesFilter;
+  });
 
   return (
-    <AppShell title="Client Data" subtitle={`${clients.length} total clients`}>
-      <div className="data-table-wrapper">
-        <div className="data-table-header">
-          <div className="search-wrapper">
-            <Search className="search-icon" />
-            <input className="search-input" placeholder="Search clients..." value={search} onChange={e => setSearch(e.target.value)} />
+    <AppShell title="Client Directory" subtitle="Manage client accounts, statutory details, and tax registrations">
+      {/* Salesforce Page Banner */}
+      <div className="page-header-slds">
+        <div>
+          <div className="breadcrumb">
+            <span>Salesforce CRM</span>
+            <span>/</span>
+            <span className="current">Clients Directory</span>
           </div>
-          <button className="btn btn-primary" onClick={openAdd}><Plus size={15} /> Add Client</button>
+          <div className="page-title-slds">Clients Directory & Accounts</div>
+          <div className="page-subtitle-slds">
+            {clients.length} active client accounts registered under CA/CMA Firm practice.
+          </div>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Client Name</th>
-              <th>Owner Name</th>
-              <th>Mobile</th>
-              <th>Email</th>
-              <th>GST No</th>
-              <th>PAN No</th>
-              <th>Reg No</th>
-              <th>Acquired Date</th>
-              <th>Referred By</th>
-              <th>WhatsApp</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr><td colSpan={12} style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>No clients found</td></tr>
-            ) : filtered.map((c, i) => (
-              <tr key={c.id}>
-                <td style={{ color: "#94A3B8", fontWeight: 600 }}>{i + 1}</td>
-                <td>
-                  <div style={{ fontWeight: 700, color: "#0F172A" }}>{c.name}</div>
-                  {c.address && <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>{c.address}</div>}
-                </td>
-                <td>{c.ownerName}</td>
-                <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <Phone size={12} color="#94A3B8" /> {c.mobile}
-                  </div>
-                </td>
-                <td>
-                  {c.email && <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <Mail size={12} color="#94A3B8" /> {c.email}
-                  </div>}
-                </td>
-                <td><span style={{ fontFamily: "monospace", fontSize: 12 }}>{c.gstNo || "-"}</span></td>
-                <td><span style={{ fontFamily: "monospace", fontSize: 12 }}>{c.panNo || "-"}</span></td>
-                <td><span style={{ fontSize: 12 }}>{c.registrationNo || "-"}</span></td>
-                <td>{c.acquiredDate ? formatDate(c.acquiredDate) : "-"}</td>
-                <td>{c.referredBy || "-"}</td>
-                <td>
-                  <a href={getWhatsAppLink(c.mobile)} target="_blank" rel="noreferrer" className="wa-btn">
-                    <MessageCircle size={13} />
-                  </a>
-                </td>
-                <td>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button className="btn btn-ghost btn-icon btn-sm" onClick={() => openEdit(c)}><Pencil size={13} /></button>
-                    <button className="btn btn-danger btn-icon btn-sm" onClick={() => setDeleteConfirm(c.id)}><Trash2 size={13} /></button>
-                  </div>
-                </td>
-              </tr>
+        <button className="btn-slds btn-slds-primary" onClick={handleOpenAdd}>
+          <Plus size={16} />
+          <span>Add New Client</span>
+        </button>
+      </div>
+
+      {/* Zoho CRM Filter & Toolbar */}
+      <div className="card-slds">
+        <div className="table-toolbar-slds">
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#64748B" }}>Entity Filter:</span>
+            {["ALL", "PROPRIETORSHIP", "PARTNERSHIP", "PRIVATE_LIMITED", "INDIVIDUAL"].map((type) => (
+              <button
+                key={type}
+                className={`btn-slds ${filterType === type ? "btn-slds-primary" : "btn-slds-secondary"}`}
+                style={{ padding: "4px 10px", fontSize: 11 }}
+                onClick={() => setFilterType(type)}
+              >
+                {type.replace("_", " ")}
+              </button>
             ))}
-          </tbody>
-        </table>
-        <div style={{ padding: "10px 16px", fontSize: 12, color: "#94A3B8", borderTop: "1px solid #F1F5F9" }}>
-          Showing {filtered.length} of {clients.length} clients
+          </div>
+
+          <div className="search-input-wrapper">
+            <Search size={15} />
+            <input
+              type="text"
+              placeholder="Search by name, PAN, GSTIN, or phone..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Clients Table */}
+        <div className="table-wrapper-slds">
+          <table className="table-slds">
+            <thead>
+              <tr>
+                <th>Client Name</th>
+                <th>Entity Type</th>
+                <th>PAN / GSTIN</th>
+                <th>Contact Info</th>
+                <th>City</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredClients.length > 0 ? (
+                filteredClients.map((client) => (
+                  <tr key={client.id}>
+                    <td>
+                      <div style={{ fontWeight: 700, color: "#0F172A", fontSize: 14 }}>{client.name}</div>
+                      <div style={{ fontSize: 11, color: "#64748B" }}>Contact: {client.contactPerson || "N/A"}</div>
+                    </td>
+                    <td>
+                      <span className="badge-slds badge-new">
+                        {(client.type || "PROPRIETORSHIP").replace("_", " ")}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>PAN: {client.pan || "—"}</div>
+                      <div style={{ fontSize: 11, color: "#64748B" }}>GST: {client.gstin || "—"}</div>
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#0F172A" }}>
+                        <Phone size={13} color="#0176D3" />
+                        <span>{client.phone}</span>
+                      </div>
+                      {client.email && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#64748B", marginTop: 2 }}>
+                          <Mail size={12} />
+                          <span>{client.email}</span>
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ fontWeight: 500, color: "#475569" }}>
+                      {client.city || "Mumbai"}
+                    </td>
+                    <td>
+                      <span className={`badge-slds ${client.status === "ACTIVE" ? "badge-converted" : "badge-inactive"}`}>
+                        {client.status}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          className="btn-slds btn-slds-secondary"
+                          style={{ padding: "4px 8px", fontSize: 11 }}
+                          onClick={() => handleOpenEdit(client)}
+                        >
+                          <Edit size={13} />
+                        </button>
+                        <button
+                          className="btn-slds btn-slds-secondary"
+                          style={{ padding: "4px 8px", fontSize: 11, color: "#DC2626" }}
+                          onClick={() => {
+                            if (confirm(`Delete client ${client.name}?`)) {
+                              deleteClient(client.id);
+                              toast.success("Client deleted.");
+                            }
+                          }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: "center", padding: 28, color: "#64748B" }}>
+                    No clients found matching the query.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
-      {modal.open && (
-        <div className="modal-overlay" onClick={() => setModal({ open: false, editing: null })}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title">{modal.editing ? "Edit Client" : "Add New Client"}</div>
-              <button className="btn btn-ghost btn-icon" onClick={() => setModal({ open: false, editing: null })}>✕</button>
-            </div>
-            <div className="modal-body">
-              <div className="form-grid-2">
-                <div className="form-group"><label className="form-label">Client Name *</label><input className="form-input" value={form.name} onChange={F("name")} placeholder="Company / Individual name" /></div>
-                <div className="form-group"><label className="form-label">Owner Name *</label><input className="form-input" value={form.ownerName} onChange={F("ownerName")} placeholder="Proprietor / Director name" /></div>
-                <div className="form-group"><label className="form-label">Mobile *</label><input className="form-input" value={form.mobile} onChange={F("mobile")} placeholder="10-digit mobile number" /></div>
-                <div className="form-group"><label className="form-label">Email</label><input className="form-input" type="email" value={form.email} onChange={F("email")} placeholder="Email address" /></div>
-                <div className="form-group"><label className="form-label">GST Number</label><input className="form-input" value={form.gstNo} onChange={F("gstNo")} placeholder="15-digit GSTIN" /></div>
-                <div className="form-group"><label className="form-label">PAN Number</label><input className="form-input" value={form.panNo} onChange={F("panNo")} placeholder="AAAAA0000A" /></div>
-                <div className="form-group"><label className="form-label">Registration Number</label><input className="form-input" value={form.registrationNo} onChange={F("registrationNo")} placeholder="CIN / Registration No." /></div>
-                <div className="form-group"><label className="form-label">Referred By</label><input className="form-input" value={form.referredBy} onChange={F("referredBy")} placeholder="Who referred this client?" /></div>
-                <div className="form-group"><label className="form-label">Acquired Date</label><input className="form-input" type="date" value={form.acquiredDate} onChange={F("acquiredDate")} /></div>
-                <div className="form-group"><label className="form-label">Incorporation Date</label><input className="form-input" type="date" value={form.incorporationDate} onChange={F("incorporationDate")} /></div>
+      {/* Add / Edit Client Modal */}
+      {isModalOpen && (
+        <div className="command-palette-backdrop" onClick={() => setIsModalOpen(false)}>
+          <div className="command-palette-card" style={{ maxWidth: 540 }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: "18px 24px", borderBottom: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: "#0F172A" }}>
+                {editingClient ? "Edit Client Details" : "Create New Client Account"}
               </div>
-              <div className="form-group"><label className="form-label">Address</label><input className="form-input" value={form.address} onChange={F("address")} placeholder="Full address" /></div>
-              <div className="form-group"><label className="form-label">Notes</label><textarea className="form-textarea" value={form.notes} onChange={F("notes")} placeholder="Additional notes..." /></div>
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setModal({ open: false, editing: null })}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSave}>{modal.editing ? "Save Changes" : "Add Client"}</button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Delete Confirm */}
-      {deleteConfirm && (
-        <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: 400 }}>
-            <div className="modal-header"><div className="modal-title">Delete Client?</div></div>
-            <div className="modal-body"><p style={{ color: "#64748B", fontSize: 14 }}>This will permanently delete the client and all associated data. This action cannot be undone.</p></div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn btn-danger" onClick={() => handleDelete(deleteConfirm)}>Delete</button>
-            </div>
+            <form onSubmit={handleSubmit} style={{ padding: 24, display: "grid", gap: 16 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>
+                  Client / Firm Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="command-palette-input"
+                  style={{ borderRadius: 8, border: "1px solid #CBD5E1", padding: 10, fontSize: 14 }}
+                  placeholder="e.g. Acme Logistics Pvt Ltd"
+                  value={formData.name}
+                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>
+                    Entity Type
+                  </label>
+                  <select
+                    className="fy-selector-slds"
+                    style={{ width: "100%", background: "white", color: "#0F172A", border: "1px solid #CBD5E1", padding: 10 }}
+                    value={formData.type}
+                    onChange={e => setFormData({ ...formData, type: e.target.value as any })}
+                  >
+                    <option value="PROPRIETORSHIP">Proprietorship</option>
+                    <option value="PARTNERSHIP">Partnership</option>
+                    <option value="PRIVATE_LIMITED">Private Limited</option>
+                    <option value="LLP">LLP</option>
+                    <option value="INDIVIDUAL">Individual</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>
+                    Phone Number *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="command-palette-input"
+                    style={{ borderRadius: 8, border: "1px solid #CBD5E1", padding: 10, fontSize: 14 }}
+                    placeholder="9876543210"
+                    value={formData.phone}
+                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>
+                    PAN Number
+                  </label>
+                  <input
+                    type="text"
+                    className="command-palette-input"
+                    style={{ borderRadius: 8, border: "1px solid #CBD5E1", padding: 10, fontSize: 14 }}
+                    placeholder="ABCDE1234F"
+                    value={formData.pan}
+                    onChange={e => setFormData({ ...formData, pan: e.target.value.toUpperCase() })}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>
+                    GSTIN
+                  </label>
+                  <input
+                    type="text"
+                    className="command-palette-input"
+                    style={{ borderRadius: 8, border: "1px solid #CBD5E1", padding: 10, fontSize: 14 }}
+                    placeholder="27ABCDE1234F1Z5"
+                    value={formData.gstin}
+                    onChange={e => setFormData({ ...formData, gstin: e.target.value.toUpperCase() })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
+                <button
+                  type="button"
+                  className="btn-slds btn-slds-secondary"
+                  onClick={() => setIsModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-slds btn-slds-primary">
+                  {editingClient ? "Save Changes" : "Create Client"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
