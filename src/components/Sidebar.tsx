@@ -5,57 +5,86 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, MessageSquare, Briefcase, Layers,
   FileText, ClipboardList, Building2, Calendar, PenTool,
-  CreditCard, Settings, ChevronLeft, ChevronRight
+  CreditCard, Settings, ChevronLeft, ChevronRight, Shield
 } from "lucide-react";
-
-const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/clients", label: "Clients", icon: Users },
-  { href: "/leads", label: "WhatsApp Leads", icon: MessageSquare },
-  { href: "/services", label: "Services", icon: Briefcase },
-  { href: "/sub-services", label: "Sub Services", icon: Layers },
-  { href: "/required-docs", label: "Required Docs", icon: FileText },
-  { href: "/assign", label: "Assign Services", icon: ClipboardList },
-  { href: "/banking", label: "Banking", icon: Building2 },
-  { href: "/due-dates", label: "Due Dates", icon: Calendar },
-  { href: "/drafts", label: "Document Drafts", icon: PenTool },
-  { href: "/subscription", label: "Subscription", icon: CreditCard },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { sidebarCollapsed, setSidebarCollapsed } = useAppStore();
+  const { sidebarCollapsed, setSidebarCollapsed, clients, leads, assignedServices } = useAppStore();
+
+  const activeLeadsCount = leads.filter(l => l.status !== "CONVERTED").length;
+  const activeClientsCount = clients.length;
+
+  const categories = [
+    {
+      title: "Core CRM & Sales",
+      items: [
+        { href: "/", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/clients", label: "Clients", icon: Users, badge: activeClientsCount },
+        { href: "/leads", label: "WhatsApp Leads", icon: MessageSquare, badge: activeLeadsCount > 0 ? activeLeadsCount : undefined },
+      ]
+    },
+    {
+      title: "Operations & Services",
+      items: [
+        { href: "/services", label: "Services", icon: Briefcase },
+        { href: "/sub-services", label: "Sub Services", icon: Layers },
+        { href: "/required-docs", label: "Required Docs", icon: FileText },
+        { href: "/assign", label: "Assign Services", icon: ClipboardList, badge: assignedServices.length },
+      ]
+    },
+    {
+      title: "Financials & Billing",
+      items: [
+        { href: "/banking", label: "Banking & Ledger", icon: Building2 },
+        { href: "/due-dates", label: "Due Dates Grid", icon: Calendar },
+        { href: "/drafts", label: "Document Drafts", icon: PenTool },
+      ]
+    },
+    {
+      title: "Enterprise System",
+      items: [
+        { href: "/subscription", label: "Subscription", icon: CreditCard },
+        { href: "/settings", label: "Settings", icon: Settings },
+      ]
+    }
+  ];
 
   return (
     <aside className={`sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
-      {/* Logo */}
+      {/* Brand Logo Header */}
       <div className="sidebar-logo">
-        <div style={{ width: 36, height: 36, background: "rgba(255,255,255,0.2)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <span style={{ fontWeight: 900, fontSize: 16, color: "white" }}>C</span>
+        <div className="sidebar-logo-icon">
+          C
         </div>
         {!sidebarCollapsed && (
           <div className="sidebar-logo-text">
-            cma<span>expert</span>
+            crm<span>expert</span>
           </div>
         )}
       </div>
 
-      {/* Nav */}
-      <nav style={{ flex: 1, padding: "12px 0", overflowY: "auto" }}>
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
-          return (
-            <Link key={href} href={href} className={`nav-item ${isActive ? "active" : ""}`}>
-              <Icon className="nav-icon" />
-              <span className="nav-label">{label}</span>
-            </Link>
-          );
-        })}
+      {/* Categorized Navigation List */}
+      <nav style={{ flex: 1, padding: "8px 0", overflowY: "auto" }}>
+        {categories.map((cat) => (
+          <div key={cat.title}>
+            <div className="sidebar-category">{cat.title}</div>
+            {cat.items.map(({ href, label, icon: Icon, badge }) => {
+              const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
+              return (
+                <Link key={href} href={href} className={`nav-item ${isActive ? "active" : ""}`}>
+                  <Icon className="nav-icon" />
+                  <span className="nav-label">{label}</span>
+                  {badge !== undefined && <span className="nav-badge">{badge}</span>}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
-      {/* Collapse toggle */}
-      <div style={{ padding: "12px 8px", borderTop: "1px solid rgba(255,255,255,0.15)" }}>
+      {/* Sidebar Footer / Collapse Trigger */}
+      <div style={{ padding: "12px 10px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
         <button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
           className="nav-item"
@@ -63,7 +92,7 @@ export default function Sidebar() {
         >
           {sidebarCollapsed
             ? <ChevronRight className="nav-icon" />
-            : <><ChevronLeft className="nav-icon" /><span className="nav-label">Collapse</span></>
+            : <><ChevronLeft className="nav-icon" /><span className="nav-label">Collapse Rail</span></>
           }
         </button>
       </div>

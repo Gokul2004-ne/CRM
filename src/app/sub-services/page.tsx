@@ -36,7 +36,7 @@ export default function SubServicesPage() {
     <AppShell title="Sub Services" subtitle={`${subServices.length} sub-services configured`}>
       <div className="data-table-wrapper">
         <div className="data-table-header">
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <div className="toolbar-controls">
             <div className="search-wrapper">
               <Search className="search-icon" />
               <input className="search-input" placeholder="Search sub-services..." value={search} onChange={e => setSearch(e.target.value)} />
@@ -46,34 +46,54 @@ export default function SubServicesPage() {
               {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
-          <button className="btn btn-primary" onClick={openAdd}><Plus size={15} /> Add Sub Service</button>
+          <button className="btn-slds btn-slds-primary" onClick={openAdd}><Plus size={15} /> Add Sub Service</button>
         </div>
-        <table>
-          <thead>
-            <tr><th>#</th><th>Main Service</th><th>Sub Service Name</th><th>Due Date</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            {filtered.map((ss, i) => {
-              const parentService = services.find(s => s.id === ss.serviceId);
-              return (
-                <tr key={ss.id}>
-                  <td style={{ color: "#94A3B8", fontWeight: 600 }}>{i + 1}</td>
-                  <td>
-                    <span className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8" }}>{parentService?.name || "-"}</span>
-                  </td>
-                  <td style={{ fontWeight: 600, color: "#0F172A" }}>{ss.name}</td>
-                  <td>{ss.dueDate ? formatDate(ss.dueDate) : "-"}</td>
-                  <td>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button className="btn btn-ghost btn-icon btn-sm" onClick={() => openEdit(ss)}><Pencil size={13} /></button>
-                      <button className="btn btn-danger btn-icon btn-sm" onClick={() => { deleteSubService(ss.id); toast.success("Deleted"); }}><Trash2 size={13} /></button>
-                    </div>
+
+        <div className="table-scroll-container">
+          <table>
+            <thead>
+              <tr>
+                <th className="col-num">#</th>
+                <th>Main Service</th>
+                <th>Sub Service Name</th>
+                <th>Due Date</th>
+                <th className="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((ss, i) => {
+                const parentService = services.find(s => s.id === ss.serviceId);
+                return (
+                  <tr key={ss.id}>
+                    <td className="col-num">{i + 1}</td>
+                    <td>
+                      <span className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8" }}>{parentService?.name || "-"}</span>
+                    </td>
+                    <td style={{ fontWeight: 600, color: "#0F172A" }}>{ss.name}</td>
+                    <td>{ss.dueDate ? formatDate(ss.dueDate) : "-"}</td>
+                    <td className="col-actions">
+                      <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
+                        <button className="btn-slds btn-slds-secondary" style={{ padding: "5px 8px" }} onClick={() => openEdit(ss)} title="Edit">
+                          <Pencil size={13} />
+                        </button>
+                        <button className="btn-slds btn-slds-secondary" style={{ padding: "5px 8px", color: "#DC2626", borderColor: "#FCA5A5" }} onClick={() => { deleteSubService(ss.id); toast.success("Deleted"); }} title="Delete">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="empty-table-cell">
+                    No sub-services found
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {modal.open && (
@@ -81,7 +101,7 @@ export default function SubServicesPage() {
           <div className="modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title">{modal.editing ? "Edit Sub Service" : "Add Sub Service"}</div>
-              <button className="btn btn-ghost btn-icon" onClick={() => setModal({ open: false, editing: null })}>✕</button>
+              <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px" }} onClick={() => setModal({ open: false, editing: null })}>✕</button>
             </div>
             <div className="modal-body">
               <div className="form-group"><label className="form-label">Main Service *</label>
@@ -98,8 +118,8 @@ export default function SubServicesPage() {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setModal({ open: false, editing: null })}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSave}>{modal.editing ? "Save" : "Add"}</button>
+              <button className="btn-slds btn-slds-secondary" onClick={() => setModal({ open: false, editing: null })}>Cancel</button>
+              <button className="btn-slds btn-slds-primary" onClick={handleSave}>{modal.editing ? "Save" : "Add"}</button>
             </div>
           </div>
         </div>

@@ -41,7 +41,7 @@ export default function RequiredDocsPage() {
     <AppShell title="Required Documents" subtitle={`${requiredDocs.length} documents configured`}>
       <div className="data-table-wrapper">
         <div className="data-table-header">
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <div className="toolbar-controls">
             <div className="search-wrapper">
               <Search className="search-icon" />
               <input className="search-input" placeholder="Search documents..." value={search} onChange={e => setSearch(e.target.value)} />
@@ -51,38 +51,59 @@ export default function RequiredDocsPage() {
               {subServices.map(ss => <option key={ss.id} value={ss.id}>{ss.name}</option>)}
             </select>
           </div>
-          <button className="btn btn-primary" onClick={openAdd}><Plus size={15} /> Add Document</button>
+          <button className="btn-slds btn-slds-primary" onClick={openAdd}><Plus size={15} /> Add Document</button>
         </div>
-        <table>
-          <thead>
-            <tr><th>#</th><th>Main Service</th><th>Sub Service</th><th>Document Name</th><th>Mandatory</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            {filtered.map((d, i) => {
-              const { ss, svc } = getSSInfo(d.subServiceId);
-              return (
-                <tr key={d.id}>
-                  <td style={{ color: "#94A3B8", fontWeight: 600 }}>{i + 1}</td>
-                  <td><span className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8" }}>{svc?.name || "-"}</span></td>
-                  <td><span className="chip" style={{ background: "#F0FDF4", color: "#15803D" }}>{ss?.name || "-"}</span></td>
-                  <td style={{ fontWeight: 600, color: "#0F172A" }}>{d.name}</td>
-                  <td>
-                    {d.isMandatory
-                      ? <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#DC2626", fontWeight: 600, fontSize: 13 }}><CheckCircle size={15} /> Mandatory</span>
-                      : <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#94A3B8", fontSize: 13 }}><Circle size={15} /> Optional</span>
-                    }
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button className="btn btn-ghost btn-icon btn-sm" onClick={() => openEdit(d)}><Pencil size={13} /></button>
-                      <button className="btn btn-danger btn-icon btn-sm" onClick={() => { deleteRequiredDoc(d.id); toast.success("Deleted"); }}><Trash2 size={13} /></button>
-                    </div>
+
+        <div className="table-scroll-container">
+          <table>
+            <thead>
+              <tr>
+                <th className="col-num">#</th>
+                <th>Main Service</th>
+                <th>Sub Service</th>
+                <th>Document Name</th>
+                <th>Mandatory</th>
+                <th className="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((d, i) => {
+                const { ss, svc } = getSSInfo(d.subServiceId);
+                return (
+                  <tr key={d.id}>
+                    <td className="col-num">{i + 1}</td>
+                    <td><span className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8" }}>{svc?.name || "-"}</span></td>
+                    <td><span className="chip" style={{ background: "#F0FDF4", color: "#15803D" }}>{ss?.name || "-"}</span></td>
+                    <td style={{ fontWeight: 600, color: "#0F172A" }}>{d.name}</td>
+                    <td>
+                      {d.isMandatory
+                        ? <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "#DC2626", fontWeight: 600, fontSize: 13 }}><CheckCircle size={15} /> Mandatory</span>
+                        : <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "#94A3B8", fontSize: 13 }}><Circle size={15} /> Optional</span>
+                      }
+                    </td>
+                    <td className="col-actions">
+                      <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
+                        <button className="btn-slds btn-slds-secondary" style={{ padding: "5px 8px" }} onClick={() => openEdit(d)} title="Edit">
+                          <Pencil size={13} />
+                        </button>
+                        <button className="btn-slds btn-slds-secondary" style={{ padding: "5px 8px", color: "#DC2626", borderColor: "#FCA5A5" }} onClick={() => { deleteRequiredDoc(d.id); toast.success("Deleted"); }} title="Delete">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="empty-table-cell">
+                    No documents found
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {modal.open && (
@@ -90,7 +111,7 @@ export default function RequiredDocsPage() {
           <div className="modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title">{modal.editing ? "Edit Document" : "Add Required Document"}</div>
-              <button className="btn btn-ghost btn-icon" onClick={() => setModal({ open: false, editing: null })}>✕</button>
+              <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px" }} onClick={() => setModal({ open: false, editing: null })}>✕</button>
             </div>
             <div className="modal-body">
               <div className="form-group"><label className="form-label">Sub Service *</label>
@@ -113,8 +134,8 @@ export default function RequiredDocsPage() {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setModal({ open: false, editing: null })}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSave}>{modal.editing ? "Save" : "Add"}</button>
+              <button className="btn-slds btn-slds-secondary" onClick={() => setModal({ open: false, editing: null })}>Cancel</button>
+              <button className="btn-slds btn-slds-primary" onClick={handleSave}>{modal.editing ? "Save" : "Add"}</button>
             </div>
           </div>
         </div>

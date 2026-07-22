@@ -6,19 +6,19 @@ import { toast } from "sonner";
 
 export default function SettingsPage() {
   const [tab, setTab] = useState("firm");
-  const [firmName, setFirmName] = useState("CMAExpert Advisory LLP");
+  const [firmName, setFirmName] = useState("CRMExpert Advisory LLP");
   const [ownerName, setOwnerName] = useState("CA Gokulnath");
-  const [email, setEmail] = useState("info@cmaexpert.in");
+  const [email, setEmail] = useState("info@crmexpert.in");
   const [mobile, setMobile] = useState("9876543210");
   const [address, setAddress] = useState("Mumbai, Maharashtra");
   const [fyStart, setFyStart] = useState("4");
   const [currency, setCurrency] = useState("INR");
-  const [primaryColor, setPrimaryColor] = useState("#E8520A");
+  const [primaryColor, setPrimaryColor] = useState("#0176D3");
 
   const handleSave = () => toast.success("Settings saved successfully!");
 
   return (
-    <AppShell title="Settings" subtitle="Configure your CMAExpert workspace">
+    <AppShell title="Settings" subtitle="Configure your CRMExpert workspace">
       <div style={{ display: "flex", gap: 20 }}>
         {/* Sidebar Tabs */}
         <div style={{ width: 200, flexShrink: 0 }}>
