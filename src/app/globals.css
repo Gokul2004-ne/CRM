@@ -963,6 +963,11 @@ input[type="number"] {
   overflow: hidden;
 }
 
+.command-palette-card form {
+  overflow-y: auto;
+  max-height: calc(88vh - 65px);
+}
+
 .command-palette-input {
   width: 100%;
   padding: 10px 12px;

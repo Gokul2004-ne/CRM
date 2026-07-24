@@ -29,6 +29,8 @@ export interface Client {
   panNo?: string;
   gstin?: string;
   gstNo?: string;
+  gstPortalId?: string;
+  gstPortalPassword?: string;
   contactPerson?: string;
   city?: string;
   status?: string;
