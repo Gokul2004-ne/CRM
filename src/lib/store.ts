@@ -322,6 +322,22 @@ export const useAppStore = create<AppState>()(
         removeDraftFromSupabase(id);
       },
     }),
-    { name: "crmexpert-store" }
+    {
+      name: "crmexpert-store-v2",
+      version: 2,
+      migrate: () => ({
+        clients: [],
+        services: [],
+        subServices: [],
+        requiredDocs: [],
+        assignedServices: [],
+        bankingEntries: [],
+        leads: [],
+        drafts: [],
+        selectedFY: getCurrentFY(),
+        sidebarCollapsed: false,
+        isLoadingSupabase: false,
+      }),
+    }
   )
 );
