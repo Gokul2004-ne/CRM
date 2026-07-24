@@ -288,7 +288,7 @@ export default function ClientsPage() {
               <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px" }} onClick={() => setIsModalOpen(false)}>✕</button>
             </div>
 
-            <form onSubmit={handleSubmit} style={{ padding: 24, display: "grid", gap: 16 }}>
+            <form onSubmit={handleSubmit} style={{ padding: 24, display: "grid", gap: 16, overflowY: "auto", maxHeight: "calc(85vh - 65px)" }}>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>
                   Client / Firm Name *
