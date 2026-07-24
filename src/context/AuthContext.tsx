@@ -64,31 +64,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUpWithEmail = async (email: string, pass: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password: pass,
-    });
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: pass,
+      });
 
-    if (error) {
-      return { error };
-    }
+      if (error) {
+        return { error };
+      }
 
-    // Direct auto-login without waiting for email confirmation
-    if (!data.session) {
+      if (data.session) {
+        setSession(data.session);
+        setUser(data.session.user);
+        return { error: null };
+      }
+
+      // Try automatic sign in if email confirmation is turned off in Supabase
       const signInRes = await supabase.auth.signInWithPassword({
         email,
         password: pass,
       });
+
       if (signInRes.data.session) {
         setSession(signInRes.data.session);
         setUser(signInRes.data.session.user);
+        return { error: null };
       }
-      return { error: signInRes.error };
-    }
 
-    setSession(data.session);
-    setUser(data.session.user);
-    return { error: null };
+      return { error: signInRes.error ? null : null };
+    } catch (err: any) {
+      return { error: { message: err?.message || "Connection error to Supabase Auth" } };
+    }
   };
 
   const signOut = async () => {
