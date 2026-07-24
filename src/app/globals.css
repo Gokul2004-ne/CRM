@@ -30,6 +30,18 @@ html, body {
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
 
+/* Hide up/down spinner arrows on all numerical inputs across the website */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* Global App Shell Layout */
 .app-shell {
   display: flex;
@@ -40,7 +52,7 @@ html, body {
 /* Sidebar - Salesforce / Zoho Obsidian Rail */
 .sidebar {
   width: 250px;
-  min-height: 100vh;
+  height: 100vh;
   background: #0F172A;
   border-right: 1px solid #1E293B;
   display: flex;
@@ -52,37 +64,39 @@ html, body {
   z-index: 50;
   transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 4px 0 24px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
 }
 
 .sidebar.collapsed { width: 72px; }
 
 .sidebar-logo {
-  height: 64px;
+  height: 54px;
   padding: 0 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   gap: 12px;
   background: #0B132B;
+  flex-shrink: 0;
 }
 
 .sidebar-logo-icon {
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   background: linear-gradient(135deg, #0176D3 0%, #00A88F 100%);
-  border-radius: 10px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
   font-weight: 800;
-  font-size: 17px;
+  font-size: 15px;
   box-shadow: 0 4px 12px rgba(1, 118, 211, 0.35);
   flex-shrink: 0;
 }
 
 .sidebar-logo-text {
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 800;
   color: white;
   letter-spacing: -0.5px;
@@ -97,8 +111,8 @@ html, body {
 
 /* Sidebar Category Headers */
 .sidebar-category {
-  padding: 16px 16px 6px;
-  font-size: 10.5px;
+  padding: 10px 14px 4px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -114,21 +128,21 @@ html, body {
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
+  gap: 10px;
+  padding: 7px 12px;
   color: #94A3B8;
   text-decoration: none;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
-  border-radius: 8px;
-  margin: 2px 10px;
+  border-radius: 6px;
+  margin: 1px 8px;
   transition: all 0.15s ease-in-out;
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
   border: none;
   background: none;
-  width: calc(100% - 20px);
+  width: calc(100% - 16px);
   text-align: left;
   position: relative;
 }
@@ -609,6 +623,7 @@ html, body {
   align-items: center;
   justify-content: center;
   padding: 20px;
+  overflow-y: auto;
 }
 
 .modal {
@@ -616,6 +631,9 @@ html, body {
   border-radius: 16px;
   width: 100%;
   max-width: 540px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35);
   border: 1px solid #E2E8F0;
   overflow: hidden;
@@ -627,6 +645,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .modal-title {
@@ -637,6 +656,8 @@ html, body {
 
 .modal-body {
   padding: 20px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .modal-footer {
@@ -647,6 +668,7 @@ html, body {
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .form-group {
@@ -925,6 +947,7 @@ html, body {
   align-items: center;
   justify-content: center;
   padding: 20px;
+  overflow-y: auto;
 }
 
 .command-palette-card {
@@ -932,6 +955,9 @@ html, body {
   border-radius: 16px;
   width: 100%;
   max-width: 540px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35);
   border: 1px solid #E2E8F0;
   overflow: hidden;

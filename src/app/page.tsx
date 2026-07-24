@@ -1,20 +1,22 @@
 "use client";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
-import { formatCurrency, getDaysRemaining } from "@/lib/utils";
+import { formatCurrency, getDaysRemaining, formatDate, getWhatsAppLink } from "@/lib/utils";
 import {
   Users, Briefcase, DollarSign, Clock, MessageCircle,
-  TrendingUp, TrendingDown, ArrowUpRight, Filter, Download,
-  Layers, AlertTriangle, ShieldCheck, Search
+  TrendingUp, Download, Filter, Search, AlertTriangle, ShieldCheck, ArrowUpDown, ArrowUp, ArrowDown
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from "recharts";
 
+import PaymentAndDeliveryCell from "@/components/PaymentAndDeliveryCell";
+
 export default function Dashboard() {
-  const { clients, services, assignedServices, selectedFY } = useAppStore();
+  const { clients, services, subServices, assignedServices, selectedFY } = useAppStore();
   const [searchTerm, setSearchTerm] = useState("");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   const totalClients = clients.length;
   const totalServices = services.length;
@@ -34,18 +36,32 @@ export default function Dashboard() {
     };
   });
 
-  const dueServices = assignedServices.slice(0, 8);
-  const filteredDueServices = dueServices.filter(item => {
-    const client = clients.find(c => c.id === item.clientId);
-    const service = services.find(s => s.id === item.serviceId);
-    const name = client?.name || "";
-    const svcName = service?.name || "";
-    return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           svcName.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  // Section 8: Dynamic sorting & Proximity color coding
+  // Sort items closer to (or past) the due date to the top (Ascending default), with toggle support
+  const sortedDueServices = useMemo(() => {
+    return assignedServices
+      .filter(item => item.dueDate)
+      .map(item => {
+        const client = clients.find(c => c.id === item.clientId);
+        const service = services.find(s => s.id === item.serviceId);
+        const daysLeft = getDaysRemaining(item.dueDate!);
+        return { ...item, client, service, daysLeft };
+      })
+      .filter(item => {
+        const name = item.client?.name || "";
+        const svcName = item.service?.name || "";
+        return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+               svcName.toLowerCase().includes(searchTerm.toLowerCase());
+      })
+      .sort((a, b) => {
+        const timeA = new Date(a.dueDate!).getTime();
+        const timeB = new Date(b.dueDate!).getTime();
+        return sortOrder === "asc" ? timeA - timeB : timeB - timeA;
+      });
+  }, [assignedServices, clients, services, searchTerm, sortOrder]);
 
   return (
-    <AppShell title="Dashboard" subtitle={`Financial Year ${selectedFY} Overview & Operational Insights`}>
+    <AppShell title="Dashboard" subtitle={`Financial Year ${selectedFY} Overview & Compliance Priority Grid`}>
       {/* Salesforce Welcome Banner Header */}
       <div className="page-header-slds">
         <div>
@@ -60,11 +76,11 @@ export default function Dashboard() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <button className="btn-slds btn-slds-secondary">
+          <button type="button" className="btn-slds btn-slds-secondary">
             <Download size={15} />
             <span>Export Report</span>
           </button>
-          <button className="btn-slds btn-slds-primary">
+          <button type="button" className="btn-slds btn-slds-primary">
             <TrendingUp size={15} />
             <span>Billing Insights</span>
           </button>
@@ -155,7 +171,7 @@ export default function Dashboard() {
               April {selectedFY.split("-")[0]} – March 20{selectedFY.split("-")[1]} performance chart
             </div>
           </div>
-          <button className="btn-slds btn-slds-secondary" style={{ padding: "5px 10px", fontSize: 12 }}>
+          <button type="button" className="btn-slds btn-slds-secondary" style={{ padding: "5px 10px", fontSize: 12 }}>
             <Filter size={13} />
             <span>FY Breakdown</span>
           </button>
@@ -176,22 +192,47 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Zoho CRM Upcoming Due Dates Table */}
+      {/* Section 8: Upcoming Service Due Dates with Proximity Color Coding & Sort Toggle */}
       <div className="card-slds">
-        <div className="table-toolbar-slds">
+        <div className="table-toolbar-slds" style={{ flexWrap: "wrap", gap: 12 }}>
           <div>
-            <div className="card-title-slds">Upcoming Service Due Dates</div>
-            <div style={{ fontSize: 12, color: "#64748B" }}>Compliance deadlines sorted by nearest target date</div>
+            <div className="card-title-slds" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span>Upcoming Compliance Due Dates</span>
+              <span style={{ fontSize: 11, background: "#EFF6FF", color: "#1D4ED8", padding: "2px 8px", borderRadius: 12, fontWeight: 700 }}>
+                Dynamic Priority
+              </span>
+            </div>
+            <div style={{ fontSize: 12, color: "#64748B" }}>
+              🟢 Green (&gt;15 days) • 🟡 Yellow (10–15 days) • 🔴 Red (≤9 days / Overdue)
+            </div>
           </div>
 
-          <div className="search-input-wrapper">
-            <Search size={15} />
-            <input
-              type="text"
-              placeholder="Search due dates by client or service..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            {/* Sort Toggle Button (Ascending / Descending per Section 8) */}
+            <button
+              type="button"
+              className="btn-slds btn-slds-secondary"
+              style={{ padding: "6px 12px", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}
+              onClick={(e) => {
+                e.preventDefault();
+                setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+              }}
+              title="Toggle Ascending/Descending Sort"
+            >
+              <ArrowUpDown size={14} />
+              <span>Sort: {sortOrder === "asc" ? "Nearest First (Asc)" : "Furthest First (Desc)"}</span>
+              {sortOrder === "asc" ? <ArrowUp size={12} color="#059669" /> : <ArrowDown size={12} color="#DC2626" />}
+            </button>
+
+            <div className="search-input-wrapper">
+              <Search size={15} />
+              <input
+                type="text"
+                placeholder="Search due dates by client or service..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
@@ -200,44 +241,69 @@ export default function Dashboard() {
             <thead>
               <tr>
                 <th>Client Name</th>
-                <th>Assigned Service</th>
+                <th>Main Service & Sub-Services</th>
                 <th>Target Due Date</th>
-                <th>Total Fee</th>
-                <th>Status</th>
+                <th>Payment & Service Delivery Status</th>
+                <th>Proximity Status</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              {filteredDueServices.length > 0 ? (
-                filteredDueServices.map((item) => {
-                  const client = clients.find(c => c.id === item.clientId);
-                  const service = services.find(s => s.id === item.serviceId);
-                  const daysLeft = getDaysRemaining(item.dueDate || "2026-07-31");
+              {sortedDueServices.length > 0 ? (
+                sortedDueServices.map((item) => {
+                  const daysLeft = item.daysLeft;
                   const isOverdue = daysLeft < 0;
+                  const phoneNum = item.client?.phone || item.client?.mobile || "";
+                  const assignedSubs = subServices.filter(ss => item.subServiceIds?.includes(ss.id));
+
+                  let badgeStyle = { background: "#DCFCE7", color: "#166534", border: "1px solid #86EFAC" }; // Green
+                  let badgeText = `🟢 Green • ${daysLeft}d remaining`;
+
+                  if (isOverdue) {
+                    badgeStyle = { background: "#FEE2E2", color: "#991B1B", border: "1px solid #FCA5A5" }; // Red Overdue
+                    badgeText = `🔴 Red • Overdue (${Math.abs(daysLeft)}d ago)`;
+                  } else if (daysLeft <= 9) {
+                    badgeStyle = { background: "#FEE2E2", color: "#991B1B", border: "1px solid #FCA5A5" }; // Red Critical
+                    badgeText = `🔴 Red • ${daysLeft}d (Critical)`;
+                  } else if (daysLeft <= 15) {
+                    badgeStyle = { background: "#FEF3C7", color: "#92400E", border: "1px solid #FCD34D" }; // Yellow Approaching
+                    badgeText = `🟡 Yellow • ${daysLeft}d (Approaching)`;
+                  }
 
                   return (
-                    <tr key={item.id}>
-                      <td style={{ fontWeight: 600, color: "#0F172A" }}>
-                        {client?.name || "Acme Logistics Ltd"}
-                      </td>
-                      <td style={{ color: "#334155" }}>
-                        {service?.name || "GST Monthly Filing"}
-                      </td>
-                      <td style={{ fontWeight: 500 }}>
-                        {item.dueDate || "2026-07-31"}
-                      </td>
+                    <tr key={item.id} style={{ background: isOverdue ? "#FFF5F5" : daysLeft <= 9 ? "#FFFAF0" : "transparent" }}>
                       <td style={{ fontWeight: 700, color: "#0F172A" }}>
-                        {formatCurrency(item.totalFee || 5000)}
+                        {item.client?.name || "Acme Logistics Ltd"}
                       </td>
                       <td>
-                        <span className={`badge-slds ${isOverdue ? "badge-overdue" : daysLeft <= 5 ? "badge-pending" : "badge-active"}`}>
-                          {isOverdue ? `Overdue (${Math.abs(daysLeft)}d)` : `${daysLeft} days left`}
+                        <div style={{ fontWeight: 800, color: "#0176D3" }}>{item.service?.name || "GST Compliance"}</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                          {assignedSubs.map(ss => (
+                            <span key={ss.id} className="chip" style={{ background: "#F1F5F9", color: "#334155", fontSize: 11 }}>
+                              {ss.name}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={{ fontWeight: 600, color: "#0F172A" }}>
+                        {formatDate(item.dueDate!)}
+                      </td>
+                      <td>
+                        <PaymentAndDeliveryCell
+                          amountBilled={item.amountBilled || item.totalFee || 0}
+                          amountReceived={item.amountReceived || item.paidAmount || 0}
+                          deliveryStatus={item.status || "PENDING"}
+                        />
+                      </td>
+                      <td>
+                        <span className="badge-slds" style={{ ...badgeStyle, padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700 }}>
+                          {badgeText}
                         </span>
                       </td>
                       <td>
-                        {client?.phone && (
+                        {phoneNum && (
                           <a
-                            href={`https://wa.me/91${client.phone}?text=Hello%20${encodeURIComponent(client.name)},%20this%20is%20a%20reminder%20for%20your%20due%20date.`}
+                            href={getWhatsAppLink(phoneNum, `Hello ${item.client?.name}, this is a reminder regarding ${item.service?.name} due on ${formatDate(item.dueDate!)}.`)}
                             target="_blank"
                             rel="noreferrer"
                             className="btn-slds btn-slds-success"
@@ -265,3 +331,4 @@ export default function Dashboard() {
     </AppShell>
   );
 }
+

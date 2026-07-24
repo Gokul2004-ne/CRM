@@ -20,12 +20,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                  for (var registration of registrations) {
-                    registration.unregister();
-                  }
-                });
+              if (typeof window !== 'undefined') {
+                if ('scrollRestoration' in window.history) {
+                  window.history.scrollRestoration = 'manual';
+                }
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for (var registration of registrations) {
+                      registration.unregister();
+                    }
+                  });
+                }
               }
             `,
           }}
