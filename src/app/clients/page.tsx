@@ -403,6 +403,41 @@ export default function ClientsPage() {
                 </div>
               </div>
 
+              {/* GST Portal Login Credentials */}
+              <div style={{ padding: "12px 14px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#166534", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                  🔐 GST Portal Login Credentials
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>
+                      GST Portal User ID
+                    </label>
+                    <input
+                      type="text"
+                      className="command-palette-input"
+                      style={{ borderRadius: 8, border: "1px solid #BBF7D0", padding: 10, fontSize: 14, background: "white" }}
+                      placeholder="GST portal username"
+                      value={formData.gstPortalId || ""}
+                      onChange={e => setFormData({ ...formData, gstPortalId: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>
+                      GST Portal Password
+                    </label>
+                    <input
+                      type="text"
+                      className="command-palette-input"
+                      style={{ borderRadius: 8, border: "1px solid #BBF7D0", padding: 10, fontSize: 14, background: "white" }}
+                      placeholder="GST portal password"
+                      value={formData.gstPortalPassword || ""}
+                      onChange={e => setFormData({ ...formData, gstPortalPassword: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
                 <button
                   type="button"
@@ -509,6 +544,19 @@ export default function ClientsPage() {
                       </div>
                       <div style={{ marginTop: 4, fontSize: 13 }}>
                         <span style={{ color: "#64748B" }}>Total Uploaded Documents:</span> <strong style={{ color: "#059669" }}>{viewingClient.documentCount || viewingClient.documents?.length || 0} Docs</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* GST Portal Credentials Display */}
+                  <div className="section-card" style={{ padding: 16, background: "#F0FDF4", borderColor: "#BBF7D0" }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", textTransform: "uppercase" }}>🔐 GST Portal Login Credentials</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 8 }}>
+                      <div style={{ fontSize: 13 }}>
+                        <span style={{ color: "#64748B" }}>User ID / Username:</span> <strong style={{ color: "#0F172A", marginLeft: 6 }}>{viewingClient.gstPortalId || "Not set"}</strong>
+                      </div>
+                      <div style={{ fontSize: 13 }}>
+                        <span style={{ color: "#64748B" }}>Password:</span> <strong style={{ color: "#0F172A", marginLeft: 6 }}>{viewingClient.gstPortalPassword || "Not set"}</strong>
                       </div>
                     </div>
                   </div>
