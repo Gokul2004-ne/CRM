@@ -551,7 +551,7 @@ export default function AppShell({ children, title, subtitle }: AppShellProps) {
   return (
     <div className="app-shell">
       <Sidebar />
-      <div className={`main-content ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+      <div className="main-content">
         <Topbar title={title} subtitle={subtitle} />
         <div className="page-wrapper">{children}</div>
       </div>

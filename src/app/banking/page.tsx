@@ -7,13 +7,37 @@ import { Pencil, Check, X, Download } from "lucide-react";
 import { toast } from "sonner";
 
 export default function BankingPage() {
-  const { bankingEntries, clients, services, subServices, selectedFY, updateBankingEntry } = useAppStore();
+  const { bankingEntries, assignedServices, clients, services, subServices, selectedFY, updateBankingEntry } = useAppStore();
   const [editId, setEditId] = useState<string | null>(null);
   const [editRemark, setEditRemark] = useState("");
   const [editReceived, setEditReceived] = useState(0);
 
-  const filtered = useMemo(() =>
-    bankingEntries.filter(b => b.financialYear === selectedFY), [bankingEntries, selectedFY]);
+  const filtered = useMemo(() => {
+    const list = [...bankingEntries.filter(b => b.financialYear === selectedFY)];
+
+    // Automatically map any assigned services for this FY that do not have a banking entry yet
+    assignedServices
+      .filter(a => a.financialYear === selectedFY)
+      .forEach(a => {
+        const hasEntry = list.some(b => b.clientId === a.clientId && b.serviceId === a.serviceId);
+        if (!hasEntry) {
+          list.push({
+            id: `b-${a.id}`,
+            financialYear: a.financialYear,
+            clientId: a.clientId,
+            serviceId: a.serviceId,
+            subServiceId: a.subServiceIds?.[0] || null,
+            amountBilled: a.amountBilled || 0,
+            amountReceived: a.amountReceived || 0,
+            amountPending: Math.max(0, (a.amountBilled || 0) - (a.amountReceived || 0)),
+            paymentStatus: (a.amountReceived || 0) >= (a.amountBilled || 0) && (a.amountBilled || 0) > 0 ? "PAID" : (a.amountReceived || 0) > 0 ? "PARTIAL" : "PENDING",
+            remark: "Auto-synced from Assign Services"
+          });
+        }
+      });
+
+    return list;
+  }, [bankingEntries, assignedServices, selectedFY]);
 
   const totals = useMemo(() => ({
     billed: filtered.reduce((s, b) => s + b.amountBilled, 0),

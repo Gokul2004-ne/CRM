@@ -4,6 +4,18 @@ export type Recurrence = "MONTHLY" | "QUARTERLY" | "ANNUAL" | "CUSTOM";
 export type LeadStatus = "LEAD" | "CONVERTED";
 export type ServiceStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "OVERDUE";
 
+export interface ClientDocument {
+  id: string;
+  clientId: string;
+  name: string;
+  type: string;
+  category?: string;
+  uploadDate: string;
+  fileUrl?: string;
+  size?: string;
+  status?: "RECEIVED" | "PENDING" | "VERIFIED";
+}
+
 export interface Client {
   id: string;
   name: string;
@@ -25,6 +37,8 @@ export interface Client {
   acquiredDate?: string;
   address?: string;
   notes?: string;
+  documentCount?: number;
+  documents?: ClientDocument[];
   createdAt?: string;
 }
 
@@ -41,6 +55,7 @@ export interface SubService {
   id: string;
   serviceId: string;
   name: string;
+  serviceIds?: string[]; // Grouped services under sub-service
   dueDate?: string;
 }
 
@@ -49,6 +64,9 @@ export interface RequiredDoc {
   subServiceId: string;
   name: string;
   isMandatory: boolean;
+  fileName?: string;
+  fileUrl?: string;
+  fileType?: string;
 }
 
 export interface AssignedService {
@@ -76,6 +94,7 @@ export interface BankingEntry {
   amountBilled: number;
   amountReceived: number;
   amountPending: number;
+  paymentStatus?: string;
   remark?: string;
 }
 

@@ -24,13 +24,14 @@ export default function Topbar({ title, subtitle }: TopbarProps) {
 
   return (
     <>
-      <header className={`topbar ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+      <header className="topbar">
         <div className="topbar-left">
           {/* Salesforce 9-Dot App Launcher */}
           <button
+            type="button"
             className="app-launcher-btn"
             title="Salesforce App Launcher"
-            onClick={() => setIsAppLauncherOpen(!isAppLauncherOpen)}
+            onClick={(e) => { e.preventDefault(); setIsAppLauncherOpen(!isAppLauncherOpen); }}
           >
             <Grid size={18} />
           </button>
@@ -53,9 +54,10 @@ export default function Topbar({ title, subtitle }: TopbarProps) {
           {/* Quick Create Dropdown */}
           <div style={{ position: "relative" }}>
             <button
+              type="button"
               className="btn-slds btn-slds-primary"
               style={{ padding: "6px 12px", fontSize: 13 }}
-              onClick={() => setIsQuickCreateOpen(!isQuickCreateOpen)}
+              onClick={(e) => { e.preventDefault(); setIsQuickCreateOpen(!isQuickCreateOpen); }}
             >
               <Plus size={15} />
               <span>Quick Create</span>

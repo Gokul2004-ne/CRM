@@ -132,7 +132,16 @@ export default function ServicesPage() {
                   <input className="form-input" type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} />
                 </div>
                 <div className="form-group"><label className="form-label">Price (₹)</label>
-                  <input className="form-input" type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: Number(e.target.value) }))} placeholder="0" />
+                  <input
+                    className="form-input"
+                    type="number"
+                    value={form.price || ""}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(f => ({ ...f, price: val === "" ? 0 : Number(val) }));
+                    }}
+                    placeholder="Enter price e.g. 5000"
+                  />
                 </div>
                 <div className="form-group"><label className="form-label">Recurrence</label>
                   <select className="form-select" value={form.recurrence} onChange={e => setForm(f => ({ ...f, recurrence: e.target.value as any }))}>

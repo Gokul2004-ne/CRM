@@ -51,17 +51,15 @@ export default function Sidebar() {
   ];
 
   return (
-    <aside className={`sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
+    <aside className="sidebar">
       {/* Brand Logo Header */}
       <div className="sidebar-logo">
         <div className="sidebar-logo-icon">
           C
         </div>
-        {!sidebarCollapsed && (
-          <div className="sidebar-logo-text">
-            crm<span>expert</span>
-          </div>
-        )}
+        <div className="sidebar-logo-text">
+          crm<span>expert</span>
+        </div>
       </div>
 
       {/* Categorized Navigation List */}
@@ -72,7 +70,17 @@ export default function Sidebar() {
             {cat.items.map(({ href, label, icon: Icon, badge }) => {
               const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
               return (
-                <Link key={href} href={href} className={`nav-item ${isActive ? "active" : ""}`}>
+                <Link
+                  key={href}
+                  href={href}
+                  scroll={false}
+                  className={`nav-item ${isActive ? "active" : ""}`}
+                  onClick={(e) => {
+                    if (isActive) {
+                      e.preventDefault();
+                    }
+                  }}
+                >
                   <Icon className="nav-icon" />
                   <span className="nav-label">{label}</span>
                   {badge !== undefined && <span className="nav-badge">{badge}</span>}
@@ -82,20 +90,6 @@ export default function Sidebar() {
           </div>
         ))}
       </nav>
-
-      {/* Sidebar Footer / Collapse Trigger */}
-      <div style={{ padding: "12px 10px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-        <button
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="nav-item"
-          style={{ justifyContent: sidebarCollapsed ? "center" : "flex-start" }}
-        >
-          {sidebarCollapsed
-            ? <ChevronRight className="nav-icon" />
-            : <><ChevronLeft className="nav-icon" /><span className="nav-label">Collapse Rail</span></>
-          }
-        </button>
-      </div>
     </aside>
   );
 }
