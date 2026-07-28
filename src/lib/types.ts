@@ -119,6 +119,16 @@ export interface DocumentDraft {
   updatedAt: string;
 }
 
+export interface Collaboration {
+  id: string;
+  name: string;
+  number: string;
+  email: string;
+  type?: string;
+  notes?: string;
+  createdAt?: string;
+}
+
 // Dashboard computed types
 export interface DashboardStats {
   totalClients: number;

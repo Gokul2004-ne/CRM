@@ -1,11 +1,11 @@
 import { supabase } from "./supabase";
 import {
   Client, Service, SubService, RequiredDoc,
-  AssignedService, BankingEntry, Lead, DocumentDraft
+  AssignedService, BankingEntry, Lead, DocumentDraft, Collaboration
 } from "./types";
 import {
   mockClients, mockServices, mockSubServices, mockRequiredDocs,
-  mockAssignedServices, mockBankingEntries, mockLeads, mockDrafts
+  mockAssignedServices, mockBankingEntries, mockLeads, mockDrafts, mockCollaborations
 } from "./mockData";
 
 // Fetch all CRM data from Supabase
@@ -20,6 +20,7 @@ export async function fetchAllCRMData() {
       { data: bankingEntries },
       { data: leads },
       { data: drafts },
+      { data: collaborations },
     ] = await Promise.all([
       supabase.from("clients").select("*"),
       supabase.from("services").select("*"),
@@ -29,6 +30,7 @@ export async function fetchAllCRMData() {
       supabase.from("banking_entries").select("*"),
       supabase.from("leads").select("*"),
       supabase.from("drafts").select("*"),
+      supabase.from("collaborations").select("*"),
     ]);
 
     const formattedClients: Client[] = (clients || []).map((c: any) => ({
@@ -127,6 +129,16 @@ export async function fetchAllCRMData() {
       updatedAt: d.updated_at,
     }));
 
+    const formattedCollaborations: Collaboration[] = (collaborations || []).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      number: c.number,
+      email: c.email,
+      type: c.type,
+      notes: c.notes,
+      createdAt: c.created_at,
+    }));
+
     // If tables are empty in Supabase, seed initial data
     if (formattedClients.length === 0) {
       await seedInitialDataToSupabase();
@@ -139,6 +151,7 @@ export async function fetchAllCRMData() {
         bankingEntries: mockBankingEntries,
         leads: mockLeads,
         drafts: mockDrafts,
+        collaborations: mockCollaborations,
       };
     }
 
@@ -151,6 +164,7 @@ export async function fetchAllCRMData() {
       bankingEntries: formattedBankingEntries,
       leads: formattedLeads,
       drafts: formattedDrafts,
+      collaborations: formattedCollaborations,
     };
   } catch (error) {
     console.error("Error fetching CRM data from Supabase:", error);
@@ -416,4 +430,29 @@ export async function syncDraftToSupabase(d: DocumentDraft) {
 
 export async function removeDraftFromSupabase(id: string) {
   await supabase.from("drafts").delete().eq("id", id);
+}
+
+// Collaborations Sync
+export async function syncCollaborationToSupabase(c: Collaboration) {
+  try {
+    await supabase.from("collaborations").upsert({
+      id: c.id,
+      name: c.name,
+      number: c.number,
+      email: c.email,
+      type: c.type,
+      notes: c.notes,
+      created_at: c.createdAt || new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("Error syncing collaboration to Supabase:", err);
+  }
+}
+
+export async function removeCollaborationFromSupabase(id: string) {
+  try {
+    await supabase.from("collaborations").delete().eq("id", id);
+  } catch (err) {
+    console.error("Error removing collaboration from Supabase:", err);
+  }
 }

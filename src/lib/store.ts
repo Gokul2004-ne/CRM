@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import {
   Client, Service, SubService, RequiredDoc,
-  AssignedService, BankingEntry, Lead, DocumentDraft
+  AssignedService, BankingEntry, Lead, DocumentDraft, Collaboration
 } from "./types";
 import { getCurrentFY } from "./utils";
 import {
@@ -21,7 +21,9 @@ import {
   syncLeadToSupabase,
   removeLeadFromSupabase,
   syncDraftToSupabase,
-  removeDraftFromSupabase
+  removeDraftFromSupabase,
+  syncCollaborationToSupabase,
+  removeCollaborationFromSupabase
 } from "./supabaseData";
 
 interface AppState {
@@ -34,6 +36,7 @@ interface AppState {
   bankingEntries: BankingEntry[];
   leads: Lead[];
   drafts: DocumentDraft[];
+  collaborations: Collaboration[];
   selectedFY: string;
   sidebarCollapsed: boolean;
   isLoadingSupabase: boolean;
@@ -82,6 +85,11 @@ interface AppState {
   addDraft: (d: DocumentDraft) => void;
   updateDraft: (d: DocumentDraft) => void;
   deleteDraft: (id: string) => void;
+
+  // Actions - Collaborations
+  addCollaboration: (c: Collaboration) => void;
+  updateCollaboration: (c: Collaboration) => void;
+  deleteCollaboration: (id: string) => void;
 }
 
 // No localStorage persist — all data comes fresh from Supabase on every load
@@ -94,6 +102,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   bankingEntries: [],
   leads: [],
   drafts: [],
+  collaborations: [],
   selectedFY: getCurrentFY(),
   sidebarCollapsed: false,
   isLoadingSupabase: false,
@@ -111,6 +120,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
         bankingEntries: data.bankingEntries,
         leads: data.leads,
         drafts: data.drafts,
+        collaborations: data.collaborations || [],
         isLoadingSupabase: false,
       });
     } else {
@@ -314,5 +324,19 @@ export const useAppStore = create<AppState>()((set, get) => ({
   deleteDraft: (id) => {
     set((s) => ({ drafts: s.drafts.filter(x => x.id !== id) }));
     removeDraftFromSupabase(id);
+  },
+
+  // Collaborations Sync
+  addCollaboration: (c) => {
+    set((s) => ({ collaborations: [...s.collaborations, c] }));
+    syncCollaborationToSupabase(c);
+  },
+  updateCollaboration: (c) => {
+    set((s) => ({ collaborations: s.collaborations.map(x => x.id === c.id ? c : x) }));
+    syncCollaborationToSupabase(c);
+  },
+  deleteCollaboration: (id) => {
+    set((s) => ({ collaborations: s.collaborations.filter(x => x.id !== id) }));
+    removeCollaborationFromSupabase(id);
   },
 }));

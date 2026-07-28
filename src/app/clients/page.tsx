@@ -127,7 +127,7 @@ export default function ClientsPage() {
       <div className="page-header-slds">
         <div>
           <div className="breadcrumb">
-            <span>Salesforce CRM</span>
+            <span>zpluscrm</span>
             <span>/</span>
             <span className="current">Clients Directory</span>
           </div>
@@ -175,6 +175,7 @@ export default function ClientsPage() {
           <table className="table-slds">
             <thead>
               <tr>
+                <th style={{ width: 60, textAlign: "center" }}>S.No.</th>
                 <th>Client Name</th>
                 <th>Entity Type</th>
                 <th>PAN / GSTIN</th>
@@ -186,12 +187,15 @@ export default function ClientsPage() {
             </thead>
             <tbody>
               {filteredClients.length > 0 ? (
-                filteredClients.map((client) => {
+                filteredClients.map((client, index) => {
                   const phoneNum = client.phone || client.mobile || "";
                   const docCount = client.documentCount || client.documents?.length || 0;
 
                   return (
                     <tr key={client.id}>
+                      <td style={{ fontWeight: 700, color: "#64748B", textAlign: "center", fontSize: 13 }}>
+                        {index + 1}
+                      </td>
                       <td>
                         <div style={{ fontWeight: 700, color: "#0F172A", fontSize: 14 }}>{client.name}</div>
                         <div style={{ fontSize: 11, color: "#64748B" }}>Contact: {client.contactPerson || "N/A"}</div>
@@ -267,7 +271,7 @@ export default function ClientsPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: 28, color: "#64748B" }}>
+                  <td colSpan={8} style={{ textAlign: "center", padding: 28, color: "#64748B" }}>
                     No clients found matching the search query.
                   </td>
                 </tr>

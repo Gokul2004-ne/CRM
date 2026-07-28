@@ -8,9 +8,9 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-plus-jakarta" });
 
 export const metadata: Metadata = {
-  title: "CRMExpert – Enterprise CRM",
-  description: "Enterprise practice management platform for professional firms. Manage clients, services, billing, and documents in one place.",
-  keywords: "firm management, CRM practice, GST filing, client management, billing, CRM",
+  title: "zpluscrm – Connect. Manage. Grow.",
+  description: "zpluscrm enterprise practice management platform for professional firms. Manage clients, services, billing, and documents in one place.",
+  keywords: "zpluscrm, firm management, CRM practice, client management, billing, CRM",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
