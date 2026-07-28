@@ -62,15 +62,15 @@ export default function Dashboard() {
 
   return (
     <AppShell title="Dashboard" subtitle={`Financial Year ${selectedFY} Overview & Compliance Priority Grid`}>
-      {/* Salesforce Welcome Banner Header */}
+      {/* zpluscrm Welcome Banner Header */}
       <div className="page-header-slds">
         <div>
           <div className="breadcrumb">
-            <span>Salesforce CRM</span>
+            <span>zpluscrm</span>
             <span>/</span>
             <span className="current">Dashboard</span>
           </div>
-          <div className="page-title-slds">CRM Expert Practice Workspace</div>
+          <div className="page-title-slds">zpluscrm Practice Workspace</div>
           <div className="page-subtitle-slds">
             Real-time compliance tracking, client billing, and WhatsApp operations management.
           </div>
@@ -240,6 +240,7 @@ export default function Dashboard() {
           <table className="table-slds">
             <thead>
               <tr>
+                <th style={{ width: 60, textAlign: "center" }}>S.No.</th>
                 <th>Client Name</th>
                 <th>Main Service & Sub-Services</th>
                 <th>Target Due Date</th>
@@ -250,7 +251,7 @@ export default function Dashboard() {
             </thead>
             <tbody>
               {sortedDueServices.length > 0 ? (
-                sortedDueServices.map((item) => {
+                sortedDueServices.map((item, index) => {
                   const daysLeft = item.daysLeft;
                   const isOverdue = daysLeft < 0;
                   const phoneNum = item.client?.phone || item.client?.mobile || "";
@@ -272,11 +273,14 @@ export default function Dashboard() {
 
                   return (
                     <tr key={item.id} style={{ background: isOverdue ? "#FFF5F5" : daysLeft <= 9 ? "#FFFAF0" : "transparent" }}>
+                      <td style={{ fontWeight: 700, color: "#64748B", textAlign: "center", fontSize: 13 }}>
+                        {index + 1}
+                      </td>
                       <td style={{ fontWeight: 700, color: "#0F172A" }}>
-                        {item.client?.name || "Acme Logistics Ltd"}
+                        {item.client?.name || "Unknown Client"}
                       </td>
                       <td>
-                        <div style={{ fontWeight: 800, color: "#0176D3" }}>{item.service?.name || "GST Compliance"}</div>
+                        <div style={{ fontWeight: 800, color: "#0176D3" }}>{item.service?.name || "Service"}</div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
                           {assignedSubs.map(ss => (
                             <span key={ss.id} className="chip" style={{ background: "#F1F5F9", color: "#334155", fontSize: 11 }}>
@@ -319,7 +323,7 @@ export default function Dashboard() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: 24, color: "#64748B" }}>
+                  <td colSpan={7} style={{ textAlign: "center", padding: 24, color: "#64748B" }}>
                     No matching due dates found.
                   </td>
                 </tr>

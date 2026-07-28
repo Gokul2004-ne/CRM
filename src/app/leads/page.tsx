@@ -104,7 +104,7 @@ export default function LeadsPage() {
       <div className="page-header-slds">
         <div>
           <div className="breadcrumb">
-            <span>Salesforce CRM</span>
+            <span>zpluscrm</span>
             <span>/</span>
             <span className="current">WhatsApp Leads</span>
           </div>
@@ -189,6 +189,7 @@ export default function LeadsPage() {
           <table className="table-slds">
             <thead>
               <tr>
+                <th style={{ width: 60, textAlign: "center" }}>S.No.</th>
                 <th>Lead Name</th>
                 <th>Phone Number</th>
                 <th>Source</th>
@@ -200,12 +201,15 @@ export default function LeadsPage() {
             </thead>
             <tbody>
               {filtered.length > 0 ? (
-                filtered.map((lead) => {
+                filtered.map((lead, index) => {
                   const phoneNum = lead.phone || lead.mobile || "";
                   const isConverted = lead.status === "CONVERTED";
 
                   return (
                     <tr key={lead.id}>
+                      <td style={{ fontWeight: 700, color: "#64748B", textAlign: "center", fontSize: 13 }}>
+                        {index + 1}
+                      </td>
                       <td style={{ fontWeight: 700, color: "#0F172A" }}>{lead.name}</td>
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#0176D3", fontWeight: 600 }}>
@@ -259,7 +263,7 @@ export default function LeadsPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: 32, color: "#64748B" }}>
+                  <td colSpan={8} style={{ textAlign: "center", padding: 32, color: "#64748B" }}>
                     No leads found matching your criteria.
                   </td>
                 </tr>

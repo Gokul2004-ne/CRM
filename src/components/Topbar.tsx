@@ -26,11 +26,11 @@ export default function Topbar({ title, subtitle }: TopbarProps) {
     <>
       <header className="topbar">
         <div className="topbar-left">
-          {/* Salesforce 9-Dot App Launcher */}
+          {/* zpluscrm App Launcher */}
           <button
             type="button"
             className="app-launcher-btn"
-            title="Salesforce App Launcher"
+            title="zpluscrm App Launcher"
             onClick={(e) => { e.preventDefault(); setIsAppLauncherOpen(!isAppLauncherOpen); }}
           >
             <Grid size={18} />
@@ -207,7 +207,7 @@ export default function Topbar({ title, subtitle }: TopbarProps) {
             onClick={e => e.stopPropagation()}
           >
             <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#94A3B8", marginBottom: 12 }}>
-              Salesforce / Zoho Apps
+              zpluscrm Apps & Modules
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
               <div style={{ textAlign: "center", padding: 8, background: "#1E293B", borderRadius: 10, cursor: "pointer" }}>

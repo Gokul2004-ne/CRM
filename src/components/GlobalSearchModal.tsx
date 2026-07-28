@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Search, Users, MessageSquare, Briefcase, Layers,
   FileText, ClipboardList, Building2, Calendar, PenTool,
-  Settings, ArrowRight, X
+  Settings, ArrowRight, X, Handshake
 } from "lucide-react";
 
 interface GlobalSearchModalProps {
@@ -16,7 +16,7 @@ interface GlobalSearchModalProps {
 export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
   const [query, setQuery] = useState("");
   const router = useRouter();
-  const { clients, leads, services, subServices } = useAppStore();
+  const { clients, leads, services, subServices, collaborations } = useAppStore();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -36,6 +36,7 @@ export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModal
   const navResults = [
     { label: "Dashboard", path: "/", icon: Search },
     { label: "Clients", path: "/clients", icon: Users },
+    { label: "Collaborations", path: "/collaborations", icon: Handshake },
     { label: "WhatsApp Leads", path: "/leads", icon: MessageSquare },
     { label: "Services", path: "/services", icon: Briefcase },
     { label: "Sub Services", path: "/sub-services", icon: Layers },
@@ -51,6 +52,12 @@ export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModal
     c.name.toLowerCase().includes(query.toLowerCase()) ||
     c.pan?.toLowerCase().includes(query.toLowerCase()) ||
     c.gstin?.toLowerCase().includes(query.toLowerCase())
+  ).slice(0, 4);
+
+  const filteredCollaborations = (collaborations || []).filter(c =>
+    c.name.toLowerCase().includes(query.toLowerCase()) ||
+    c.number.includes(query) ||
+    c.email.toLowerCase().includes(query.toLowerCase())
   ).slice(0, 4);
 
   const filteredLeads = leads.filter(l =>
@@ -115,6 +122,24 @@ export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModal
             </div>
           )}
 
+          {/* Matching Collaborations */}
+          {query.trim().length > 0 && filteredCollaborations.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#94A3B8", padding: "6px 12px" }}>
+                Collaborations ({filteredCollaborations.length})
+              </div>
+              {filteredCollaborations.map((collab) => (
+                <div key={collab.id} className="command-item" onClick={() => navigateTo("/collaborations")}>
+                  <Handshake size={16} color="#0284C7" />
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0F172A" }}>{collab.name}</div>
+                    <div style={{ fontSize: 11, color: "#64748B" }}>Number: {collab.number} | Email: {collab.email}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Matching Leads */}
           {query.trim().length > 0 && filteredLeads.length > 0 && (
             <div style={{ marginBottom: 12 }}>
@@ -151,7 +176,7 @@ export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModal
             </div>
           )}
 
-          {query.trim().length > 0 && navResults.length === 0 && filteredClients.length === 0 && filteredLeads.length === 0 && filteredServices.length === 0 && (
+          {query.trim().length > 0 && navResults.length === 0 && filteredClients.length === 0 && filteredCollaborations.length === 0 && filteredLeads.length === 0 && filteredServices.length === 0 && (
             <div style={{ padding: 24, textAlign: "center", color: "#64748B", fontSize: 14 }}>
               No matches found for "{query}"
             </div>

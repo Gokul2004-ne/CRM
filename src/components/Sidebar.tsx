@@ -5,15 +5,16 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, MessageSquare, Briefcase, Layers,
   FileText, ClipboardList, Building2, Calendar, PenTool,
-  CreditCard, Settings, ChevronLeft, ChevronRight, Shield
+  CreditCard, Settings, ChevronLeft, ChevronRight, Shield, Handshake
 } from "lucide-react";
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { sidebarCollapsed, setSidebarCollapsed, clients, leads, assignedServices } = useAppStore();
+  const { sidebarCollapsed, setSidebarCollapsed, clients, leads, collaborations, assignedServices } = useAppStore();
 
   const activeLeadsCount = leads.filter(l => l.status !== "CONVERTED").length;
   const activeClientsCount = clients.length;
+  const collaborationsCount = collaborations?.length || 0;
 
   const categories = [
     {
@@ -21,6 +22,7 @@ export default function Sidebar() {
       items: [
         { href: "/", label: "Dashboard", icon: LayoutDashboard },
         { href: "/clients", label: "Clients", icon: Users, badge: activeClientsCount },
+        { href: "/collaborations", label: "Collaborations", icon: Handshake, badge: collaborationsCount > 0 ? collaborationsCount : undefined },
         { href: "/leads", label: "WhatsApp Leads", icon: MessageSquare, badge: activeLeadsCount > 0 ? activeLeadsCount : undefined },
       ]
     },
@@ -54,11 +56,14 @@ export default function Sidebar() {
     <aside className="sidebar">
       {/* Brand Logo Header */}
       <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">
-          C
-        </div>
-        <div className="sidebar-logo-text">
-          crm<span>expert</span>
+        <img
+          src="/zplus-icon.svg"
+          alt="zpluscrm logo"
+          style={{ width: 34, height: 34, objectFit: "contain" }}
+        />
+        <div className="sidebar-logo-text" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          <span style={{ color: "#FFFFFF", fontWeight: 900 }}>zplus</span>
+          <span style={{ color: "#54B400", fontWeight: 900 }}>crm</span>
         </div>
       </div>
 

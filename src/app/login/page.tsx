@@ -138,31 +138,23 @@ export default function LoginPage() {
             marginBottom: "20px",
           }}
         >
-          <div
-            style={{
-              width: "56px",
-              height: "56px",
-              borderRadius: "16px",
-              background: "linear-gradient(135deg, #2563EB 0%, #4F46E5 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: "16px",
-              boxShadow: "0 10px 25px -5px rgba(37, 99, 235, 0.4)",
-            }}
-          >
-            <ShieldCheck style={{ width: "32px", height: "32px", color: "#FFFFFF" }} />
-          </div>
+          <img
+            src="/zpluscrm-logo.svg"
+            alt="zpluscrm Logo"
+            style={{ width: "240px", height: "auto", marginBottom: "16px" }}
+          />
           <h1
             style={{
               fontSize: "26px",
-              fontWeight: 800,
+              fontWeight: 900,
               letterSpacing: "-0.5px",
               color: "#FFFFFF",
               marginBottom: "6px",
+              fontFamily: "'Plus Jakarta Sans', sans-serif"
             }}
           >
-            CRMExpert Enterprise
+            <span style={{ color: "#FFFFFF" }}>zplus</span>
+            <span style={{ color: "#54B400" }}>crm</span>
           </h1>
           <p
             style={{

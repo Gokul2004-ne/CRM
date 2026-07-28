@@ -6,9 +6,9 @@ import { toast } from "sonner";
 
 export default function SettingsPage() {
   const [tab, setTab] = useState("firm");
-  const [firmName, setFirmName] = useState("CRMExpert Advisory LLP");
+  const [firmName, setFirmName] = useState("zpluscrm Advisory LLP");
   const [ownerName, setOwnerName] = useState("CA Gokulnath");
-  const [email, setEmail] = useState("info@crmexpert.in");
+  const [email, setEmail] = useState("info@zpluscrm.com");
   const [mobile, setMobile] = useState("9876543210");
   const [address, setAddress] = useState("Mumbai, Maharashtra");
   const [fyStart, setFyStart] = useState("4");
@@ -18,7 +18,7 @@ export default function SettingsPage() {
   const handleSave = () => toast.success("Settings saved successfully!");
 
   return (
-    <AppShell title="Settings" subtitle="Configure your CRMExpert workspace">
+    <AppShell title="Settings" subtitle="Configure your zpluscrm practice workspace">
       <div style={{ display: "flex", gap: 20 }}>
         {/* Sidebar Tabs */}
         <div style={{ width: 200, flexShrink: 0 }}>

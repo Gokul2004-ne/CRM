@@ -856,7 +856,9 @@ input[type="number"] {
 /* ===== SLDS TABLE ===== */
 .table-wrapper-slds {
   width: 100%;
+  max-height: 68vh;
   overflow-x: auto;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -880,6 +882,11 @@ input[type="number"] {
   letter-spacing: 0.6px;
   color: #475569;
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #F8FAFC;
+  box-shadow: 0 1px 0 #E2E8F0;
 }
 
 .table-slds td {
