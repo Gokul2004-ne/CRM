@@ -11,9 +11,10 @@ import Link from "next/link";
 interface TopbarProps {
   title: string;
   subtitle?: string;
+  onOpenSearch?: () => void;
 }
 
-export default function Topbar({ title, subtitle }: TopbarProps) {
+export default function Topbar({ title, subtitle, onOpenSearch }: TopbarProps) {
   const { selectedFY, setSelectedFY, sidebarCollapsed } = useAppStore();
   const { user, signOut } = useAuth();
   const [isSearchOpen, setIsSearchOpen] = useState(false);

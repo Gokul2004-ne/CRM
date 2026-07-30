@@ -26,6 +26,28 @@ import {
   removeCollaborationFromSupabase
 } from "./supabaseData";
 
+// LocalStorage Persistence Helpers
+const LOCAL_STORAGE_KEY_PREFIX = "zpluscrm_local_";
+
+function loadFromLocal<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const item = localStorage.getItem(LOCAL_STORAGE_KEY_PREFIX + key);
+    return item ? JSON.parse(item) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveToLocal(key: string, data: any) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY_PREFIX + key, JSON.stringify(data));
+  } catch (e) {
+    console.error(`Error saving ${key} to localStorage:`, e);
+  }
+}
+
 interface AppState {
   // Data
   clients: Client[];
@@ -58,6 +80,7 @@ interface AppState {
 
   // Actions - SubServices
   addSubService: (s: SubService) => void;
+  addSubServicesBatch?: (ssList: SubService[]) => void;
   updateSubService: (s: SubService) => void;
   deleteSubService: (id: string) => void;
 
@@ -92,7 +115,6 @@ interface AppState {
   deleteCollaboration: (id: string) => void;
 }
 
-// No localStorage persist — all data comes fresh from Supabase on every load
 export const useAppStore = create<AppState>()((set, get) => ({
   clients: [],
   services: [],
@@ -102,29 +124,64 @@ export const useAppStore = create<AppState>()((set, get) => ({
   bankingEntries: [],
   leads: [],
   drafts: [],
-  collaborations: [],
+  collaborations: loadFromLocal<Collaboration[]>("collaborations", []),
   selectedFY: getCurrentFY(),
   sidebarCollapsed: false,
   isLoadingSupabase: false,
 
   loadSupabaseData: async () => {
     set({ isLoadingSupabase: true });
+    const localCollabs = loadFromLocal<Collaboration[]>("collaborations", []);
+    const localSubServices = loadFromLocal<SubService[]>("subServices", []);
+    const localDrafts = loadFromLocal<DocumentDraft[]>("drafts", []);
+
     const data = await fetchAllCRMData();
     if (data) {
+      // Merge remote collaborations with local collaborations so local creations are never lost
+      const combinedCollabs = [...(data.collaborations || [])];
+      localCollabs.forEach(lc => {
+        if (!combinedCollabs.some(c => c.id === lc.id)) {
+          combinedCollabs.push(lc);
+        }
+      });
+
+      const combinedSubServices = [...(data.subServices || [])];
+      localSubServices.forEach(lss => {
+        if (!combinedSubServices.some(ss => ss.id === lss.id)) {
+          combinedSubServices.push(lss);
+        }
+      });
+
+      const combinedDrafts = [...(data.drafts || [])];
+      localDrafts.forEach(ld => {
+        if (!combinedDrafts.some(d => d.id === ld.id)) {
+          combinedDrafts.push(ld);
+        }
+      });
+
       set({
         clients: data.clients,
         services: data.services,
-        subServices: data.subServices,
+        subServices: combinedSubServices,
         requiredDocs: data.requiredDocs,
         assignedServices: data.assignedServices,
         bankingEntries: data.bankingEntries,
         leads: data.leads,
-        drafts: data.drafts,
-        collaborations: data.collaborations || [],
+        drafts: combinedDrafts,
+        collaborations: combinedCollabs,
         isLoadingSupabase: false,
       });
+
+      saveToLocal("collaborations", combinedCollabs);
+      saveToLocal("subServices", combinedSubServices);
+      saveToLocal("drafts", combinedDrafts);
     } else {
-      set({ isLoadingSupabase: false });
+      set({
+        collaborations: localCollabs,
+        subServices: localSubServices,
+        drafts: localDrafts,
+        isLoadingSupabase: false
+      });
     }
   },
 
@@ -133,43 +190,87 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   // Clients Sync
   addClient: (c) => {
-    set((s) => ({ clients: [...s.clients, c] }));
+    set((s) => {
+      const next = [...s.clients, c];
+      saveToLocal("clients", next);
+      return { clients: next };
+    });
     syncClientToSupabase(c);
   },
   updateClient: (c) => {
-    set((s) => ({ clients: s.clients.map(x => x.id === c.id ? c : x) }));
+    set((s) => {
+      const next = s.clients.map(x => x.id === c.id ? c : x);
+      saveToLocal("clients", next);
+      return { clients: next };
+    });
     syncClientToSupabase(c);
   },
   deleteClient: (id) => {
-    set((s) => ({ clients: s.clients.filter(x => x.id !== id) }));
+    set((s) => {
+      const next = s.clients.filter(x => x.id !== id);
+      saveToLocal("clients", next);
+      return { clients: next };
+    });
     removeClientFromSupabase(id);
   },
 
-  // Services Sync
+  // Services Sync (Packages)
   addService: (sv) => {
-    set((s) => ({ services: [...s.services, sv] }));
+    set((s) => {
+      const next = [...s.services, sv];
+      saveToLocal("services", next);
+      return { services: next };
+    });
     syncServiceToSupabase(sv);
   },
   updateService: (sv) => {
-    set((s) => ({ services: s.services.map(x => x.id === sv.id ? sv : x) }));
+    set((s) => {
+      const next = s.services.map(x => x.id === sv.id ? sv : x);
+      saveToLocal("services", next);
+      return { services: next };
+    });
     syncServiceToSupabase(sv);
   },
   deleteService: (id) => {
-    set((s) => ({ services: s.services.filter(x => x.id !== id) }));
+    set((s) => {
+      const next = s.services.filter(x => x.id !== id);
+      saveToLocal("services", next);
+      return { services: next };
+    });
     removeServiceFromSupabase(id);
   },
 
-  // SubServices Sync
+  // SubServices Sync (Services)
   addSubService: (ss) => {
-    set((s) => ({ subServices: [...s.subServices, ss] }));
+    set((s) => {
+      const next = [...s.subServices, ss];
+      saveToLocal("subServices", next);
+      return { subServices: next };
+    });
     syncSubServiceToSupabase(ss);
   },
+  addSubServicesBatch: (ssList) => {
+    set((s) => {
+      const next = [...s.subServices, ...ssList];
+      saveToLocal("subServices", next);
+      return { subServices: next };
+    });
+    ssList.forEach(ss => syncSubServiceToSupabase(ss));
+  },
   updateSubService: (ss) => {
-    set((s) => ({ subServices: s.subServices.map(x => x.id === ss.id ? ss : x) }));
+    set((s) => {
+      const next = s.subServices.map(x => x.id === ss.id ? ss : x);
+      saveToLocal("subServices", next);
+      return { subServices: next };
+    });
     syncSubServiceToSupabase(ss);
   },
   deleteSubService: (id) => {
-    set((s) => ({ subServices: s.subServices.filter(x => x.id !== id) }));
+    set((s) => {
+      const next = s.subServices.filter(x => x.id !== id);
+      saveToLocal("subServices", next);
+      return { subServices: next };
+    });
     removeSubServiceFromSupabase(id);
   },
 
@@ -210,8 +311,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
       } else {
         updatedBkList.push(newBanking);
       }
+      const nextAssigned = [...s.assignedServices, a];
+      saveToLocal("assignedServices", nextAssigned);
+      saveToLocal("bankingEntries", updatedBkList);
       return {
-        assignedServices: [...s.assignedServices, a],
+        assignedServices: nextAssigned,
         bankingEntries: updatedBkList
       };
     });
@@ -243,8 +347,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
         updatedBkList.push(newBanking);
       }
 
+      const nextAssigned = s.assignedServices.map(x => x.id === a.id ? a : x);
+      saveToLocal("assignedServices", nextAssigned);
+      saveToLocal("bankingEntries", updatedBkList);
+
       return {
-        assignedServices: s.assignedServices.map(x => x.id === a.id ? a : x),
+        assignedServices: nextAssigned,
         bankingEntries: updatedBkList
       };
     });
@@ -254,17 +362,27 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   deleteAssignedService: (id) => {
-    set((s) => ({
-      assignedServices: s.assignedServices.filter(x => x.id !== id),
-      bankingEntries: s.bankingEntries.filter(x => x.id !== `b-${id}`)
-    }));
+    set((s) => {
+      const nextAssigned = s.assignedServices.filter(x => x.id !== id);
+      const nextBanking = s.bankingEntries.filter(x => x.id !== `b-${id}`);
+      saveToLocal("assignedServices", nextAssigned);
+      saveToLocal("bankingEntries", nextBanking);
+      return {
+        assignedServices: nextAssigned,
+        bankingEntries: nextBanking
+      };
+    });
     removeAssignedServiceFromSupabase(id);
     removeBankingEntryFromSupabase(`b-${id}`);
   },
 
   // Banking Sync
   addBankingEntry: (b) => {
-    set((s) => ({ bankingEntries: [...s.bankingEntries, b] }));
+    set((s) => {
+      const next = [...s.bankingEntries, b];
+      saveToLocal("bankingEntries", next);
+      return { bankingEntries: next };
+    });
     syncBankingEntryToSupabase(b);
   },
   updateBankingEntry: (b) => {
@@ -280,25 +398,41 @@ export const useAppStore = create<AppState>()((set, get) => ({
         return a;
       });
 
+      const nextBanking = s.bankingEntries.map(x => x.id === b.id ? b : x);
+      saveToLocal("bankingEntries", nextBanking);
+      saveToLocal("assignedServices", updatedAssigned);
+
       return {
-        bankingEntries: s.bankingEntries.map(x => x.id === b.id ? b : x),
+        bankingEntries: nextBanking,
         assignedServices: updatedAssigned
       };
     });
     syncBankingEntryToSupabase(b);
   },
   deleteBankingEntry: (id) => {
-    set((s) => ({ bankingEntries: s.bankingEntries.filter(x => x.id !== id) }));
+    set((s) => {
+      const next = s.bankingEntries.filter(x => x.id !== id);
+      saveToLocal("bankingEntries", next);
+      return { bankingEntries: next };
+    });
     removeBankingEntryFromSupabase(id);
   },
 
   // Leads Sync
   addLead: (l) => {
-    set((s) => ({ leads: [...s.leads, l] }));
+    set((s) => {
+      const next = [...s.leads, l];
+      saveToLocal("leads", next);
+      return { leads: next };
+    });
     syncLeadToSupabase(l);
   },
   updateLead: (l) => {
-    set((s) => ({ leads: s.leads.map(x => x.id === l.id ? l : x) }));
+    set((s) => {
+      const next = s.leads.map(x => x.id === l.id ? l : x);
+      saveToLocal("leads", next);
+      return { leads: next };
+    });
     syncLeadToSupabase(l);
   },
   convertLead: (leadId, clientId) => {
@@ -308,35 +442,60 @@ export const useAppStore = create<AppState>()((set, get) => ({
       if (convertedLead) {
         syncLeadToSupabase(convertedLead);
       }
+      saveToLocal("leads", updatedLeads);
       return { leads: updatedLeads };
     });
   },
 
   // Drafts Sync
   addDraft: (d) => {
-    set((s) => ({ drafts: [...s.drafts, d] }));
+    set((s) => {
+      const next = [...s.drafts, d];
+      saveToLocal("drafts", next);
+      return { drafts: next };
+    });
     syncDraftToSupabase(d);
   },
   updateDraft: (d) => {
-    set((s) => ({ drafts: s.drafts.map(x => x.id === d.id ? d : x) }));
+    set((s) => {
+      const next = s.drafts.map(x => x.id === d.id ? d : x);
+      saveToLocal("drafts", next);
+      return { drafts: next };
+    });
     syncDraftToSupabase(d);
   },
   deleteDraft: (id) => {
-    set((s) => ({ drafts: s.drafts.filter(x => x.id !== id) }));
+    set((s) => {
+      const next = s.drafts.filter(x => x.id !== id);
+      saveToLocal("drafts", next);
+      return { drafts: next };
+    });
     removeDraftFromSupabase(id);
   },
 
-  // Collaborations Sync
+  // Collaborations Sync (Permanently Persisted)
   addCollaboration: (c) => {
-    set((s) => ({ collaborations: [...s.collaborations, c] }));
+    set((s) => {
+      const next = [...s.collaborations, c];
+      saveToLocal("collaborations", next);
+      return { collaborations: next };
+    });
     syncCollaborationToSupabase(c);
   },
   updateCollaboration: (c) => {
-    set((s) => ({ collaborations: s.collaborations.map(x => x.id === c.id ? c : x) }));
+    set((s) => {
+      const next = s.collaborations.map(x => x.id === c.id ? c : x);
+      saveToLocal("collaborations", next);
+      return { collaborations: next };
+    });
     syncCollaborationToSupabase(c);
   },
   deleteCollaboration: (id) => {
-    set((s) => ({ collaborations: s.collaborations.filter(x => x.id !== id) }));
+    set((s) => {
+      const next = s.collaborations.filter(x => x.id !== id);
+      saveToLocal("collaborations", next);
+      return { collaborations: next };
+    });
     removeCollaborationFromSupabase(id);
   },
 }));

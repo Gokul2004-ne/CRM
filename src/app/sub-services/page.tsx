@@ -3,7 +3,7 @@ import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
 import { SubService, Service } from "@/lib/types";
-import { Plus, Pencil, Trash2, Search, Eye, Check, Sparkles, Calendar, RefreshCw } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Eye, Check, Sparkles, Calendar, RefreshCw, X, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/utils";
 
@@ -15,15 +15,51 @@ const recurrenceColors: Record<string, { bg: string; color: string }> = {
   ANNUALLY: { bg: "#FFF7ED", color: "#C2410C" },
 };
 
+const SUGGESTED_SERVICES = [
+  "GSTR-1",
+  "GSTR-3B",
+  "GSTR-9",
+  "ITR-1 Sahaj",
+  "ITR-4 Sugam",
+  "ITR-6 Corporate",
+  "Tax Audit 3CA/3CB",
+  "Form 24Q Salary TDS",
+  "Form 26Q Non-Salary TDS",
+  "DIR-3 KYC",
+  "AOC-4 Financial",
+  "MGT-7 Annual"
+];
+
+export interface SelectedServiceRow {
+  id: string;
+  name: string;
+  recurrence: Recurrence;
+  dueDate: string;
+  dueDateDay: string;
+}
+
+const emptyRow = (defaultName = ""): SelectedServiceRow => ({
+  id: `row_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+  name: defaultName,
+  recurrence: "MONTHLY",
+  dueDate: "",
+  dueDateDay: "20"
+});
+
 const empty = (): SubService => ({ id: "", serviceId: "", name: "", serviceIds: [], recurrence: "MONTHLY", dueDate: "" });
 
 export default function ServicesPage() {
-  const { services, subServices, requiredDocs, addSubService, updateSubService, deleteSubService } = useAppStore();
+  const { services, subServices, requiredDocs, addSubService, addSubServicesBatch, updateSubService, deleteSubService } = useAppStore();
   const [search, setSearch] = useState("");
   const [filterPackage, setFilterPackage] = useState("all");
   const [modal, setModal] = useState<{ open: boolean; editing: SubService | null }>({ open: false, editing: null });
   const [viewMainService, setViewMainService] = useState<Service | null>(null);
+
+  // Form state
   const [form, setForm] = useState<SubService>(empty());
+  // Selected Services Dynamic Rows (Sketched LinkedIn-style dynamic rows)
+  const [selectedRows, setSelectedRows] = useState<SelectedServiceRow[]>([emptyRow()]);
+  const [serviceInput, setServiceInput] = useState("");
 
   const filtered = useMemo(() =>
     subServices.filter(ss =>
@@ -31,27 +67,105 @@ export default function ServicesPage() {
       ss.name.toLowerCase().includes(search.toLowerCase())
     ), [subServices, search, filterPackage]);
 
-  const openAdd = () => { setForm(empty()); setModal({ open: true, editing: null }); };
-  const openEdit = (ss: SubService) => { setForm({ ...ss, serviceIds: ss.serviceIds || [ss.serviceId] }); setModal({ open: true, editing: ss }); };
+  const openAdd = () => {
+    setForm(empty());
+    setSelectedRows([emptyRow()]);
+    setServiceInput("");
+    setModal({ open: true, editing: null });
+  };
+
+  const openEdit = (ss: SubService) => {
+    setForm({ ...ss, serviceIds: ss.serviceIds || [ss.serviceId] });
+    setSelectedRows([{
+      id: ss.id,
+      name: ss.name,
+      recurrence: ((ss as any).recurrence as Recurrence) || "MONTHLY",
+      dueDate: ss.dueDate || "",
+      dueDateDay: (ss as any).dueDateDay || "20"
+    }]);
+    setServiceInput("");
+    setModal({ open: true, editing: ss });
+  };
+
+  // Add new dynamic row to Selected list
+  const addRow = (initialName = "") => {
+    setSelectedRows(prev => [...prev, emptyRow(initialName)]);
+  };
+
+  const removeRow = (index: number) => {
+    setSelectedRows(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateRow = (index: number, field: keyof SelectedServiceRow, value: any) => {
+    setSelectedRows(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const handleSuggestedClick = (suggestedName: string) => {
+    // If the first row is empty, populate it; otherwise append a new row
+    setSelectedRows(prev => {
+      if (prev.length === 1 && !prev[0].name.trim()) {
+        return [{ ...prev[0], name: suggestedName }];
+      }
+      return [...prev, emptyRow(suggestedName)];
+    });
+  };
 
   const handleSave = () => {
-    if (!form.name || !form.serviceId) { toast.error("Main Package and Service name are required"); return; }
-    const serviceData: SubService = {
-      ...form,
-      serviceIds: [form.serviceId]
-    };
+    if (!form.serviceId) {
+      toast.error("Please select a Main Package");
+      return;
+    }
 
     if (modal.editing) {
+      const row = selectedRows[0];
+      if (!row || !row.name.trim()) {
+        toast.error("Service name is required");
+        return;
+      }
+      const serviceData: SubService = {
+        ...form,
+        name: row.name.trim(),
+        recurrence: row.recurrence,
+        dueDate: row.dueDate,
+        dueDateDay: row.dueDateDay,
+        serviceIds: [form.serviceId]
+      };
       updateSubService(serviceData);
-      toast.success("Service updated");
+      toast.success("Service updated successfully!");
     } else {
-      addSubService({ ...serviceData, id: `ss${Date.now()}` });
-      toast.success("Service added");
+      // Filter valid rows with non-empty service name
+      const validRows = selectedRows.filter(r => r.name.trim().length > 0);
+
+      if (validRows.length === 0) {
+        toast.error("Please add or select at least one service name");
+        return;
+      }
+
+      const newSubServices: SubService[] = validRows.map((r, i) => ({
+        id: `ss_${Date.now()}_${i}`,
+        serviceId: form.serviceId,
+        name: r.name.trim(),
+        serviceIds: [form.serviceId],
+        recurrence: r.recurrence || "MONTHLY",
+        dueDate: r.dueDate || "",
+        dueDateDay: r.dueDateDay || ""
+      }));
+
+      if (addSubServicesBatch) {
+        addSubServicesBatch(newSubServices);
+      } else {
+        newSubServices.forEach(ss => addSubService(ss));
+      }
+      toast.success(`Successfully added ${newSubServices.length} service(s) to package!`);
     }
+
     setModal({ open: false, editing: null });
   };
 
-  // Smart due date label based on recurrence
   const getDueDateLabel = (ss: SubService) => {
     if (!ss.dueDate) return "—";
     const recurrence = (ss as any).recurrence;
@@ -61,7 +175,6 @@ export default function ServicesPage() {
     return ss.dueDate;
   };
 
-  // Group services by main package
   const packagesWithServices = useMemo(() => {
     return services.map(svc => ({
       service: svc,
@@ -83,7 +196,7 @@ export default function ServicesPage() {
               {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
-          <button className="btn-slds btn-slds-primary" onClick={openAdd}><Plus size={15} /> Add Service</button>
+          <button className="btn-slds btn-slds-primary" onClick={openAdd}><Plus size={15} /> Add Service(s)</button>
         </div>
 
         {/* Package Cards with Services */}
@@ -273,9 +386,9 @@ export default function ServicesPage() {
               <button
                 className="btn-slds btn-slds-primary"
                 style={{ fontSize: 12 }}
-                onClick={() => { setViewMainService(null); setForm({ ...empty(), serviceId: viewMainService.id }); setModal({ open: true, editing: null }); }}
+                onClick={() => { setViewMainService(null); setForm({ ...empty(), serviceId: viewMainService.id }); setSelectedRows([emptyRow()]); setModal({ open: true, editing: null }); }}
               >
-                <Plus size={13} /> Add Service to this Package
+                <Plus size={13} /> Add Services to this Package
               </button>
               <button className="btn-slds btn-slds-secondary" onClick={() => setViewMainService(null)}>Close</button>
             </div>
@@ -283,151 +396,222 @@ export default function ServicesPage() {
         </div>
       )}
 
-      {/* Add / Edit Service Modal */}
+      {/* Add / Edit Service Modal — Handwritten Sketch Workflow */}
       {modal.open && (
         <div className="modal-overlay" onClick={() => setModal({ open: false, editing: null })}>
-          <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: 740, width: "95%" }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <div className="modal-title">{modal.editing ? "Edit Service" : "Add Service"}</div>
+              <div className="modal-title">
+                {modal.editing ? "Edit Service" : "Add Service"}
+              </div>
               <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px" }} onClick={() => setModal({ open: false, editing: null })}>✕</button>
             </div>
-            <div className="modal-body" style={{ display: "grid", gap: 14 }}>
 
-              {/* Main Package */}
+            <div className="modal-body" style={{ display: "grid", gap: 16, maxHeight: "78vh", overflowY: "auto" }}>
+
+              {/* 1. Main Package */}
               <div className="form-group">
-                <label className="form-label">Main Package *</label>
-                <select className="form-select" value={form.serviceId} onChange={e => setForm(f => ({ ...f, serviceId: e.target.value }))}>
-                  <option value="">Select a main package</option>
+                <label className="form-label" style={{ fontWeight: 700, fontSize: 13 }}>Main Package *</label>
+                <select
+                  className="form-select"
+                  style={{ fontSize: 13, padding: 10 }}
+                  value={form.serviceId}
+                  onChange={e => setForm(f => ({ ...f, serviceId: e.target.value }))}
+                >
+                  <option value="">Select a main Package</option>
                   {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
 
-              {/* Service Name */}
+              {/* 2. Service Name Search/Input */}
               <div className="form-group">
-                <label className="form-label">Service Name *</label>
-                <input
-                  className="form-input"
-                  value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="Type or click a suggested service below..."
-                />
-
-                {/* Suggestions */}
-                <div style={{ marginTop: 8, padding: 10, background: "#F8FAFC", border: "1px dashed #CBD5E1", borderRadius: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", marginBottom: 6, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 4 }}>
-                    <Sparkles size={12} color="#0176D3" />
-                    <span>Suggested Services (Click to Auto-Fill):</span>
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {[
-                      "GSTR-1 Monthly Sales Return",
-                      "GSTR-3B Summary Return",
-                      "GSTR-9 Annual Return",
-                      "ITR-1 Sahaj Return",
-                      "ITR-4 Sugam Return",
-                      "ITR-6 Corporate Income Tax",
-                      "Tax Audit Report 3CA/3CB",
-                      "Form 24Q Salary TDS",
-                      "Form 26Q Non-Salary TDS",
-                      "DIR-3 KYC Director Registration",
-                      "AOC-4 Financial Statement Return",
-                      "MGT-7 Annual Return"
-                    ].map(suggestion => (
-                      <button
-                        key={suggestion}
-                        type="button"
-                        className="chip"
-                        style={{
-                          background: form.name === suggestion ? "#0176D3" : "#FFFFFF",
-                          color: form.name === suggestion ? "#FFFFFF" : "#0F172A",
-                          border: "1px solid #CBD5E1",
-                          padding: "4px 8px",
-                          fontSize: 11,
-                          cursor: "pointer",
-                          fontWeight: form.name === suggestion ? 700 : 500
-                        }}
-                        onClick={() => setForm(f => ({ ...f, name: suggestion }))}
-                      >
-                        + {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Recurrence */}
-              <div className="form-group">
-                <label className="form-label">Recurrence *</label>
+                <label className="form-label" style={{ fontWeight: 700, fontSize: 13 }}>Service Name</label>
                 <div style={{ display: "flex", gap: 8 }}>
-                  {(["MONTHLY", "QUARTERLY", "ANNUALLY"] as Recurrence[]).map(r => {
-                    const colors = recurrenceColors[r];
-                    const isSelected = (form as any).recurrence === r;
-                    return (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => setForm(f => ({ ...f, recurrence: r } as any))}
-                        style={{
-                          flex: 1,
-                          padding: "10px 8px",
-                          borderRadius: 10,
-                          border: isSelected ? `2px solid ${colors.color}` : "2px solid #E2E8F0",
-                          background: isSelected ? colors.bg : "#F8FAFC",
-                          color: isSelected ? colors.color : "#64748B",
-                          fontWeight: isSelected ? 700 : 500,
-                          fontSize: 12,
-                          cursor: "pointer",
-                          transition: "all 0.2s",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 6,
-                        }}
-                      >
-                        {isSelected && <Check size={13} />}
-                        {r}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Smart Due Date based on recurrence */}
-              <div className="form-group">
-                <label className="form-label">
-                  Due Date
-                  {(form as any).recurrence === "MONTHLY" && " (Date of each month)"}
-                  {(form as any).recurrence === "QUARTERLY" && " (Due date of last month of quarter)"}
-                  {(form as any).recurrence === "ANNUALLY" && " (Annual due date)"}
-                </label>
-                {(form as any).recurrence === "MONTHLY" ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <input
-                      className="form-input"
-                      type="number"
-                      min={1}
-                      max={31}
-                      value={(form as any).dueDateDay || ""}
-                      onChange={e => setForm(f => ({ ...f, dueDateDay: e.target.value, dueDate: e.target.value } as any))}
-                      placeholder="e.g. 20 (20th of every month)"
-                      style={{ maxWidth: 220 }}
-                    />
-                    <span style={{ fontSize: 13, color: "#64748B" }}>of every month</span>
-                  </div>
-                ) : (
                   <input
                     className="form-input"
-                    type="date"
-                    value={form.dueDate || ""}
-                    onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
+                    style={{ fontSize: 13 }}
+                    value={serviceInput}
+                    onChange={e => setServiceInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && serviceInput.trim()) {
+                        e.preventDefault();
+                        addRow(serviceInput.trim());
+                        setServiceInput("");
+                      }
+                    }}
+                    placeholder="Type or click a suggested service below..."
                   />
-                )}
+                  <button
+                    type="button"
+                    className="btn-slds btn-slds-primary"
+                    style={{ padding: "6px 14px", fontSize: 12, whiteSpace: "nowrap" }}
+                    onClick={() => {
+                      if (serviceInput.trim()) {
+                        addRow(serviceInput.trim());
+                        setServiceInput("");
+                      } else {
+                        addRow();
+                      }
+                    }}
+                  >
+                    + Add Row
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Selected Services Dynamic List (Sketched Layout: Service Name, Recurrence, Due Date, + symbol) */}
+              <div className="form-group">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <label className="form-label" style={{ margin: 0, fontWeight: 800, fontSize: 14, color: "#0F172A" }}>
+                    Selected ({selectedRows.length})
+                  </label>
+                  {!modal.editing && (
+                    <button
+                      type="button"
+                      className="btn-slds btn-slds-secondary"
+                      style={{ padding: "3px 8px", fontSize: 11 }}
+                      onClick={() => addRow()}
+                    >
+                      + Add Another Service
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: "grid", gap: 10 }}>
+                  {selectedRows.map((row, idx) => (
+                    <div
+                      key={row.id || idx}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "10px 12px",
+                        background: "#F8FAFC",
+                        border: "1px solid #CBD5E1",
+                        borderRadius: 12,
+                        flexWrap: "wrap"
+                      }}
+                    >
+                      {/* Service Name Input */}
+                      <div style={{ flex: "1 1 180px" }}>
+                        <input
+                          className="form-input"
+                          style={{ fontSize: 13, padding: "8px 10px", fontWeight: 700, color: "#0F172A", background: "white" }}
+                          value={row.name}
+                          onChange={e => updateRow(idx, "name", e.target.value)}
+                          placeholder="e.g. GSTR-1"
+                        />
+                      </div>
+
+                      {/* Recurrence Selector */}
+                      <div style={{ flex: "0 0 130px" }}>
+                        <select
+                          className="form-select"
+                          style={{ fontSize: 12, padding: "8px 8px", background: "white" }}
+                          value={row.recurrence}
+                          onChange={e => updateRow(idx, "recurrence", e.target.value as Recurrence)}
+                        >
+                          <option value="MONTHLY">Monthly</option>
+                          <option value="QUARTERLY">Quarterly</option>
+                          <option value="ANNUALLY">Annually</option>
+                        </select>
+                      </div>
+
+                      {/* Due Date Field */}
+                      <div style={{ flex: "0 0 150px" }}>
+                        {row.recurrence === "MONTHLY" ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <input
+                              className="form-input"
+                              type="number"
+                              min={1}
+                              max={31}
+                              style={{ fontSize: 12, padding: "8px 8px", textAlign: "center", background: "white" }}
+                              value={row.dueDateDay || ""}
+                              onChange={e => updateRow(idx, "dueDateDay", e.target.value)}
+                              placeholder="20 (Day)"
+                            />
+                            <span style={{ fontSize: 11, color: "#64748B", whiteSpace: "nowrap" }}>th month</span>
+                          </div>
+                        ) : (
+                          <input
+                            className="form-input"
+                            type="date"
+                            style={{ fontSize: 12, padding: "7px 8px", background: "white" }}
+                            value={row.dueDate || ""}
+                            onChange={e => updateRow(idx, "dueDate", e.target.value)}
+                          />
+                        )}
+                      </div>
+
+                      {/* Plus Symbol (+) Beside Due Date to Append Below + Delete (✕) */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <button
+                          type="button"
+                          className="btn-slds btn-slds-primary"
+                          style={{ width: 32, height: 32, padding: 0, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}
+                          onClick={() => addRow()}
+                          title="Click plus symbol to add another service below"
+                        >
+                          <Plus size={16} />
+                        </button>
+                        {selectedRows.length > 1 && (
+                          <button
+                            type="button"
+                            className="btn-slds btn-slds-secondary"
+                            style={{ width: 32, height: 32, padding: 0, borderRadius: 8, color: "#DC2626", borderColor: "#FCA5A5", display: "flex", alignItems: "center", justifyContent: "center" }}
+                            onClick={() => removeRow(idx)}
+                            title="Remove row"
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 4. Suggested Box (Chips: GSTR-1, GSTR-3B, GSTR-9, etc.) */}
+              <div style={{ padding: 14, background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", marginBottom: 10, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 6 }}>
+                  <Sparkles size={14} color="#166534" />
+                  <span>Suggested Services (Click to Add Row):</span>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {SUGGESTED_SERVICES.map(suggestion => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      style={{
+                        background: "#FFFFFF",
+                        color: "#0F172A",
+                        border: "1px solid #CBD5E1",
+                        padding: "6px 12px",
+                        borderRadius: 8,
+                        fontSize: 12,
+                        cursor: "pointer",
+                        fontWeight: 600,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                        transition: "all 0.15s ease"
+                      }}
+                      onClick={() => handleSuggestedClick(suggestion)}
+                    >
+                      + {suggestion}
+                    </button>
+                  ))}
+                </div>
               </div>
 
             </div>
             <div className="modal-footer">
               <button className="btn-slds btn-slds-secondary" onClick={() => setModal({ open: false, editing: null })}>Cancel</button>
-              <button className="btn-slds btn-slds-primary" onClick={handleSave}>{modal.editing ? "Save Changes" : "Add Service"}</button>
+              <button className="btn-slds btn-slds-primary" onClick={handleSave}>
+                {modal.editing ? "Save Changes" : "Add Service"}
+              </button>
             </div>
           </div>
         </div>

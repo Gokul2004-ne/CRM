@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="100%" height="100%">
+  <defs>
+    <linearGradient id="blueGradIcon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F4C81" />
+      <stop offset="50%" stop-color="#0066D4" />
+      <stop offset="100%" stop-color="#0B2545" />
+    </linearGradient>
+    <linearGradient id="blueLightIcon" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1E88E5" />
+      <stop offset="100%" stop-color="#0052CC" />
+    </linearGradient>
+    <linearGradient id="greenGradIcon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#64DD17" />
+      <stop offset="100%" stop-color="#388E3C" />
+    </linearGradient>
+  </defs>
+
+  <!-- Top Blue Outer Arc -->
+  <path d="M 65 140 A 110 110 0 0 1 220 50" fill="none" stroke="url(#blueLightIcon)" stroke-width="14" stroke-linecap="round" />
+
+  <!-- Bottom Green Outer Arc -->
+  <path d="M 80 175 A 110 110 0 0 0 235 110" fill="none" stroke="url(#greenGradIcon)" stroke-width="13" stroke-linecap="round" />
+
+  <!-- Stylized Z Symbol -->
+  <g transform="translate(68, 55) scale(0.6)">
+    <path d="M 30 20 L 175 20 L 70 140 L 175 140 L 170 170 L 15 170 L 120 50 L 30 50 Z" fill="url(#blueGradIcon)" />
+    <path d="M 120 50 L 175 20 L 70 140 Z" fill="url(#blueLightIcon)" opacity="0.4" />
+  </g>
+
+  <!-- Green Plus Symbol (+) -->
+  <g transform="translate(178, 62) scale(0.65)">
+    <rect x="25" y="0" width="22" height="70" rx="6" fill="url(#greenGradIcon)" />
+    <rect x="0" y="24" width="72" height="22" rx="6" fill="url(#greenGradIcon)" />
+  </g>
+</svg>

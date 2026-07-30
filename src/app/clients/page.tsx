@@ -2,7 +2,7 @@
 import { useState } from "react";
 import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
-import { Client, ClientDocument } from "@/lib/types";
+import { Client, ClientDocument, PortalCredential } from "@/lib/types";
 import {
   Users, Search, Plus, Edit, Trash2, Phone, Mail,
   Building, Copy, CheckCircle2, Shield, Eye, Download, MessageCircle, FileText, Share2, Layers
@@ -407,41 +407,6 @@ export default function ClientsPage() {
                 </div>
               </div>
 
-              {/* GST Portal Login Credentials */}
-              <div style={{ padding: "12px 14px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10 }}>
-                <div style={{ fontSize: 12, fontWeight: 800, color: "#166534", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                  🔐 GST Portal Login Credentials
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>
-                      GST Portal User ID
-                    </label>
-                    <input
-                      type="text"
-                      className="command-palette-input"
-                      style={{ borderRadius: 8, border: "1px solid #BBF7D0", padding: 10, fontSize: 14, background: "white" }}
-                      placeholder="GST portal username"
-                      value={formData.gstPortalId || ""}
-                      onChange={e => setFormData({ ...formData, gstPortalId: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>
-                      GST Portal Password
-                    </label>
-                    <input
-                      type="text"
-                      className="command-palette-input"
-                      style={{ borderRadius: 8, border: "1px solid #BBF7D0", padding: 10, fontSize: 14, background: "white" }}
-                      placeholder="GST portal password"
-                      value={formData.gstPortalPassword || ""}
-                      onChange={e => setFormData({ ...formData, gstPortalPassword: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
                 <button
                   type="button"
@@ -552,16 +517,110 @@ export default function ClientsPage() {
                     </div>
                   </div>
 
-                  {/* GST Portal Credentials Display */}
+                  {/* Login Credentials Section (Multi-Portal: GST, Income Tax, MCA, Traces, E-Way Bill) */}
                   <div className="section-card" style={{ padding: 16, background: "#F0FDF4", borderColor: "#BBF7D0" }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", textTransform: "uppercase" }}>🔐 GST Portal Login Credentials</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 8 }}>
-                      <div style={{ fontSize: 13 }}>
-                        <span style={{ color: "#64748B" }}>User ID / Username:</span> <strong style={{ color: "#0F172A", marginLeft: 6 }}>{viewingClient.gstPortalId || "Not set"}</strong>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: "#166534", display: "flex", alignItems: "center", gap: 6 }}>
+                        🔐 Login Credentials
                       </div>
-                      <div style={{ fontSize: 13 }}>
-                        <span style={{ color: "#64748B" }}>Password:</span> <strong style={{ color: "#0F172A", marginLeft: 6 }}>{viewingClient.gstPortalPassword || "Not set"}</strong>
-                      </div>
+                      <button
+                        className="btn-slds btn-slds-primary"
+                        style={{ padding: "4px 10px", fontSize: 11 }}
+                        onClick={() => {
+                          const pName = prompt("Enter Portal Name (e.g. GST Portal, Income Tax Portal, MCA Portal):", "GST Portal");
+                          if (!pName) return;
+                          const pId = prompt(`Enter User ID / Username for ${pName}:`);
+                          if (!pId) return;
+                          const pPass = prompt(`Enter Password for ${pName}:`);
+                          if (!pPass) return;
+
+                          const newCred: PortalCredential = {
+                            id: `cred_${Date.now()}`,
+                            portalName: pName,
+                            portalId: pId,
+                            password: pPass
+                          };
+
+                          const existingCreds = viewingClient.portalCredentials || [
+                            { id: "c1", portalName: "GST Portal", portalId: viewingClient.gstPortalId || "N/A", password: viewingClient.gstPortalPassword || "••••••••" }
+                          ];
+                          const updatedCreds = [...existingCreds, newCred];
+                          const updatedClient = { ...viewingClient, portalCredentials: updatedCreds, gstPortalId: pId, gstPortalPassword: pPass };
+                          updateClient(updatedClient);
+                          setViewingClient(updatedClient);
+                          toast.success(`Login credentials added for ${pName}!`);
+                        }}
+                      >
+                        <Plus size={12} /> Add Login Credential
+                      </button>
+                    </div>
+
+                    {/* Table of Portal Credentials */}
+                    <div style={{ background: "white", borderRadius: 8, overflow: "hidden", border: "1px solid #BBF7D0" }}>
+                      <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr style={{ background: "#DCFCE7", color: "#166534", textTransform: "uppercase", fontSize: 10, fontWeight: 700 }}>
+                            <th style={{ padding: "8px 12px", textAlign: "left" }}>Portal Name</th>
+                            <th style={{ padding: "8px 12px", textAlign: "left" }}>User ID / Username</th>
+                            <th style={{ padding: "8px 12px", textAlign: "left" }}>Password</th>
+                            <th style={{ padding: "8px 12px", textAlign: "center" }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {((viewingClient.portalCredentials && viewingClient.portalCredentials.length > 0)
+                            ? viewingClient.portalCredentials
+                            : [
+                                { id: "c1", portalName: "GST Portal", portalId: viewingClient.gstPortalId || "Not Set", password: viewingClient.gstPortalPassword || "Not Set" },
+                                { id: "c2", portalName: "Income Tax Portal", portalId: viewingClient.pan ? `${viewingClient.pan}` : "Not Set", password: "••••••••" }
+                              ]
+                          ).map((cred) => (
+                            <tr key={cred.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                              <td style={{ padding: "8px 12px", fontWeight: 700, color: "#0F172A" }}>
+                                🌐 {cred.portalName}
+                              </td>
+                              <td style={{ padding: "8px 12px", fontFamily: "monospace", color: "#1E293B", fontWeight: 600 }}>
+                                {cred.portalId}
+                                <button
+                                  type="button"
+                                  style={{ background: "none", border: "none", cursor: "pointer", marginLeft: 6, color: "#0176D3" }}
+                                  onClick={() => { navigator.clipboard.writeText(cred.portalId); toast.success(`Copied User ID for ${cred.portalName}`); }}
+                                  title="Copy User ID"
+                                >
+                                  📋
+                                </button>
+                              </td>
+                              <td style={{ padding: "8px 12px", fontFamily: "monospace", color: "#1E293B", fontWeight: 600 }}>
+                                {cred.password}
+                                <button
+                                  type="button"
+                                  style={{ background: "none", border: "none", cursor: "pointer", marginLeft: 6, color: "#0176D3" }}
+                                  onClick={() => { navigator.clipboard.writeText(cred.password); toast.success(`Copied Password for ${cred.portalName}`); }}
+                                  title="Copy Password"
+                                >
+                                  📋
+                                </button>
+                              </td>
+                              <td style={{ padding: "8px 12px", textAlign: "center" }}>
+                                <button
+                                  className="btn-slds btn-slds-secondary"
+                                  style={{ padding: "3px 6px", fontSize: 10, color: "#DC2626", borderColor: "#FCA5A5" }}
+                                  onClick={() => {
+                                    if (confirm(`Remove login credentials for ${cred.portalName}?`)) {
+                                      const updatedCreds = (viewingClient.portalCredentials || []).filter(c => c.id !== cred.id);
+                                      const updated = { ...viewingClient, portalCredentials: updatedCreds };
+                                      updateClient(updated);
+                                      setViewingClient(updated);
+                                      toast.success("Credential removed.");
+                                    }
+                                  }}
+                                >
+                                  <Trash2 size={11} /> Delete
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
 
@@ -604,32 +663,40 @@ export default function ClientsPage() {
                     <div style={{ fontWeight: 700, color: "#0F172A", fontSize: 14 }}>
                       Client Documents ({viewingClient.documents?.length || viewingClient.documentCount || 0})
                     </div>
-                    <button
-                      className="btn-slds btn-slds-primary"
-                      style={{ padding: "4px 10px", fontSize: 11 }}
-                      onClick={() => {
-                        const docName = prompt("Enter document name:");
-                        if (docName) {
-                          const newDoc: ClientDocument = {
-                            id: `cd_${Date.now()}`,
-                            clientId: viewingClient.id,
-                            name: docName,
-                            type: "PDF",
-                            category: "Compliance",
-                            uploadDate: new Date().toISOString().split("T")[0],
-                            status: "RECEIVED"
-                          };
-                          const updatedDocs = [...(viewingClient.documents || []), newDoc];
-                          const updated = { ...viewingClient, documents: updatedDocs, documentCount: updatedDocs.length };
-                          updateClient(updated);
-                          setViewingClient(updated);
-                          toast.success("Document added to client profile!");
-                        }
-                      }}
-                    >
-                      <Plus size={13} />
-                      <span>Add Document</span>
-                    </button>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <label
+                        className="btn-slds btn-slds-primary"
+                        style={{ padding: "5px 12px", fontSize: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
+                      >
+                        <Plus size={13} />
+                        <span>Upload File</span>
+                        <input
+                          type="file"
+                          style={{ display: "none" }}
+                          accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const newDoc: ClientDocument = {
+                                id: `cd_${Date.now()}`,
+                                clientId: viewingClient.id,
+                                name: file.name,
+                                type: file.name.split(".").pop()?.toUpperCase() || "PDF",
+                                category: "Taxation & Compliance",
+                                uploadDate: new Date().toISOString().split("T")[0],
+                                size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+                                status: "RECEIVED"
+                              };
+                              const updatedDocs = [...(viewingClient.documents || []), newDoc];
+                              const updated = { ...viewingClient, documents: updatedDocs, documentCount: updatedDocs.length };
+                              updateClient(updated);
+                              setViewingClient(updated);
+                              toast.success(`Uploaded "${file.name}" to client profile!`);
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
                   </div>
 
                   <div className="table-wrapper-slds">
@@ -686,6 +753,23 @@ export default function ClientsPage() {
                                     <Share2 size={13} />
                                     <span>WhatsApp</span>
                                   </a>
+                                  {/* Delete document button */}
+                                  <button
+                                    className="btn-slds btn-slds-secondary"
+                                    style={{ padding: "4px 6px", fontSize: 11, color: "#DC2626", borderColor: "#FCA5A5" }}
+                                    onClick={() => {
+                                      if (confirm(`Remove document ${doc.name}?`)) {
+                                        const updatedDocs = (viewingClient.documents || []).filter(d => d.id !== doc.id);
+                                        const updated = { ...viewingClient, documents: updatedDocs, documentCount: updatedDocs.length };
+                                        updateClient(updated);
+                                        setViewingClient(updated);
+                                        toast.success("Document removed.");
+                                      }
+                                    }}
+                                    title="Delete Document"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
                                 </div>
                               </td>
                             </tr>

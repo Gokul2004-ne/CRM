@@ -11,6 +11,14 @@ export const metadata: Metadata = {
   title: "zpluscrm – Connect. Manage. Grow.",
   description: "zpluscrm enterprise practice management platform for professional firms. Manage clients, services, billing, and documents in one place.",
   keywords: "zpluscrm, firm management, CRM practice, client management, billing, CRM",
+  icons: {
+    icon: [
+      { url: "/zplus-icon.svg", type: "image/svg+xml" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/zplus-icon.svg",
+    apple: "/zplus-icon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

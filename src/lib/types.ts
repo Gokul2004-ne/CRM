@@ -16,6 +16,13 @@ export interface ClientDocument {
   status?: "RECEIVED" | "PENDING" | "VERIFIED";
 }
 
+export interface PortalCredential {
+  id: string;
+  portalName: string;
+  portalId: string;
+  password: string;
+}
+
 export interface Client {
   id: string;
   name: string;
@@ -31,6 +38,7 @@ export interface Client {
   gstNo?: string;
   gstPortalId?: string;
   gstPortalPassword?: string;
+  portalCredentials?: PortalCredential[];
   contactPerson?: string;
   city?: string;
   status?: string;

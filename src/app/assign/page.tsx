@@ -129,7 +129,6 @@ export default function AssignPage() {
                 <th className="col-num">#</th>
                 <th>Service Name</th>
                 <th>Client Name</th>
-                <th>Package Name</th>
                 <th>Financial Year</th>
                 <th>Due Date</th>
                 <th>Service Delivery Status</th>
@@ -172,11 +171,6 @@ export default function AssignPage() {
 
                     {/* 2. Client Name */}
                     <td style={{ fontWeight: 800, color: "#0F172A" }}>{client?.name || "-"}</td>
-
-                    {/* 3. Package Name */}
-                    <td>
-                      <span style={{ fontWeight: 600, color: "#0176D3" }}>{service?.name || "-"}</span>
-                    </td>
 
                     {/* 4. FY */}
                     <td><span className="badge" style={{ background: "#EFF6FF", color: "#1D4ED8" }}>FY {a.financialYear}</span></td>
@@ -275,7 +269,7 @@ export default function AssignPage() {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="empty-table-cell">
+                  <td colSpan={7} className="empty-table-cell">
                     No assigned packages for FY {selectedFY}
                   </td>
                 </tr>
