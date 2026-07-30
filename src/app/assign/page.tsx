@@ -1,0 +1,489 @@
+"use client";
+import AppShell from "@/components/AppShell";
+import { useAppStore } from "@/lib/store";
+import { useState, useMemo } from "react";
+import { AssignedService } from "@/lib/types";
+import { Plus, Pencil, Trash2, Search, Eye, MessageCircle, Mail, AlertTriangle, CheckCircle2, Clock, Circle } from "lucide-react";
+import { formatDate, getCurrentFY, getFYOptions, getWhatsAppLink } from "@/lib/utils";
+import { toast } from "sonner";
+
+type DeliveryStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED";
+
+const statusConfig = {
+  PENDING: { label: "Not Started", color: "#64748B", bg: "#F1F5F9", border: "#CBD5E1", icon: Circle },
+  IN_PROGRESS: { label: "In Progress", color: "#D97706", bg: "#FFFBEB", border: "#FCD34D", icon: Clock },
+  COMPLETED: { label: "Completed", color: "#059669", bg: "#F0FDF4", border: "#6EE7B7", icon: CheckCircle2 },
+};
+
+const empty = () => ({
+  id: "", clientId: "", serviceId: "", subServiceIds: [],
+  financialYear: getCurrentFY(), amountBilled: 0, amountReceived: 0, amountPending: 0, dueDate: new Date().toISOString().split("T")[0]
+});
+
+export default function AssignPage() {
+  const { clients, services, subServices, assignedServices, selectedFY, addAssignedService, updateAssignedService, deleteAssignedService } = useAppStore();
+  const [search, setSearch] = useState("");
+  const [modal, setModal] = useState<{ open: boolean; editing: AssignedService | null }>({ open: false, editing: null });
+  const [viewDetailModal, setViewDetailModal] = useState<{ open: boolean; assignment: AssignedService | null }>({ open: false, assignment: null });
+  const [form, setForm] = useState<any>(empty());
+
+  const getDueStatus = (dueDateStr?: string) => {
+    if (!dueDateStr) return { days: 999, category: "GREEN" as const, label: "On Schedule" };
+    const due = new Date(dueDateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    due.setHours(0, 0, 0, 0);
+    const days = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (days <= 0) return { days, category: "RED" as const, label: days === 0 ? "Due Today!" : `${Math.abs(days)} Days Overdue` };
+    if (days <= 9) return { days, category: "RED" as const, label: `Due in ${days} Days (Critical)` };
+    if (days <= 15) return { days, category: "YELLOW" as const, label: `Due in ${days} Days` };
+    return { days, category: "GREEN" as const, label: `Due in ${days} Days` };
+  };
+
+  const filtered = useMemo(() => {
+    const list = assignedServices
+      .filter(a => a.financialYear === selectedFY)
+      .filter(a => {
+        const client = clients.find(c => c.id === a.clientId);
+        const service = services.find(s => s.id === a.serviceId);
+        const subs = subServices.filter(ss => a.subServiceIds?.includes(ss.id));
+        const subName = subs.map(s => s.name).join(" ");
+        return (client?.name || "").toLowerCase().includes(search.toLowerCase()) ||
+               (service?.name || "").toLowerCase().includes(search.toLowerCase()) ||
+               subName.toLowerCase().includes(search.toLowerCase());
+      });
+
+    return list.sort((a, b) => {
+      const daysA = getDueStatus(a.dueDate).days;
+      const daysB = getDueStatus(b.dueDate).days;
+      return daysA - daysB;
+    });
+  }, [assignedServices, clients, services, subServices, search, selectedFY]);
+
+  const openAdd = () => { setForm(empty()); setModal({ open: true, editing: null }); };
+  const openEdit = (a: AssignedService) => { setForm({ ...a }); setModal({ open: true, editing: a }); };
+
+  const availableSubServices = useMemo(() =>
+    subServices.filter(ss => ss.serviceId === form.serviceId || (ss.serviceIds && ss.serviceIds.includes(form.serviceId))),
+    [subServices, form.serviceId]);
+
+  const handleSave = () => {
+    if (!form.clientId || !form.serviceId || !form.dueDate) {
+      toast.error("Client, Package, and Due Date are required");
+      return;
+    }
+    const record: AssignedService = {
+      ...form,
+      amountBilled: form.amountBilled || 0,
+      amountReceived: form.amountReceived || 0,
+      amountPending: (form.amountBilled || 0) - (form.amountReceived || 0),
+      id: form.id || `as${Date.now()}`
+    };
+    if (modal.editing) { updateAssignedService(record); toast.success("Assignment updated"); }
+    else { addAssignedService(record); toast.success("Package assigned successfully"); }
+    setModal({ open: false, editing: null });
+  };
+
+  const toggleSubService = (id: string) => {
+    setForm((f: any) => ({
+      ...f,
+      subServiceIds: f.subServiceIds.includes(id)
+        ? f.subServiceIds.filter((x: string) => x !== id)
+        : [...f.subServiceIds, id]
+    }));
+  };
+
+  const handleStatusCycle = (a: AssignedService) => {
+    const order: DeliveryStatus[] = ["PENDING", "IN_PROGRESS", "COMPLETED"];
+    const current = (a.status as DeliveryStatus) || "PENDING";
+    const next = order[(order.indexOf(current) + 1) % order.length];
+    updateAssignedService({ ...a, status: next });
+    toast.success(`Status updated to ${statusConfig[next].label}`);
+  };
+
+  const fyOptions = getFYOptions();
+
+  return (
+    <AppShell title="Assign Packages" subtitle="Assign packages to clients with due date tracking">
+      <div className="data-table-wrapper">
+        <div className="data-table-header">
+          <div className="toolbar-controls">
+            <div className="search-wrapper">
+              <Search className="search-icon" />
+              <input className="search-input" placeholder="Search client, package or service..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+          </div>
+          <button className="btn-slds btn-slds-primary" onClick={openAdd}><Plus size={15} /> Assign Package</button>
+        </div>
+
+        {/* Priority Alert Banner */}
+        <div style={{ padding: "10px 16px", background: "#FEF2F2", borderBottom: "1px solid #FECACA", display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#991B1B", fontWeight: 700 }}>
+          <AlertTriangle size={16} color="#DC2626" />
+          <span>Priority Alert: Approaching / Overdue Due Dates are automatically highlighted RED on top.</span>
+        </div>
+
+        <div className="table-scroll-container">
+          <table>
+            <thead>
+              <tr>
+                <th className="col-num">#</th>
+                <th>Service Name</th>
+                <th>Client Name</th>
+                <th>Package Name</th>
+                <th>Financial Year</th>
+                <th>Due Date</th>
+                <th>Service Delivery Status</th>
+                <th className="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((a, i) => {
+                const client = clients.find(c => c.id === a.clientId);
+                const service = services.find(s => s.id === a.serviceId);
+                const subs = subServices.filter(ss => a.subServiceIds?.includes(ss.id));
+                const status = getDueStatus(a.dueDate);
+                const deliveryStatus = (a.status as DeliveryStatus) || "PENDING";
+                const cfg = statusConfig[deliveryStatus];
+                const StatusIcon = cfg.icon;
+
+                const isRed = status.category === "RED";
+                const isYellow = status.category === "YELLOW";
+
+                return (
+                  <tr
+                    key={a.id}
+                    style={{
+                      background: isRed ? "#FEF2F2" : isYellow ? "#FEFCE8" : "#FFFFFF",
+                      borderLeft: isRed ? "4px solid #DC2626" : isYellow ? "4px solid #D97706" : "4px solid #059669"
+                    }}
+                  >
+                    <td className="col-num">{i + 1}</td>
+
+                    {/* 1. Service Name */}
+                    <td>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {subs.length > 0 ? subs.map(ss => (
+                          <span key={ss.id} className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 600, fontSize: 12 }}>{ss.name}</span>
+                        )) : (
+                          <span style={{ color: "#94A3B8", fontSize: 12 }}>No services</span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* 2. Client Name */}
+                    <td style={{ fontWeight: 800, color: "#0F172A" }}>{client?.name || "-"}</td>
+
+                    {/* 3. Package Name */}
+                    <td>
+                      <span style={{ fontWeight: 600, color: "#0176D3" }}>{service?.name || "-"}</span>
+                    </td>
+
+                    {/* 4. FY */}
+                    <td><span className="badge" style={{ background: "#EFF6FF", color: "#1D4ED8" }}>FY {a.financialYear}</span></td>
+
+                    {/* 5. Due Date */}
+                    <td>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <span style={{ fontWeight: 700, color: isRed ? "#DC2626" : isYellow ? "#B45309" : "#059669", fontSize: 13 }}>
+                          {a.dueDate ? formatDate(a.dueDate) : "-"}
+                        </span>
+                        <span
+                          className="badge-slds"
+                          style={{
+                            background: isRed ? "#DC2626" : isYellow ? "#F59E0B" : "#10B981",
+                            color: "white",
+                            fontWeight: 700,
+                            fontSize: 10,
+                            padding: "2px 6px",
+                            borderRadius: 6,
+                            width: "fit-content"
+                          }}
+                        >
+                          {status.label}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* 6. Delivery Status — clickable to cycle */}
+                    <td>
+                      <button
+                        onClick={() => handleStatusCycle(a)}
+                        title="Click to update status"
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 8,
+                          border: `1px solid ${cfg.border}`,
+                          background: cfg.bg,
+                          color: cfg.color,
+                          fontWeight: 700,
+                          fontSize: 12,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        <StatusIcon size={13} />
+                        {cfg.label}
+                      </button>
+                    </td>
+
+                    {/* 7. Actions */}
+                    <td className="col-actions">
+                      <div style={{ display: "flex", justifyContent: "center", gap: 4 }}>
+                        <button
+                          className="btn-slds btn-slds-primary"
+                          style={{ padding: "4px 8px", fontSize: 11 }}
+                          onClick={() => setViewDetailModal({ open: true, assignment: a })}
+                          title="View Details"
+                        >
+                          <Eye size={13} />
+                        </button>
+                        {client?.phone && (
+                          <a
+                            href={getWhatsAppLink(client.phone, `Hello ${client.name}, this is a reminder for ${service?.name} due on ${formatDate(a.dueDate || "")}.`)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn-slds btn-slds-success"
+                            style={{ padding: "4px 8px", fontSize: 11 }}
+                            title="WhatsApp"
+                          >
+                            <MessageCircle size={13} />
+                          </a>
+                        )}
+                        {client?.email && (
+                          <a
+                            href={`mailto:${client.email}?subject=${encodeURIComponent(`Reminder: ${service?.name}`)}&body=${encodeURIComponent(`Dear ${client.name},\n\nThis is a reminder that ${service?.name} is due on ${formatDate(a.dueDate || "")}.\n\nThank you!`)}`}
+                            className="btn-slds btn-slds-secondary"
+                            style={{ padding: "4px 8px", fontSize: 11, color: "#0284C7" }}
+                            title="Send Email"
+                          >
+                            <Mail size={13} />
+                          </a>
+                        )}
+                        <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px" }} onClick={() => openEdit(a)} title="Edit">
+                          <Pencil size={13} />
+                        </button>
+                        <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px", color: "#DC2626", borderColor: "#FCA5A5" }} onClick={() => { deleteAssignedService(a.id); toast.success("Removed"); }} title="Delete">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="empty-table-cell">
+                    No assigned packages for FY {selectedFY}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* View Detail Modal */}
+      {viewDetailModal.open && viewDetailModal.assignment && (
+        <div className="command-palette-backdrop" onClick={() => setViewDetailModal({ open: false, assignment: null })}>
+          <div className="command-palette-card" style={{ maxWidth: 540 }} onClick={e => e.stopPropagation()}>
+            {(() => {
+              const assign = viewDetailModal.assignment!;
+              const client = clients.find(c => c.id === assign.clientId);
+              const service = services.find(s => s.id === assign.serviceId);
+              const subs = subServices.filter(ss => assign.subServiceIds?.includes(ss.id));
+              const status = getDueStatus(assign.dueDate);
+              const isRed = status.category === "RED";
+              const deliveryStatus = (assign.status as DeliveryStatus) || "PENDING";
+              const cfg = statusConfig[deliveryStatus];
+              const StatusIcon = cfg.icon;
+
+              return (
+                <>
+                  <div style={{ padding: "18px 24px", background: isRed ? "#7F1D1D" : "#0F172A", color: "white", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: 18, fontWeight: 800 }}>{client?.name || "Client Record"}</div>
+                      <div style={{ fontSize: 12, color: "#94A3B8" }}>Assigned Package Details</div>
+                    </div>
+                    <button className="btn-slds btn-slds-secondary" style={{ background: "rgba(255,255,255,0.15)", color: "white", border: "none" }} onClick={() => setViewDetailModal({ open: false, assignment: null })}>✕</button>
+                  </div>
+
+                  <div style={{ padding: 24, display: "grid", gap: 16 }}>
+                    <div style={{ padding: 14, background: isRed ? "#FEF2F2" : "#F8FAFC", border: `1px solid ${isRed ? "#FCA5A5" : "#E2E8F0"}`, borderRadius: 10 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Due Date Status</div>
+                      <div style={{ fontSize: 18, fontWeight: 900, color: isRed ? "#DC2626" : "#059669", marginTop: 2 }}>
+                        {assign.dueDate ? formatDate(assign.dueDate) : "No Due Date"} — {status.label}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>Client</div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>{client?.name}</div>
+                        <div style={{ fontSize: 12, color: "#0176D3" }}>{client?.mobile || client?.phone}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>Financial Year</div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>FY {assign.financialYear}</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", marginBottom: 4 }}>Package</div>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: "#0176D3" }}>{service?.name}</div>
+                    </div>
+
+                    {subs.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", marginBottom: 6 }}>Services</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                          {subs.map(ss => (
+                            <span key={ss.id} className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700 }}>{ss.name}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", marginBottom: 6 }}>Service Delivery Status</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 8, width: "fit-content" }}>
+                        <StatusIcon size={16} color={cfg.color} />
+                        <span style={{ fontWeight: 700, color: cfg.color }}>{cfg.label}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <a
+                        href={getWhatsAppLink(client?.mobile || "", `Hello ${client?.name}, this is a reminder for ${service?.name} due on ${formatDate(assign.dueDate || "")}.`)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn-slds btn-slds-success"
+                        style={{ padding: "6px 14px" }}
+                      >
+                        <MessageCircle size={14} />
+                        <span>Send WhatsApp Reminder</span>
+                      </a>
+                      <button className="btn-slds btn-slds-secondary" onClick={() => setViewDetailModal({ open: false, assignment: null })}>Close</button>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Assign Package Modal */}
+      {modal.open && (
+        <div className="modal-overlay" onClick={() => setModal({ open: false, editing: null })}>
+          <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">{modal.editing ? "Edit Assignment" : "Assign Package to Client"}</div>
+              <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px" }} onClick={() => setModal({ open: false, editing: null })}>✕</button>
+            </div>
+            <div className="modal-body" style={{ display: "grid", gap: 14 }}>
+
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 700 }}>1. Client Name *</label>
+                <select className="form-select" value={form.clientId} onChange={e => setForm((f: any) => ({ ...f, clientId: e.target.value }))}>
+                  <option value="">Select client</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 700 }}>2. Package *</label>
+                <select className="form-select" value={form.serviceId} onChange={e => {
+                  const selectedSvcId = e.target.value;
+                  const matchingSubs = subServices.filter(ss => ss.serviceId === selectedSvcId || (ss.serviceIds && ss.serviceIds.includes(selectedSvcId))).map(ss => ss.id);
+                  setForm((f: any) => ({ ...f, serviceId: selectedSvcId, subServiceIds: matchingSubs }));
+                }}>
+                  <option value="">Select package</option>
+                  {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+
+              {availableSubServices.length > 0 && (
+                <div className="form-group">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>3. Services</label>
+                    <button
+                      type="button"
+                      className="btn-slds btn-slds-secondary"
+                      style={{ padding: "2px 8px", fontSize: 10 }}
+                      onClick={() => {
+                        const allIds = availableSubServices.map(ss => ss.id);
+                        const isAllSelected = allIds.every(id => form.subServiceIds.includes(id));
+                        setForm((f: any) => ({ ...f, subServiceIds: isAllSelected ? [] : allIds }));
+                      }}
+                    >
+                      {availableSubServices.every(ss => form.subServiceIds.includes(ss.id)) ? "Deselect All" : "Select All"}
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                    {availableSubServices.map(ss => (
+                      <button key={ss.id} type="button"
+                        className={`btn-slds ${form.subServiceIds.includes(ss.id) ? "btn-slds-primary" : "btn-slds-secondary"}`}
+                        style={{ padding: "4px 10px", fontSize: 12 }}
+                        onClick={() => toggleSubService(ss.id)}
+                      >{ss.name}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 700 }}>4. Financial Year *</label>
+                  <select className="form-select" value={form.financialYear} onChange={e => setForm((f: any) => ({ ...f, financialYear: e.target.value }))}>
+                    {fyOptions.map(fy => <option key={fy} value={fy}>FY {fy}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 700 }}>5. Due Date *</label>
+                  <input className="form-input" type="date" value={form.dueDate} onChange={e => setForm((f: any) => ({ ...f, dueDate: e.target.value }))} />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, paddingTop: 10, borderTop: "1px dashed #CBD5E1" }}>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 700 }}>Total Billed Amount (₹)</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    value={form.amountBilled || ""}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm((f: any) => ({ ...f, amountBilled: val === "" ? 0 : Number(val) }));
+                    }}
+                    placeholder="e.g. 12000"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 700 }}>Amount Received (₹)</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    value={form.amountReceived || ""}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm((f: any) => ({ ...f, amountReceived: val === "" ? 0 : Number(val) }));
+                    }}
+                    placeholder="e.g. 8000"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-slds btn-slds-secondary" onClick={() => setModal({ open: false, editing: null })}>Cancel</button>
+              <button className="btn-slds btn-slds-primary" onClick={handleSave}>{modal.editing ? "Save Changes" : "Assign Package"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </AppShell>
+  );
+}
