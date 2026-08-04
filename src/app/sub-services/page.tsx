@@ -49,7 +49,7 @@ const emptyRow = (defaultName = ""): SelectedServiceRow => ({
 const empty = (): SubService => ({ id: "", serviceId: "", name: "", serviceIds: [], recurrence: "MONTHLY", dueDate: "" });
 
 export default function ServicesPage() {
-  const { services, subServices, requiredDocs, addSubService, addSubServicesBatch, updateSubService, deleteSubService } = useAppStore();
+  const { clients, services, subServices, requiredDocs, addSubService, addSubServicesBatch, updateSubService, deleteSubService } = useAppStore();
   const [search, setSearch] = useState("");
   const [filterPackage, setFilterPackage] = useState("all");
   const [modal, setModal] = useState<{ open: boolean; editing: SubService | null }>({ open: false, editing: null });
@@ -132,7 +132,9 @@ export default function ServicesPage() {
         recurrence: row.recurrence,
         dueDate: row.dueDate,
         dueDateDay: row.dueDateDay,
-        serviceIds: [form.serviceId]
+        serviceIds: [form.serviceId],
+        clientId: form.clientId,
+        clientName: form.clientName || clients.find(c => c.id === form.clientId)?.name || ""
       };
       updateSubService(serviceData);
       toast.success("Service updated successfully!");
@@ -150,6 +152,8 @@ export default function ServicesPage() {
         serviceId: form.serviceId,
         name: r.name.trim(),
         serviceIds: [form.serviceId],
+        clientId: form.clientId,
+        clientName: form.clientName || clients.find(c => c.id === form.clientId)?.name || "",
         recurrence: r.recurrence || "MONTHLY",
         dueDate: r.dueDate || "",
         dueDateDay: r.dueDateDay || ""
@@ -248,7 +252,7 @@ export default function ServicesPage() {
               <thead>
                 <tr>
                   <th className="col-num">#</th>
-                  <th>Main Package</th>
+                  <th>Client Name</th>
                   <th>Service Name</th>
                   <th>Recurrence</th>
                   <th>Due Date</th>
@@ -258,6 +262,8 @@ export default function ServicesPage() {
               <tbody>
                 {filtered.map((ss, i) => {
                   const parentService = services.find(s => s.id === ss.serviceId);
+                  const assignedClient = clients.find(c => c.id === ss.clientId);
+                  const displayClientName = ss.clientName || assignedClient?.name || (parentService ? `[${parentService.name}]` : "All Clients");
                   const recurrence = (ss as any).recurrence as string || "MONTHLY";
                   const colors = recurrenceColors[recurrence] || { bg: "#F1F5F9", color: "#334155" };
 
@@ -266,7 +272,7 @@ export default function ServicesPage() {
                       <td className="col-num">{i + 1}</td>
                       <td>
                         <span className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700 }}>
-                          {parentService?.name || "-"}
+                          🏢 {displayClientName}
                         </span>
                       </td>
                       <td style={{ fontWeight: 700, color: "#0F172A" }}>{ss.name}</td>
@@ -409,18 +415,36 @@ export default function ServicesPage() {
 
             <div className="modal-body" style={{ display: "grid", gap: 16, maxHeight: "78vh", overflowY: "auto" }}>
 
-              {/* 1. Main Package */}
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 700, fontSize: 13 }}>Main Package *</label>
-                <select
-                  className="form-select"
-                  style={{ fontSize: 13, padding: 10 }}
-                  value={form.serviceId}
-                  onChange={e => setForm(f => ({ ...f, serviceId: e.target.value }))}
-                >
-                  <option value="">Select a main Package</option>
-                  {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+              {/* 1. Main Package & Client Name Selection */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: 13 }}>Main Package *</label>
+                  <select
+                    className="form-select"
+                    style={{ fontSize: 13, padding: 10 }}
+                    value={form.serviceId}
+                    onChange={e => setForm(f => ({ ...f, serviceId: e.target.value }))}
+                  >
+                    <option value="">Select a main Package</option>
+                    {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: 13 }}>Client Name</label>
+                  <select
+                    className="form-select"
+                    style={{ fontSize: 13, padding: 10 }}
+                    value={form.clientId || ""}
+                    onChange={e => {
+                      const selected = clients.find(c => c.id === e.target.value);
+                      setForm(f => ({ ...f, clientId: e.target.value, clientName: selected?.name || "" }));
+                    }}
+                  >
+                    <option value="">Select a Client Name (Optional)</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
               </div>
 
               {/* 2. Service Name Search/Input */}

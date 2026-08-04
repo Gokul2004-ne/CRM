@@ -68,6 +68,8 @@ export interface SubService {
   serviceId: string;
   name: string;
   serviceIds?: string[];
+  clientId?: string;
+  clientName?: string;
   recurrence?: Recurrence | "MONTHLY" | "QUARTERLY" | "ANNUALLY";
   dueDate?: string;
   dueDateDay?: string; // For monthly: day of month

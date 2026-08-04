@@ -5,7 +5,7 @@ import { useAppStore } from "@/lib/store";
 import { Client, ClientDocument, PortalCredential } from "@/lib/types";
 import {
   Users, Search, Plus, Edit, Trash2, Phone, Mail,
-  Building, Copy, CheckCircle2, Shield, Eye, Download, MessageCircle, FileText, Share2, Layers
+  Building, Copy, CheckCircle2, Shield, Eye, Download, MessageCircle, FileText, Share2, Layers, Lock
 } from "lucide-react";
 import { getWhatsAppLink, formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
@@ -17,7 +17,7 @@ export default function ClientsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [viewingClient, setViewingClient] = useState<Client | null>(null);
-  const [activeTab, setActiveTab] = useState<"details" | "documents" | "services">("details");
+  const [activeTab, setActiveTab] = useState<"details" | "credentials" | "documents" | "services">("details");
 
   const [formData, setFormData] = useState<Partial<Client>>({
     name: "",
@@ -459,6 +459,7 @@ export default function ClientsPage() {
               <div style={{ display: "flex", gap: 12, marginTop: 20, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
                 {[
                   { id: "details", label: "Client Profile & Details", icon: Building },
+                  { id: "credentials", label: "Login Credentials", icon: Lock },
                   { id: "documents", label: `Documents (${viewingClient.documentCount || viewingClient.documents?.length || 0})`, icon: FileText },
                   { id: "services", label: "Services & Workflow", icon: Layers }
                 ].map(t => (
@@ -517,6 +518,18 @@ export default function ClientsPage() {
                     </div>
                   </div>
 
+                  <div className="section-card" style={{ padding: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Office Address & Location</div>
+                    <div style={{ fontSize: 13, color: "#334155", marginTop: 6 }}>
+                      {viewingClient.address || `${viewingClient.city || "Mumbai"}, Maharashtra, India`}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: Login Credentials */}
+              {activeTab === "credentials" && (
+                <div style={{ display: "grid", gap: 16 }}>
                   {/* Login Credentials Section (Multi-Portal: GST, Income Tax, MCA, Traces, E-Way Bill) */}
                   <div className="section-card" style={{ padding: 16, background: "#F0FDF4", borderColor: "#BBF7D0" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -624,15 +637,8 @@ export default function ClientsPage() {
                     </div>
                   </div>
 
-                  <div className="section-card" style={{ padding: 16 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Office Address & Location</div>
-                    <div style={{ fontSize: 13, color: "#334155", marginTop: 6 }}>
-                      {viewingClient.address || `${viewingClient.city || "Mumbai"}, Maharashtra, India`}
-                    </div>
-                  </div>
-
                   {/* WhatsApp Direct Action Bar */}
-                  <div style={{ padding: "14px 18px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ marginTop: 12, padding: "14px 18px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: "#166534", display: "flex", alignItems: "center", gap: 6 }}>
                         <MessageCircle size={16} />
