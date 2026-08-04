@@ -8,9 +8,34 @@ import {
   mockAssignedServices, mockBankingEntries, mockLeads, mockDrafts, mockCollaborations
 } from "./mockData";
 
-// Fetch all CRM data from Supabase
+// Fetch all CRM data from Supabase (Scoped to current authenticated user_id)
 export async function fetchAllCRMData() {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id;
+
+    let clientsQ = supabase.from("clients").select("*");
+    let servicesQ = supabase.from("services").select("*");
+    let subServicesQ = supabase.from("sub_services").select("*");
+    let requiredDocsQ = supabase.from("required_docs").select("*");
+    let assignedServicesQ = supabase.from("assigned_services").select("*");
+    let bankingEntriesQ = supabase.from("banking_entries").select("*");
+    let leadsQ = supabase.from("leads").select("*");
+    let draftsQ = supabase.from("drafts").select("*");
+    let collaborationsQ = supabase.from("collaborations").select("*");
+
+    if (userId) {
+      clientsQ = clientsQ.eq("user_id", userId);
+      servicesQ = servicesQ.eq("user_id", userId);
+      subServicesQ = subServicesQ.eq("user_id", userId);
+      requiredDocsQ = requiredDocsQ.eq("user_id", userId);
+      assignedServicesQ = assignedServicesQ.eq("user_id", userId);
+      bankingEntriesQ = bankingEntriesQ.eq("user_id", userId);
+      leadsQ = leadsQ.eq("user_id", userId);
+      draftsQ = draftsQ.eq("user_id", userId);
+      collaborationsQ = collaborationsQ.eq("user_id", userId);
+    }
+
     const [
       { data: clients },
       { data: services },
@@ -22,15 +47,15 @@ export async function fetchAllCRMData() {
       { data: drafts },
       { data: collaborations },
     ] = await Promise.all([
-      supabase.from("clients").select("*"),
-      supabase.from("services").select("*"),
-      supabase.from("sub_services").select("*"),
-      supabase.from("required_docs").select("*"),
-      supabase.from("assigned_services").select("*"),
-      supabase.from("banking_entries").select("*"),
-      supabase.from("leads").select("*"),
-      supabase.from("drafts").select("*"),
-      supabase.from("collaborations").select("*"),
+      clientsQ,
+      servicesQ,
+      subServicesQ,
+      requiredDocsQ,
+      assignedServicesQ,
+      bankingEntriesQ,
+      leadsQ,
+      draftsQ,
+      collaborationsQ,
     ]);
 
     const formattedClients: Client[] = (clients || []).map((c: any) => ({
@@ -280,10 +305,21 @@ export async function seedInitialDataToSupabase() {
   }
 }
 
+async function getUserId(): Promise<string | undefined> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    return user?.id;
+  } catch {
+    return undefined;
+  }
+}
+
 // Clients Sync
 export async function syncClientToSupabase(c: Client) {
+  const userId = await getUserId();
   await supabase.from("clients").upsert({
     id: c.id,
+    user_id: userId,
     name: c.name,
     owner_name: c.ownerName,
     type: c.type,
@@ -315,8 +351,10 @@ export async function removeClientFromSupabase(id: string) {
 
 // Services Sync
 export async function syncServiceToSupabase(s: Service) {
+  const userId = await getUserId();
   await supabase.from("services").upsert({
     id: s.id,
+    user_id: userId,
     name: s.name,
     due_date: s.dueDate,
     price: s.price,
@@ -331,8 +369,10 @@ export async function removeServiceFromSupabase(id: string) {
 
 // SubServices Sync
 export async function syncSubServiceToSupabase(ss: SubService) {
+  const userId = await getUserId();
   await supabase.from("sub_services").upsert({
     id: ss.id,
+    user_id: userId,
     service_id: ss.serviceId,
     name: ss.name,
     due_date: ss.dueDate,
@@ -345,8 +385,10 @@ export async function removeSubServiceFromSupabase(id: string) {
 
 // RequiredDocs Sync
 export async function syncRequiredDocToSupabase(rd: RequiredDoc) {
+  const userId = await getUserId();
   await supabase.from("required_docs").upsert({
     id: rd.id,
+    user_id: userId,
     sub_service_id: rd.subServiceId,
     name: rd.name,
     is_mandatory: rd.isMandatory,
@@ -359,8 +401,10 @@ export async function removeRequiredDocFromSupabase(id: string) {
 
 // AssignedServices Sync
 export async function syncAssignedServiceToSupabase(a: AssignedService) {
+  const userId = await getUserId();
   await supabase.from("assigned_services").upsert({
     id: a.id,
+    user_id: userId,
     client_id: a.clientId,
     service_id: a.serviceId,
     sub_service_ids: a.subServiceIds,
@@ -382,8 +426,10 @@ export async function removeAssignedServiceFromSupabase(id: string) {
 
 // BankingEntries Sync
 export async function syncBankingEntryToSupabase(b: BankingEntry) {
+  const userId = await getUserId();
   await supabase.from("banking_entries").upsert({
     id: b.id,
+    user_id: userId,
     financial_year: b.financialYear,
     client_id: b.clientId,
     service_id: b.serviceId,
@@ -401,8 +447,10 @@ export async function removeBankingEntryFromSupabase(id: string) {
 
 // Leads Sync
 export async function syncLeadToSupabase(l: Lead) {
+  const userId = await getUserId();
   await supabase.from("leads").upsert({
     id: l.id,
+    user_id: userId,
     name: l.name,
     mobile: l.mobile,
     phone: l.phone,
@@ -420,8 +468,10 @@ export async function removeLeadFromSupabase(id: string) {
 
 // Drafts Sync
 export async function syncDraftToSupabase(d: DocumentDraft) {
+  const userId = await getUserId();
   await supabase.from("drafts").upsert({
     id: d.id,
+    user_id: userId,
     title: d.title,
     content: d.content,
     updated_at: d.updatedAt || new Date().toISOString(),
@@ -435,8 +485,10 @@ export async function removeDraftFromSupabase(id: string) {
 // Collaborations Sync
 export async function syncCollaborationToSupabase(c: Collaboration) {
   try {
+    const userId = await getUserId();
     await supabase.from("collaborations").upsert({
       id: c.id,
+      user_id: userId,
       name: c.name,
       number: c.number,
       email: c.email,

@@ -104,6 +104,14 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
         // Create SEPARATE individual rows for each selected service
         targetSubIds.forEach((ssId: string, idx: number) => {
           const ssObj = subServices.find(s => s.id === ssId);
+          // Calculate Due Date based on form.durationMonths or form.dueDate
+          let calculatedDueDate = form.dueDate || new Date().toISOString().split("T")[0];
+          if (form.durationMonths && form.durationMonths > 0) {
+            const dt = new Date();
+            dt.setMonth(dt.getMonth() + Number(form.durationMonths));
+            calculatedDueDate = dt.toISOString().split("T")[0];
+          }
+
           const newRecord: AssignedService = {
             id: `as_${Date.now()}_${idx}_${Math.random().toString(36).substring(2,6)}`,
             clientId: form.clientId,
@@ -114,7 +122,7 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
             amountReceived: 0,
             amountPending: 0,
             status: "PENDING",
-            dueDate: ssObj?.dueDate || new Date().toISOString().split("T")[0]
+            dueDate: ssObj?.dueDate || calculatedDueDate
           };
           addAssignedService(newRecord);
         });
@@ -509,6 +517,39 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
                       </button>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* 4. Service Duration / Number of Months & Due Date */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 4 }}>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 700 }}>4. Duration (Months) *</label>
+                  <select
+                    className="form-select"
+                    value={form.durationMonths || 1}
+                    onChange={e => {
+                      const months = Number(e.target.value);
+                      const dt = new Date();
+                      dt.setMonth(dt.getMonth() + months);
+                      const computedStr = dt.toISOString().split("T")[0];
+                      setForm((f: any) => ({ ...f, durationMonths: months, dueDate: computedStr }));
+                    }}
+                  >
+                    <option value={1}>1 Month (Monthly)</option>
+                    <option value={3}>3 Months (Quarterly)</option>
+                    <option value={6}>6 Months (Half-Yearly)</option>
+                    <option value={12}>12 Months (1 Year / Annual)</option>
+                    <option value={24}>24 Months (2 Years)</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 700 }}>Due Date</label>
+                  <input
+                    className="form-input"
+                    type="date"
+                    value={form.dueDate || new Date().toISOString().split("T")[0]}
+                    onChange={e => setForm((f: any) => ({ ...f, dueDate: e.target.value }))}
+                  />
                 </div>
               </div>
             </div>

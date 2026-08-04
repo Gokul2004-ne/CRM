@@ -26,13 +26,30 @@ import {
   removeCollaborationFromSupabase
 } from "./supabaseData";
 
-// LocalStorage Persistence Helpers
-const LOCAL_STORAGE_KEY_PREFIX = "zpluscrm_local_";
+// User-Scoped LocalStorage Persistence Helpers (Strict Multi-Tenant Privacy)
+function getScopedUserKey(key: string): string {
+  if (typeof window === "undefined") return `zpluscrm_${key}`;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith("sb-") || k.includes("auth-token"))) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const uid = parsed?.user?.id || parsed?.user?.email || parsed?.currentSession?.user?.id;
+          if (uid) return `zpluscrm_user_${uid}_${key}`;
+        }
+      }
+    }
+  } catch {}
+  return `zpluscrm_local_${key}`;
+}
 
 function loadFromLocal<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try {
-    const item = localStorage.getItem(LOCAL_STORAGE_KEY_PREFIX + key);
+    const fullKey = getScopedUserKey(key);
+    const item = localStorage.getItem(fullKey);
     return item ? JSON.parse(item) : fallback;
   } catch {
     return fallback;
@@ -42,7 +59,8 @@ function loadFromLocal<T>(key: string, fallback: T): T {
 function saveToLocal(key: string, data: any) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY_PREFIX + key, JSON.stringify(data));
+    const fullKey = getScopedUserKey(key);
+    localStorage.setItem(fullKey, JSON.stringify(data));
   } catch (e) {
     console.error(`Error saving ${key} to localStorage:`, e);
   }
@@ -582,11 +600,17 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
   deleteInvoice: (id) => {
     set((s) => {
-      const next = s.invoices.filter(x => x.id !== id);
-      saveToLocal("invoices", next);
-      const nextBanking = s.bankingEntries.filter(b => b.id !== `b_inv_${id}`);
+      const nextInvoices = s.invoices.filter(x => x.id !== id);
+      saveToLocal("invoices", nextInvoices);
+
+      const targetBankingId = `b_inv_${id}`;
+      const nextBanking = s.bankingEntries.filter(b => b.id !== targetBankingId && b.id !== id);
+      saveToLocal("bankingEntries", nextBanking);
       saveToLocal("banking", nextBanking);
-      return { invoices: next, bankingEntries: nextBanking };
+
+      removeBankingEntryFromSupabase(targetBankingId);
+
+      return { invoices: nextInvoices, bankingEntries: nextBanking };
     });
   },
 }));

@@ -4,7 +4,7 @@ import { useAppStore } from "@/lib/store";
 import { useState, useMemo, useRef } from "react";
 import { formatCurrency, getCurrentFY, getFYOptions } from "@/lib/utils";
 import { Invoice, InvoiceItem, InvoiceType } from "@/lib/types";
-import { Plus, Printer, Eye, X, IndianRupee, FileText, Filter, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { Plus, Printer, Eye, X, IndianRupee, FileText, Filter, CheckCircle2, AlertCircle, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 const PRESET_DESCRIPTIONS = [
@@ -276,16 +276,17 @@ export default function InvoicePage() {
                         </button>
                         <button
                           className="btn-slds btn-slds-secondary"
-                          style={{ padding: "4px 8px", color: "#DC2626", borderColor: "#FCA5A5" }}
+                          style={{ padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "#DC2626", borderColor: "#FCA5A5" }}
                           onClick={() => {
-                            if (confirm(`Delete ${inv.type} #${inv.invoiceNumber}?`)) {
+                            if (confirm(`Delete ${inv.type} #${inv.invoiceNumber}? This will automatically remove its entry from Banking & Ledger as well.`)) {
                               deleteInvoice(inv.id);
-                              toast.success("Document deleted");
+                              toast.success(`${inv.type} #${inv.invoiceNumber} deleted and removed from Banking & Ledger!`);
                             }
                           }}
-                          title="Delete"
+                          title="Delete document and remove from Banking & Ledger"
                         >
-                          <X size={13} />
+                          <Trash2 size={13} style={{ marginRight: 4 }} />
+                          Delete
                         </button>
                       </div>
                     </td>
