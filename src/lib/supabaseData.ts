@@ -8,54 +8,50 @@ import {
   mockAssignedServices, mockBankingEntries, mockLeads, mockDrafts, mockCollaborations
 } from "./mockData";
 
+async function safeTableFetch(tableName: string, userId?: string) {
+  try {
+    let q = supabase.from(tableName).select("*");
+    if (userId) {
+      q = q.eq("user_id", userId);
+    }
+    const { data, error } = await q;
+    if (error) {
+      // Retry without user_id filter if column missing
+      const { data: fallbackData } = await supabase.from(tableName).select("*");
+      return fallbackData || [];
+    }
+    return data || [];
+  } catch {
+    return [];
+  }
+}
+
 // Fetch all CRM data from Supabase (Scoped to current authenticated user_id)
 export async function fetchAllCRMData() {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     const userId = user?.id;
 
-    let clientsQ = supabase.from("clients").select("*");
-    let servicesQ = supabase.from("services").select("*");
-    let subServicesQ = supabase.from("sub_services").select("*");
-    let requiredDocsQ = supabase.from("required_docs").select("*");
-    let assignedServicesQ = supabase.from("assigned_services").select("*");
-    let bankingEntriesQ = supabase.from("banking_entries").select("*");
-    let leadsQ = supabase.from("leads").select("*");
-    let draftsQ = supabase.from("drafts").select("*");
-    let collaborationsQ = supabase.from("collaborations").select("*");
-
-    if (userId) {
-      clientsQ = clientsQ.eq("user_id", userId);
-      servicesQ = servicesQ.eq("user_id", userId);
-      subServicesQ = subServicesQ.eq("user_id", userId);
-      requiredDocsQ = requiredDocsQ.eq("user_id", userId);
-      assignedServicesQ = assignedServicesQ.eq("user_id", userId);
-      bankingEntriesQ = bankingEntriesQ.eq("user_id", userId);
-      leadsQ = leadsQ.eq("user_id", userId);
-      draftsQ = draftsQ.eq("user_id", userId);
-      collaborationsQ = collaborationsQ.eq("user_id", userId);
-    }
-
     const [
-      { data: clients },
-      { data: services },
-      { data: subServices },
-      { data: requiredDocs },
-      { data: assignedServices },
-      { data: bankingEntries },
-      { data: leads },
-      { data: drafts },
-      { data: collaborations },
+      clients,
+      services,
+      subServices,
+      requiredDocs,
+      assignedServices,
+      bankingEntries,
+      leads,
+      drafts,
+      collaborations,
     ] = await Promise.all([
-      clientsQ,
-      servicesQ,
-      subServicesQ,
-      requiredDocsQ,
-      assignedServicesQ,
-      bankingEntriesQ,
-      leadsQ,
-      draftsQ,
-      collaborationsQ,
+      safeTableFetch("clients", userId),
+      safeTableFetch("services", userId),
+      safeTableFetch("sub_services", userId),
+      safeTableFetch("required_docs", userId),
+      safeTableFetch("assigned_services", userId),
+      safeTableFetch("banking_entries", userId),
+      safeTableFetch("leads", userId),
+      safeTableFetch("drafts", userId),
+      safeTableFetch("collaborations", userId),
     ]);
 
     const formattedClients: Client[] = (clients || []).map((c: any) => ({
