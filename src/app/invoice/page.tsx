@@ -4,7 +4,7 @@ import { useAppStore } from "@/lib/store";
 import { useState, useMemo, useRef } from "react";
 import { formatCurrency, getCurrentFY, getFYOptions } from "@/lib/utils";
 import { Invoice, InvoiceItem, InvoiceType } from "@/lib/types";
-import { Plus, Printer, Eye, X, IndianRupee, FileText, Filter, CheckCircle2, AlertCircle } from "lucide-react";
+import { Plus, Printer, Eye, X, IndianRupee, FileText, Filter, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 const PRESET_DESCRIPTIONS = [
@@ -244,7 +244,28 @@ export default function InvoicePage() {
                       </span>
                     </td>
                     <td className="col-actions">
-                      <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
+                      <div style={{ display: "flex", gap: 6, justifyContent: "center", alignItems: "center" }}>
+                        {inv.type === "PROFORMA" && (
+                          <button
+                            className="btn-slds btn-slds-primary"
+                            style={{ padding: "4px 10px", fontSize: 11, fontWeight: 700, background: "#2563EB" }}
+                            onClick={() => {
+                              const nextInvNum = getInvoiceNumber("INVOICE");
+                              const converted: Invoice = {
+                                ...inv,
+                                type: "INVOICE",
+                                invoiceNumber: nextInvNum,
+                                status: "SENT"
+                              };
+                              updateInvoice(converted);
+                              toast.success(`Proforma ${inv.invoiceNumber} converted to Tax Invoice ${nextInvNum}!`);
+                            }}
+                            title="Convert this Proforma to Tax Invoice"
+                          >
+                            <RefreshCw size={12} style={{ marginRight: 4 }} />
+                            Convert to Invoice
+                          </button>
+                        )}
                         <button
                           className="btn-slds btn-slds-secondary"
                           style={{ padding: "4px 8px" }}
@@ -433,20 +454,22 @@ export default function InvoicePage() {
                     <span style={{ color: "#1D4ED8" }}>{formatCurrency(total)}</span>
                   </div>
 
-                  {/* Amount Received Input */}
-                  <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px dashed #CBD5E1" }}>
-                    <label className="form-label" style={{ fontWeight: 700, fontSize: 12, color: "#059669" }}>
-                      Amount Received (₹)
-                    </label>
-                    <input
-                      className="form-input"
-                      type="number"
-                      style={{ fontSize: 13, fontWeight: 700, color: "#059669" }}
-                      value={form.amountReceived || ""}
-                      onChange={e => setForm(f => ({ ...f, amountReceived: Number(e.target.value || 0) }))}
-                      placeholder="e.g. 5000"
-                    />
-                  </div>
+                  {/* Amount Received Input — Hidden for Proforma */}
+                  {modal.type === "INVOICE" && (
+                    <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px dashed #CBD5E1" }}>
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: 12, color: "#059669" }}>
+                        Amount Received (₹)
+                      </label>
+                      <input
+                        className="form-input"
+                        type="number"
+                        style={{ fontSize: 13, fontWeight: 700, color: "#059669" }}
+                        value={form.amountReceived || ""}
+                        onChange={e => setForm(f => ({ ...f, amountReceived: Number(e.target.value || 0) }))}
+                        placeholder="e.g. 5000"
+                      />
+                    </div>
+                  )}
 
                   <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, color: balanceDue > 0 ? "#DC2626" : "#059669", marginTop: 4 }}>
                     <span>Balance Due:</span>
@@ -460,8 +483,12 @@ export default function InvoicePage() {
               <button className="btn-slds btn-slds-secondary" onClick={() => setModal(null)}>Cancel</button>
               <div style={{ display: "flex", gap: 10 }}>
                 <button className="btn-slds btn-slds-secondary" onClick={() => handleSave("DRAFT")}>Save as Draft</button>
-                <button className="btn-slds btn-slds-primary" onClick={() => handleSave("SENT")}>Save & Link to Banking</button>
-                <button className="btn-slds btn-slds-success" onClick={() => handleSave("PAID")}>Mark Paid & Save</button>
+                <button className="btn-slds btn-slds-primary" onClick={() => handleSave("SENT")}>
+                  {modal.type === "PROFORMA" ? "Save Proforma & Link Banking" : "Save & Link to Banking"}
+                </button>
+                {modal.type === "INVOICE" && (
+                  <button className="btn-slds btn-slds-success" onClick={() => handleSave("PAID")}>Mark Paid & Save</button>
+                )}
               </div>
             </div>
           </div>

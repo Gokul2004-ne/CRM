@@ -405,13 +405,28 @@ export const useAppStore = create<AppState>()((set, get) => ({
         return a;
       });
 
+      // Bi-directional Sync from Banking to Invoices
+      const invoiceId = b.id.startsWith("b_inv_") ? b.id.replace("b_inv_", "") : null;
+      const updatedInvoices = invoiceId ? s.invoices.map(inv => {
+        if (inv.id === invoiceId) {
+          const rcv = b.amountReceived;
+          const total = inv.total || b.amountBilled;
+          const bal = Math.max(0, total - rcv);
+          const status = rcv >= total && total > 0 ? "PAID" as const : inv.status;
+          return { ...inv, amountReceived: rcv, balanceDue: bal, status };
+        }
+        return inv;
+      }) : s.invoices;
+
       const nextBanking = s.bankingEntries.map(x => x.id === b.id ? b : x);
       saveToLocal("bankingEntries", nextBanking);
       saveToLocal("assignedServices", updatedAssigned);
+      if (invoiceId) saveToLocal("invoices", updatedInvoices);
 
       return {
         bankingEntries: nextBanking,
-        assignedServices: updatedAssigned
+        assignedServices: updatedAssigned,
+        invoices: updatedInvoices
       };
     });
     syncBankingEntryToSupabase(b);

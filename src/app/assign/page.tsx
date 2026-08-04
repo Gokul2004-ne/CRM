@@ -2,7 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
-import { AssignedService } from "@/lib/types";
+import { AssignedService, SubService } from "@/lib/types";
 import { Plus, Pencil, Trash2, Search, Eye, MessageCircle, Mail, AlertTriangle, CheckCircle2, Clock, Circle } from "lucide-react";
 import { formatDate, getCurrentFY, getFYOptions, getWhatsAppLink } from "@/lib/utils";
 import { toast } from "sonner";
@@ -63,13 +63,27 @@ export default function AssignPage() {
   const openAdd = () => { setForm(empty()); setModal({ open: true, editing: null }); };
   const openEdit = (a: AssignedService) => { setForm({ ...a }); setModal({ open: true, editing: a }); };
 
-  const availableSubServices = useMemo(() =>
-    subServices.filter(ss => ss.serviceId === form.serviceId || (ss.serviceIds && ss.serviceIds.includes(form.serviceId))),
-    [subServices, form.serviceId]);
+const DEFAULT_SUB_SERVICES: SubService[] = [
+  { id: "ss_itr1", serviceId: "s1", name: "Income Tax Return (ITR-1/2/3/4)", recurrence: "ANNUALLY", dueDate: "2026-07-31" },
+  { id: "ss_tax_audit", serviceId: "s1", name: "Tax Audit u/s 44AB", recurrence: "ANNUALLY", dueDate: "2026-09-30" },
+  { id: "ss_adv_tax", serviceId: "s1", name: "Advance Tax Payment", recurrence: "QUARTERLY", dueDate: "2026-09-15" },
+  { id: "ss_gstr3b", serviceId: "s2", name: "GSTR 3B Return", recurrence: "MONTHLY", dueDate: "2026-08-20" },
+  { id: "ss_gstr1", serviceId: "s2", name: "GSTR 1 Return", recurrence: "MONTHLY", dueDate: "2026-08-11" },
+  { id: "ss_gstr9", serviceId: "s2", name: "GSTR 9 Annual Return", recurrence: "ANNUALLY", dueDate: "2026-12-31" },
+  { id: "ss_tds26q", serviceId: "s3", name: "TDS Return (26Q/27Q)", recurrence: "QUARTERLY", dueDate: "2026-07-31" },
+  { id: "ss_roc_aoc4", serviceId: "s4", name: "ROC Annual Filing (AOC-4/MGT-7)", recurrence: "ANNUALLY", dueDate: "2026-10-30" },
+];
+
+  const availableSubServices = useMemo(() => {
+    const list = subServices.length > 0 ? subServices : DEFAULT_SUB_SERVICES;
+    if (!form.serviceId) return list;
+    const directMatches = list.filter(ss => ss.serviceId === form.serviceId || (ss.serviceIds && ss.serviceIds.includes(form.serviceId)));
+    return directMatches.length > 0 ? directMatches : list;
+  }, [subServices, form.serviceId]);
 
   const handleSave = () => {
-    if (!form.clientId || (!form.serviceId && (!form.subServiceIds || form.subServiceIds.length === 0))) {
-      toast.error("Please select a Client Name and at least one Service");
+    if (!form.clientId || !form.serviceId) {
+      toast.error("Please select a Client Name and a Package");
       return;
     }
 
@@ -77,11 +91,6 @@ export default function AssignPage() {
     const targetSubIds = (form.subServiceIds && form.subServiceIds.length > 0)
       ? form.subServiceIds
       : availableSubServices.map(ss => ss.id);
-
-    if (targetSubIds.length === 0) {
-      toast.error("No services found under the selected package");
-      return;
-    }
 
     if (modal.editing) {
       const record: AssignedService = {
@@ -91,24 +100,43 @@ export default function AssignPage() {
       updateAssignedService(record);
       toast.success("Assignment updated successfully!");
     } else {
-      // Create SEPARATE individual rows for each selected service
-      targetSubIds.forEach((ssId: string, idx: number) => {
-        const ssObj = subServices.find(s => s.id === ssId);
+      if (targetSubIds.length > 0) {
+        // Create SEPARATE individual rows for each selected service
+        targetSubIds.forEach((ssId: string, idx: number) => {
+          const ssObj = subServices.find(s => s.id === ssId);
+          const newRecord: AssignedService = {
+            id: `as_${Date.now()}_${idx}_${Math.random().toString(36).substring(2,6)}`,
+            clientId: form.clientId,
+            serviceId: form.serviceId || ssObj?.serviceId || "",
+            subServiceIds: [ssId],
+            financialYear: selectedFY || getCurrentFY(),
+            amountBilled: 0,
+            amountReceived: 0,
+            amountPending: 0,
+            status: "PENDING",
+            dueDate: ssObj?.dueDate || new Date().toISOString().split("T")[0]
+          };
+          addAssignedService(newRecord);
+        });
+        toast.success(`Assigned ${targetSubIds.length} service(s) to client in separate rows!`);
+      } else {
+        // Fallback: Assign package directly if no subservices configured under package
+        const pkgObj = services.find(s => s.id === form.serviceId);
         const newRecord: AssignedService = {
-          id: `as_${Date.now()}_${idx}_${Math.random().toString(36).substring(2,6)}`,
+          id: `as_${Date.now()}_${Math.random().toString(36).substring(2,6)}`,
           clientId: form.clientId,
-          serviceId: form.serviceId || ssObj?.serviceId || "",
-          subServiceIds: [ssId],
+          serviceId: form.serviceId,
+          subServiceIds: [],
           financialYear: selectedFY || getCurrentFY(),
-          amountBilled: 0,
+          amountBilled: pkgObj?.price || 0,
           amountReceived: 0,
-          amountPending: 0,
+          amountPending: pkgObj?.price || 0,
           status: "PENDING",
-          dueDate: ssObj?.dueDate || new Date().toISOString().split("T")[0]
+          dueDate: new Date().toISOString().split("T")[0]
         };
         addAssignedService(newRecord);
-      });
-      toast.success(`Assigned ${targetSubIds.length} service(s) to client in separate rows!`);
+        toast.success(`Package "${pkgObj?.name || 'Package'}" assigned to client!`);
+      }
     }
 
     setModal({ open: false, editing: null });
@@ -191,11 +219,24 @@ export default function AssignPage() {
                     {/* 1. Service Name */}
                     <td>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                        {subs.length > 0 ? subs.map(ss => (
-                          <span key={ss.id} className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 600, fontSize: 12 }}>{ss.name}</span>
-                        )) : (
-                          <span style={{ color: "#94A3B8", fontSize: 12 }}>No services</span>
-                        )}
+                        {(() => {
+                          const foundSubs = subServices.filter(ss => a.subServiceIds?.includes(ss.id));
+                          if (foundSubs.length > 0) {
+                            return foundSubs.map(ss => (
+                              <span key={ss.id} className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700, fontSize: 12 }}>{ss.name}</span>
+                            ));
+                          }
+                          const defaultSubs = DEFAULT_SUB_SERVICES.filter(ss => a.subServiceIds?.includes(ss.id));
+                          if (defaultSubs.length > 0) {
+                            return defaultSubs.map(ss => (
+                              <span key={ss.id} className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700, fontSize: 12 }}>{ss.name}</span>
+                            ));
+                          }
+                          const pkgName = service?.name || (a as any).serviceName || (a.subServiceIds && a.subServiceIds[0]) || "Service";
+                          return (
+                            <span className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700, fontSize: 12 }}>{pkgName}</span>
+                          );
+                        })()}
                       </div>
                     </td>
 
@@ -429,34 +470,47 @@ export default function AssignPage() {
                 </select>
               </div>
 
-              {availableSubServices.length > 0 && (
-                <div className="form-group">
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>3. Select Services *</label>
-                    <button
-                      type="button"
-                      className="btn-slds btn-slds-secondary"
-                      style={{ padding: "2px 8px", fontSize: 10 }}
-                      onClick={() => {
-                        const allIds = availableSubServices.map(ss => ss.id);
-                        const isAllSelected = allIds.every(id => form.subServiceIds.includes(id));
-                        setForm((f: any) => ({ ...f, subServiceIds: isAllSelected ? [] : allIds }));
-                      }}
-                    >
-                      {availableSubServices.every(ss => form.subServiceIds.includes(ss.id)) ? "Deselect All" : "Select All"}
-                    </button>
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-                    {availableSubServices.map(ss => (
-                      <button key={ss.id} type="button"
-                        className={`btn-slds ${form.subServiceIds.includes(ss.id) ? "btn-slds-primary" : "btn-slds-secondary"}`}
-                        style={{ padding: "6px 12px", fontSize: 12, fontWeight: 700 }}
-                        onClick={() => toggleSubService(ss.id)}
-                      >{ss.name}</button>
-                    ))}
-                  </div>
+              {/* 3. Select Services Options (Always Visible) */}
+              <div className="form-group">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>3. Select Services *</label>
+                  <button
+                    type="button"
+                    className="btn-slds btn-slds-secondary"
+                    style={{ padding: "2px 8px", fontSize: 10 }}
+                    onClick={() => {
+                      const allIds = availableSubServices.map(ss => ss.id);
+                      const isAllSelected = allIds.every(id => (form.subServiceIds || []).includes(id));
+                      setForm((f: any) => ({ ...f, subServiceIds: isAllSelected ? [] : allIds }));
+                    }}
+                  >
+                    {availableSubServices.every(ss => (form.subServiceIds || []).includes(ss.id)) ? "Deselect All" : "Select All"}
+                  </button>
                 </div>
-              )}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4, padding: 10, background: "#F8FAFC", borderRadius: 8, border: "1px solid #CBD5E1" }}>
+                  {availableSubServices.map(ss => {
+                    const isSelected = (form.subServiceIds || []).includes(ss.id);
+                    return (
+                      <button
+                        key={ss.id}
+                        type="button"
+                        className={`btn-slds ${isSelected ? "btn-slds-primary" : "btn-slds-secondary"}`}
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          background: isSelected ? "#0176D3" : "#FFFFFF",
+                          color: isSelected ? "#FFFFFF" : "#334155",
+                          border: isSelected ? "1px solid #0176D3" : "1px solid #CBD5E1"
+                        }}
+                        onClick={() => toggleSubService(ss.id)}
+                      >
+                        {isSelected ? "✓ " : "+ "}{ss.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             <div className="modal-footer">

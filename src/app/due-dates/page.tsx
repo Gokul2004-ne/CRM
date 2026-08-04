@@ -2,7 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
-import { getDaysUntilDue, formatDate, getWhatsAppLink, formatCurrency, getFYMonths } from "@/lib/utils";
+import { getDaysUntilDue, formatDate, getWhatsAppLink, formatCurrency, getFYMonths, getCurrentFY } from "@/lib/utils";
 import { MessageCircle, Mail, Calendar, CheckCircle2, Clock, AlertCircle, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
@@ -37,7 +37,8 @@ export default function DueDatesPage() {
   };
 
   const dueItems = useMemo(() => {
-    return assignedServices
+    // 1. Assigned Client Services
+    const assignedItems = assignedServices
       .filter(a => a.financialYear === selectedFY && a.dueDate)
       .map(a => {
         const client = clients.find(c => c.id === a.clientId);
@@ -48,14 +49,51 @@ export default function DueDatesPage() {
         const monthIndex = dueDate.getMonth();
         const monthName = ["January", "February", "March", "April", "May", "June",
           "July", "August", "September", "October", "November", "December"][monthIndex];
-        return { ...a, client, service, subs, daysLeft, dueDate, monthName };
-      })
-      .filter(item =>
-        !search ||
-        (item.client?.name || "").toLowerCase().includes(search.toLowerCase()) ||
-        (item.service?.name || "").toLowerCase().includes(search.toLowerCase()) ||
-        item.subs.some(s => s.name.toLowerCase().includes(search.toLowerCase()))
-      );
+        return { ...a, client, service, subs, daysLeft, dueDate, monthName, isConfiguredService: false };
+      });
+
+    // 2. Direct Services configured under Services Directory (subServices)
+    const configuredServiceItems: typeof assignedItems = [];
+    subServices.forEach(ss => {
+      const parentSvc = services.find(s => s.id === ss.serviceId);
+      const targetDueDateStr = ss.dueDate || (ss.dueDateDay ? `2026-08-${String(ss.dueDateDay).padStart(2, "0")}` : null);
+
+      if (targetDueDateStr) {
+        const daysLeft = getDaysUntilDue(targetDueDateStr);
+        const dueDate = new Date(targetDueDateStr);
+        const monthIndex = dueDate.getMonth();
+        const monthName = ["January", "February", "March", "April", "May", "June",
+          "July", "August", "September", "October", "November", "December"][monthIndex];
+
+        configuredServiceItems.push({
+          id: `cfg_${ss.id}`,
+          clientId: ss.clientId || "",
+          serviceId: ss.serviceId,
+          subServiceIds: [ss.id],
+          financialYear: selectedFY || getCurrentFY(),
+          amountBilled: 0,
+          amountReceived: 0,
+          amountPending: 0,
+          status: "PENDING",
+          client: clients.find(c => c.id === ss.clientId) || { name: ss.clientName || "All Clients" } as any,
+          service: parentSvc || { name: ss.name } as any,
+          subs: [ss],
+          daysLeft,
+          dueDate: new Date(targetDueDateStr),
+          monthName,
+          isConfiguredService: true
+        });
+      }
+    });
+
+    const combined = [...assignedItems, ...configuredServiceItems];
+
+    return combined.filter(item =>
+      !search ||
+      (item.client?.name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (item.service?.name || "").toLowerCase().includes(search.toLowerCase()) ||
+      item.subs.some(s => s.name.toLowerCase().includes(search.toLowerCase()))
+    );
   }, [assignedServices, clients, services, subServices, selectedFY, search]);
 
   // Group items by FY month
