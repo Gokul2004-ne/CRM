@@ -18,11 +18,24 @@ export default function RequiredDocsPage() {
   const [previewDoc, setPreviewDoc] = useState<RequiredDoc | null>(null);
   const [form, setForm] = useState<RequiredDoc>(empty());
 
+  const getSSInfo = (ssId: string) => {
+    const ss = subServices.find(s => s.id === ssId);
+    const svc = services.find(s => s.id === ss?.serviceId);
+    return { ss, svc };
+  };
+
   const filtered = useMemo(() =>
-    requiredDocs.filter(d =>
-      (filterSS === "all" || d.subServiceId === filterSS) &&
-      d.name.toLowerCase().includes(search.toLowerCase())
-    ), [requiredDocs, search, filterSS]);
+    requiredDocs.filter(d => {
+      const { ss, svc } = getSSInfo(d.subServiceId);
+      const q = search.trim().toLowerCase();
+      const matchesSearch = !q ||
+        d.name.toLowerCase().includes(q) ||
+        (ss?.name || "").toLowerCase().includes(q) ||
+        (svc?.name || "").toLowerCase().includes(q) ||
+        (d.fileName || "").toLowerCase().includes(q);
+      const matchesSS = filterSS === "all" || d.subServiceId === filterSS;
+      return matchesSearch && matchesSS;
+    }), [requiredDocs, search, filterSS, subServices, services]);
 
   const openAdd = () => { setForm(empty()); setModal({ open: true, editing: null }); };
   const openEdit = (d: RequiredDoc) => { setForm({ ...d }); setModal({ open: true, editing: d }); };
@@ -34,25 +47,28 @@ export default function RequiredDocsPage() {
     setModal({ open: false, editing: null });
   };
 
-  const getSSInfo = (ssId: string) => {
-    const ss = subServices.find(s => s.id === ssId);
-    const svc = services.find(s => s.id === ss?.serviceId);
-    return { ss, svc };
-  };
-
-  // Build Main Service -> Sub-Service -> Documents Hierarchy Tree
+  // Build Main Service -> Sub-Service -> Documents Hierarchy Tree (Filtered by search)
   const hierarchyTree = useMemo(() => {
+    const q = search.trim().toLowerCase();
     return services.map(svc => {
       const subs = subServices.filter(ss => ss.serviceId === svc.id || (ss.serviceIds && ss.serviceIds.includes(svc.id)));
+      const filteredSubs = subs.map(ss => {
+        const docs = requiredDocs.filter(d => d.subServiceId === ss.id && (
+          !q ||
+          d.name.toLowerCase().includes(q) ||
+          ss.name.toLowerCase().includes(q) ||
+          svc.name.toLowerCase().includes(q) ||
+          (d.fileName || "").toLowerCase().includes(q)
+        ));
+        return { subService: ss, docs };
+      }).filter(item => !q || item.docs.length > 0 || item.subService.name.toLowerCase().includes(q) || svc.name.toLowerCase().includes(q));
+
       return {
         service: svc,
-        subServices: subs.map(ss => ({
-          subService: ss,
-          docs: requiredDocs.filter(d => d.subServiceId === ss.id)
-        }))
+        subServices: filteredSubs
       };
-    });
-  }, [services, subServices, requiredDocs]);
+    }).filter(item => !q || item.subServices.length > 0 || item.service.name.toLowerCase().includes(q));
+  }, [services, subServices, requiredDocs, search]);
 
   return (
     <AppShell title="Required Documents Checklist" subtitle="Nested hierarchy: Main Service → Sub-Service → Required Documents with WhatsApp Share">

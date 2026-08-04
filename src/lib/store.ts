@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import {
   Client, Service, SubService, RequiredDoc,
-  AssignedService, BankingEntry, Lead, DocumentDraft, Collaboration
+  AssignedService, BankingEntry, Lead, DocumentDraft, Collaboration, Invoice
 } from "./types";
 import { getCurrentFY } from "./utils";
 import {
@@ -59,6 +59,7 @@ interface AppState {
   leads: Lead[];
   drafts: DocumentDraft[];
   collaborations: Collaboration[];
+  invoices: Invoice[];
   selectedFY: string;
   sidebarCollapsed: boolean;
   isLoadingSupabase: boolean;
@@ -113,6 +114,11 @@ interface AppState {
   addCollaboration: (c: Collaboration) => void;
   updateCollaboration: (c: Collaboration) => void;
   deleteCollaboration: (id: string) => void;
+
+  // Actions - Invoices (Persisted + Banking Link)
+  addInvoice: (inv: Invoice) => void;
+  updateInvoice: (inv: Invoice) => void;
+  deleteInvoice: (id: string) => void;
 }
 
 export const useAppStore = create<AppState>()((set, get) => ({
@@ -123,8 +129,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
   assignedServices: [],
   bankingEntries: [],
   leads: [],
-  drafts: [],
-  collaborations: loadFromLocal<Collaboration[]>("collaborations", []),
+  drafts: loadFromLocal("drafts", []),
+  collaborations: loadFromLocal("collaborations", []),
+  invoices: loadFromLocal("invoices", []),
   selectedFY: getCurrentFY(),
   sidebarCollapsed: false,
   isLoadingSupabase: false,
@@ -497,5 +504,74 @@ export const useAppStore = create<AppState>()((set, get) => ({
       return { collaborations: next };
     });
     removeCollaborationFromSupabase(id);
+  },
+
+  // Invoices Sync (Permanently Persisted & Linked with Banking Ledger)
+  addInvoice: (inv) => {
+    set((s) => {
+      const next = [inv, ...s.invoices];
+      saveToLocal("invoices", next);
+
+      // Auto-link with Banking Ledger if amount received > 0 or invoice paid
+      const rcv = inv.amountReceived || (inv.status === "PAID" ? inv.total : 0);
+      const billed = inv.total || 0;
+      if (inv.clientId && (billed > 0 || rcv > 0)) {
+        const bEntry: BankingEntry = {
+          id: `b_inv_${inv.id}`,
+          financialYear: inv.financialYear || s.selectedFY || getCurrentFY(),
+          clientId: inv.clientId,
+          serviceId: s.services[0]?.id || "s1",
+          amountBilled: billed,
+          amountReceived: rcv,
+          amountPending: Math.max(0, billed - rcv),
+          paymentStatus: rcv >= billed ? "PAID" : rcv > 0 ? "PARTIAL" : "PENDING",
+          remark: `${inv.type} #${inv.invoiceNumber} payment record`
+        };
+        const nextBanking = [...s.bankingEntries.filter(b => b.id !== bEntry.id), bEntry];
+        saveToLocal("banking", nextBanking);
+        syncBankingEntryToSupabase(bEntry);
+        return { invoices: next, bankingEntries: nextBanking };
+      }
+
+      return { invoices: next };
+    });
+  },
+  updateInvoice: (inv) => {
+    set((s) => {
+      const next = s.invoices.map(x => x.id === inv.id ? inv : x);
+      saveToLocal("invoices", next);
+
+      // Sync with Banking Ledger
+      const rcv = inv.amountReceived || (inv.status === "PAID" ? inv.total : 0);
+      const billed = inv.total || 0;
+      if (inv.clientId) {
+        const bEntry: BankingEntry = {
+          id: `b_inv_${inv.id}`,
+          financialYear: inv.financialYear || s.selectedFY || getCurrentFY(),
+          clientId: inv.clientId,
+          serviceId: s.services[0]?.id || "s1",
+          amountBilled: billed,
+          amountReceived: rcv,
+          amountPending: Math.max(0, billed - rcv),
+          paymentStatus: rcv >= billed ? "PAID" : rcv > 0 ? "PARTIAL" : "PENDING",
+          remark: `${inv.type} #${inv.invoiceNumber} payment record`
+        };
+        const nextBanking = [...s.bankingEntries.filter(b => b.id !== bEntry.id), bEntry];
+        saveToLocal("banking", nextBanking);
+        syncBankingEntryToSupabase(bEntry);
+        return { invoices: next, bankingEntries: nextBanking };
+      }
+
+      return { invoices: next };
+    });
+  },
+  deleteInvoice: (id) => {
+    set((s) => {
+      const next = s.invoices.filter(x => x.id !== id);
+      saveToLocal("invoices", next);
+      const nextBanking = s.bankingEntries.filter(b => b.id !== `b_inv_${id}`);
+      saveToLocal("banking", nextBanking);
+      return { invoices: next, bankingEntries: nextBanking };
+    });
   },
 }));

@@ -68,19 +68,49 @@ export default function AssignPage() {
     [subServices, form.serviceId]);
 
   const handleSave = () => {
-    if (!form.clientId || !form.serviceId || !form.dueDate) {
-      toast.error("Client, Package, and Due Date are required");
+    if (!form.clientId || (!form.serviceId && (!form.subServiceIds || form.subServiceIds.length === 0))) {
+      toast.error("Please select a Client Name and at least one Service");
       return;
     }
-    const record: AssignedService = {
-      ...form,
-      amountBilled: form.amountBilled || 0,
-      amountReceived: form.amountReceived || 0,
-      amountPending: (form.amountBilled || 0) - (form.amountReceived || 0),
-      id: form.id || `as${Date.now()}`
-    };
-    if (modal.editing) { updateAssignedService(record); toast.success("Assignment updated"); }
-    else { addAssignedService(record); toast.success("Package assigned successfully"); }
+
+    // Determine subservices to assign
+    const targetSubIds = (form.subServiceIds && form.subServiceIds.length > 0)
+      ? form.subServiceIds
+      : availableSubServices.map(ss => ss.id);
+
+    if (targetSubIds.length === 0) {
+      toast.error("No services found under the selected package");
+      return;
+    }
+
+    if (modal.editing) {
+      const record: AssignedService = {
+        ...form,
+        id: form.id
+      };
+      updateAssignedService(record);
+      toast.success("Assignment updated successfully!");
+    } else {
+      // Create SEPARATE individual rows for each selected service
+      targetSubIds.forEach((ssId: string, idx: number) => {
+        const ssObj = subServices.find(s => s.id === ssId);
+        const newRecord: AssignedService = {
+          id: `as_${Date.now()}_${idx}_${Math.random().toString(36).substring(2,6)}`,
+          clientId: form.clientId,
+          serviceId: form.serviceId || ssObj?.serviceId || "",
+          subServiceIds: [ssId],
+          financialYear: selectedFY || getCurrentFY(),
+          amountBilled: 0,
+          amountReceived: 0,
+          amountPending: 0,
+          status: "PENDING",
+          dueDate: ssObj?.dueDate || new Date().toISOString().split("T")[0]
+        };
+        addAssignedService(newRecord);
+      });
+      toast.success(`Assigned ${targetSubIds.length} service(s) to client in separate rows!`);
+    }
+
     setModal({ open: false, editing: null });
   };
 
@@ -402,7 +432,7 @@ export default function AssignPage() {
               {availableSubServices.length > 0 && (
                 <div className="form-group">
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>3. Services</label>
+                    <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>3. Select Services *</label>
                     <button
                       type="button"
                       className="btn-slds btn-slds-secondary"
@@ -420,55 +450,13 @@ export default function AssignPage() {
                     {availableSubServices.map(ss => (
                       <button key={ss.id} type="button"
                         className={`btn-slds ${form.subServiceIds.includes(ss.id) ? "btn-slds-primary" : "btn-slds-secondary"}`}
-                        style={{ padding: "4px 10px", fontSize: 12 }}
+                        style={{ padding: "6px 12px", fontSize: 12, fontWeight: 700 }}
                         onClick={() => toggleSubService(ss.id)}
                       >{ss.name}</button>
                     ))}
                   </div>
                 </div>
               )}
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>4. Financial Year *</label>
-                  <select className="form-select" value={form.financialYear} onChange={e => setForm((f: any) => ({ ...f, financialYear: e.target.value }))}>
-                    {fyOptions.map(fy => <option key={fy} value={fy}>FY {fy}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>5. Due Date *</label>
-                  <input className="form-input" type="date" value={form.dueDate} onChange={e => setForm((f: any) => ({ ...f, dueDate: e.target.value }))} />
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, paddingTop: 10, borderTop: "1px dashed #CBD5E1" }}>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>Total Billed Amount (₹)</label>
-                  <input
-                    className="form-input"
-                    type="number"
-                    value={form.amountBilled || ""}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setForm((f: any) => ({ ...f, amountBilled: val === "" ? 0 : Number(val) }));
-                    }}
-                    placeholder="e.g. 12000"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>Amount Received (₹)</label>
-                  <input
-                    className="form-input"
-                    type="number"
-                    value={form.amountReceived || ""}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setForm((f: any) => ({ ...f, amountReceived: val === "" ? 0 : Number(val) }));
-                    }}
-                    placeholder="e.g. 8000"
-                  />
-                </div>
-              </div>
             </div>
 
             <div className="modal-footer">

@@ -2,71 +2,53 @@
 import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState, useMemo, useRef } from "react";
-import { formatCurrency } from "@/lib/utils";
-import { Plus, Printer, Download, Send, Eye, X, IndianRupee, FileText, Building2, User } from "lucide-react";
+import { formatCurrency, getCurrentFY, getFYOptions } from "@/lib/utils";
+import { Invoice, InvoiceItem, InvoiceType } from "@/lib/types";
+import { Plus, Printer, Eye, X, IndianRupee, FileText, Filter, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
-type InvoiceType = "PROFORMA" | "INVOICE";
-
-interface InvoiceItem {
-  id: string;
-  description: string;
-  hsn: string;
-  quantity: number;
-  rate: number;
-  amount: number;
-}
-
-interface Invoice {
-  id: string;
-  type: InvoiceType;
-  invoiceNumber: string;
-  date: string;
-  clientId: string;
-  items: InvoiceItem[];
-  subtotal: number;
-  gstRate: number;
-  gstAmount: number;
-  total: number;
-  notes: string;
-  status: "DRAFT" | "SENT" | "PAID";
-  createdAt: string;
-}
+const PRESET_DESCRIPTIONS = [
+  "GST Filing & Compliance Services",
+  "Income Tax Return & Audit Services",
+  "TDS Quarterly Return Processing",
+  "ROC Annual Compliance & Secretarial",
+  "Accounting & Bookkeeping Services",
+  "Tax Advisory & Legal Consultancy",
+  "Business Incorporation & Registration",
+  "Custom Service / Professional Charges"
+];
 
 const defaultItem = (): InvoiceItem => ({
-  id: `item_${Date.now()}`,
-  description: "",
-  hsn: "",
+  id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+  description: PRESET_DESCRIPTIONS[0],
+  hsn: "998311",
   quantity: 1,
-  rate: 0,
-  amount: 0,
+  rate: 5000,
+  amount: 5000,
 });
 
-const FIRM_NAME = "zpluscrm Practice";
-const FIRM_ADDRESS = "Your Office Address, City - PIN";
-const FIRM_GSTIN = "YOUR_GSTIN";
-const FIRM_PAN = "YOUR_PAN";
-const FIRM_PHONE = "+91 XXXXXXXXXX";
-const FIRM_EMAIL = "contact@zpluscrm.com";
-
 export default function InvoicePage() {
-  const { clients } = useAppStore();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const { clients, invoices, selectedFY, addInvoice, updateInvoice, deleteInvoice } = useAppStore();
+
+  const [entityFilter, setEntityFilter] = useState<"ALL" | "PROFORMA" | "INVOICE">("ALL");
   const [modal, setModal] = useState<{ open: boolean; type: InvoiceType } | null>(null);
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
   const [form, setForm] = useState<Partial<Invoice>>({
     type: "PROFORMA",
     date: new Date().toISOString().split("T")[0],
+    financialYear: getCurrentFY(),
     clientId: "",
     items: [defaultItem()],
     gstRate: 18,
-    notes: "",
+    amountReceived: 0,
+    notes: "Payment due within 15 days of invoice date. Thank you for your business!",
     status: "DRAFT",
   });
+
   const printRef = useRef<HTMLDivElement>(null);
 
-  const invoiceCount = invoices.filter(i => i.type === "INVOICE").length;
-  const proformaCount = invoices.filter(i => i.type === "PROFORMA").length;
+  const invoiceCount = useMemo(() => invoices.filter(i => i.type === "INVOICE").length, [invoices]);
+  const proformaCount = useMemo(() => invoices.filter(i => i.type === "PROFORMA").length, [invoices]);
 
   const getInvoiceNumber = (type: InvoiceType) => {
     const prefix = type === "INVOICE" ? "INV" : "PRO";
@@ -80,10 +62,12 @@ export default function InvoicePage() {
       type,
       invoiceNumber: getInvoiceNumber(type),
       date: new Date().toISOString().split("T")[0],
+      financialYear: selectedFY || getCurrentFY(),
       clientId: "",
       items: [defaultItem()],
       gstRate: 18,
-      notes: "",
+      amountReceived: 0,
+      notes: "Payment due within 15 days of invoice date. Thank you for your business!",
       status: "DRAFT",
     });
     setModal({ open: true, type });
@@ -94,7 +78,7 @@ export default function InvoicePage() {
       const items = [...(f.items || [])];
       items[idx] = { ...items[idx], [field]: value };
       if (field === "quantity" || field === "rate") {
-        items[idx].amount = Number(items[idx].quantity) * Number(items[idx].rate);
+        items[idx].amount = Number(items[idx].quantity || 0) * Number(items[idx].rate || 0);
       }
       return { ...f, items };
     });
@@ -111,26 +95,53 @@ export default function InvoicePage() {
   const subtotal = useMemo(() => (form.items || []).reduce((s, i) => s + (i.amount || 0), 0), [form.items]);
   const gstAmount = useMemo(() => (subtotal * (form.gstRate || 18)) / 100, [subtotal, form.gstRate]);
   const total = useMemo(() => subtotal + gstAmount, [subtotal, gstAmount]);
+  const balanceDue = useMemo(() => Math.max(0, total - (form.amountReceived || 0)), [total, form.amountReceived]);
 
-  const handleSave = (status: "DRAFT" | "SENT") => {
-    if (!form.clientId) { toast.error("Please select a client"); return; }
-    const invoice: Invoice = {
-      ...form as Invoice,
-      id: `inv_${Date.now()}`,
+  const handleSave = (status: "DRAFT" | "SENT" | "PAID") => {
+    if (!form.clientId) {
+      toast.error("Please select a client");
+      return;
+    }
+    const clientObj = clients.find(c => c.id === form.clientId);
+    const finalAmountReceived = status === "PAID" ? total : (form.amountReceived || 0);
+
+    const invoiceRecord: Invoice = {
+      ...(form as Invoice),
+      id: form.id || `inv_${Date.now()}`,
+      clientName: clientObj?.name || "Client",
       subtotal,
       gstAmount,
       total,
+      amountReceived: finalAmountReceived,
+      balanceDue: Math.max(0, total - finalAmountReceived),
       status,
-      createdAt: new Date().toISOString(),
+      createdAt: form.createdAt || new Date().toISOString(),
     };
-    setInvoices(prev => [invoice, ...prev]);
+
+    if (form.id) {
+      updateInvoice(invoiceRecord);
+      toast.success(`${invoiceRecord.type} #${invoiceRecord.invoiceNumber} updated & saved!`);
+    } else {
+      addInvoice(invoiceRecord);
+      toast.success(`${invoiceRecord.type} #${invoiceRecord.invoiceNumber} created & linked to Banking Ledger!`);
+    }
+
     setModal(null);
-    toast.success(`${status === "SENT" ? "Invoice sent!" : "Draft saved!"}`);
   };
+
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter(inv => {
+      if (entityFilter === "PROFORMA") return inv.type === "PROFORMA";
+      if (entityFilter === "INVOICE") return inv.type === "INVOICE";
+      return true;
+    });
+  }, [invoices, entityFilter]);
 
   const handlePrint = () => {
     window.print();
   };
+
+  const fyOptions = getFYOptions();
 
   const statusConfig = {
     DRAFT: { bg: "#F1F5F9", color: "#64748B", label: "Draft" },
@@ -139,117 +150,131 @@ export default function InvoicePage() {
   };
 
   return (
-    <AppShell title="Invoices" subtitle="Create Proforma Invoices and Tax Invoices">
-      {/* Header */}
-      <div className="page-header-slds">
-        <div>
-          <div className="breadcrumb"><span>zpluscrm</span><span>/</span><span className="current">Invoices</span></div>
-          <div className="page-title-slds">Invoice & Proforma Generator</div>
-          <div className="page-subtitle-slds">Generate professional invoices and proforma for client billing.</div>
-        </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button className="btn-slds btn-slds-secondary" onClick={() => openCreate("PROFORMA")}>
-            <FileText size={15} /><span>New Proforma</span>
-          </button>
-          <button className="btn-slds btn-slds-primary" onClick={() => openCreate("INVOICE")}>
-            <Plus size={15} /><span>New Invoice</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 20 }}>
-        {[
-          { label: "Total Invoices", value: invoiceCount, color: "#1D4ED8", bg: "#EFF6FF" },
-          { label: "Proforma Invoices", value: proformaCount, color: "#6D28D9", bg: "#F5F3FF" },
-          { label: "Total Value", value: formatCurrency(invoices.filter(i => i.status === "PAID").reduce((s, i) => s + i.total, 0)), color: "#059669", bg: "#F0FDF4" },
-        ].map(stat => (
-          <div key={stat.label} style={{ background: stat.bg, border: `1px solid ${stat.bg}`, borderRadius: 14, padding: "16px 20px" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: stat.color, textTransform: "uppercase" }}>{stat.label}</div>
-            <div style={{ fontSize: 26, fontWeight: 900, color: stat.color, marginTop: 4 }}>{stat.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Table of all invoices */}
+    <AppShell title="Invoices & Proformas" subtitle="Generate, filter, and track tax invoices & proformas with banking linkage">
       <div className="data-table-wrapper">
         <div className="data-table-header">
-          <div className="data-table-title">All Invoices & Proformas</div>
+          {/* Entity Filter Toolbar (All, Proforma, Invoice) */}
+          <div className="toolbar-controls" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#64748B", display: "flex", alignItems: "center", gap: 6 }}>
+              <Filter size={14} /> Entity Filter:
+            </div>
+            <div style={{ display: "flex", gap: 4, background: "#F1F5F9", padding: 3, borderRadius: 8 }}>
+              {(["ALL", "PROFORMA", "INVOICE"] as const).map(type => (
+                <button
+                  key={type}
+                  className="btn-slds"
+                  style={{
+                    padding: "5px 14px",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    borderRadius: 6,
+                    border: "none",
+                    background: entityFilter === type ? "#0F172A" : "transparent",
+                    color: entityFilter === type ? "#FFFFFF" : "#64748B",
+                  }}
+                  onClick={() => setEntityFilter(type)}
+                >
+                  {type === "ALL" ? `All (${invoices.length})` : type === "PROFORMA" ? `Proforma (${proformaCount})` : `Invoice (${invoiceCount})`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button className="btn-slds btn-slds-secondary" onClick={() => openCreate("PROFORMA")}>
+              <Plus size={15} /> New Proforma
+            </button>
+            <button className="btn-slds btn-slds-primary" onClick={() => openCreate("INVOICE")}>
+              <Plus size={15} /> New Tax Invoice
+            </button>
+          </div>
         </div>
+
+        {/* Table of Invoices & Proformas */}
         <div className="table-scroll-container">
           <table>
             <thead>
               <tr>
-                <th>#</th>
-                <th>Invoice No.</th>
+                <th className="col-num">#</th>
                 <th>Type</th>
-                <th>Client</th>
+                <th>Doc #</th>
+                <th>Financial Year</th>
+                <th>Client Name</th>
                 <th>Date</th>
-                <th className="col-right">Subtotal</th>
-                <th className="col-right">GST</th>
-                <th className="col-right">Total</th>
+                <th>Total Amount</th>
+                <th>Amount Received</th>
+                <th>Balance Due</th>
                 <th>Status</th>
                 <th className="col-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {invoices.map((inv, i) => {
-                const client = clients.find(c => c.id === inv.clientId);
-                const cfg = statusConfig[inv.status];
+              {filteredInvoices.map((inv, i) => {
+                const clientObj = clients.find(c => c.id === inv.clientId);
+                const clientName = inv.clientName || clientObj?.name || "-";
+                const cfg = statusConfig[inv.status || "DRAFT"];
+                const rcv = inv.amountReceived || 0;
+                const bal = inv.balanceDue !== undefined ? inv.balanceDue : Math.max(0, inv.total - rcv);
+
                 return (
                   <tr key={inv.id}>
                     <td className="col-num">{i + 1}</td>
-                    <td style={{ fontWeight: 700, color: "#0F172A", fontFamily: "monospace" }}>{inv.invoiceNumber}</td>
                     <td>
-                      <span className="badge" style={{
-                        background: inv.type === "INVOICE" ? "#EFF6FF" : "#F5F3FF",
-                        color: inv.type === "INVOICE" ? "#1D4ED8" : "#6D28D9"
-                      }}>
-                        {inv.type === "INVOICE" ? "Tax Invoice" : "Proforma"}
+                      <span
+                        className="badge"
+                        style={{
+                          background: inv.type === "INVOICE" ? "#EFF6FF" : "#FFF7ED",
+                          color: inv.type === "INVOICE" ? "#1D4ED8" : "#C2410C",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {inv.type}
                       </span>
                     </td>
-                    <td style={{ fontWeight: 700 }}>{client?.name || "-"}</td>
-                    <td>{inv.date}</td>
-                    <td className="col-right">{formatCurrency(inv.subtotal)}</td>
-                    <td className="col-right" style={{ color: "#64748B" }}>{formatCurrency(inv.gstAmount)}</td>
-                    <td className="col-right" style={{ fontWeight: 800, color: "#059669" }}>{formatCurrency(inv.total)}</td>
+                    <td style={{ fontWeight: 700, color: "#0F172A", fontFamily: "monospace" }}>{inv.invoiceNumber}</td>
+                    <td><span className="chip" style={{ background: "#F1F5F9", color: "#334155" }}>FY {inv.financialYear || getCurrentFY()}</span></td>
+                    <td style={{ fontWeight: 800, color: "#0F172A" }}>{clientName}</td>
+                    <td style={{ fontSize: 13, color: "#475569" }}>{inv.date}</td>
+                    <td style={{ fontWeight: 700, color: "#0F172A" }}>{formatCurrency(inv.total)}</td>
+                    <td style={{ fontWeight: 700, color: "#059669" }}>{formatCurrency(rcv)}</td>
+                    <td style={{ fontWeight: 700, color: bal > 0 ? "#DC2626" : "#059669" }}>{formatCurrency(bal)}</td>
                     <td>
-                      <span style={{ background: cfg.bg, color: cfg.color, padding: "3px 10px", borderRadius: 6, fontWeight: 700, fontSize: 12 }}>
+                      <span className="badge" style={{ background: cfg.bg, color: cfg.color, fontWeight: 700 }}>
                         {cfg.label}
                       </span>
                     </td>
                     <td className="col-actions">
-                      <div style={{ display: "flex", justifyContent: "center", gap: 4 }}>
+                      <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
                         <button
-                          className="btn-slds btn-slds-primary"
-                          style={{ padding: "4px 8px", fontSize: 11 }}
+                          className="btn-slds btn-slds-secondary"
+                          style={{ padding: "4px 8px" }}
                           onClick={() => setViewInvoice(inv)}
-                          title="Preview"
+                          title="View / Print Document"
                         >
                           <Eye size={13} />
                         </button>
-                        {inv.status === "DRAFT" && (
-                          <button
-                            className="btn-slds btn-slds-secondary"
-                            style={{ padding: "4px 8px", fontSize: 11, color: "#059669" }}
-                            onClick={() => {
-                              setInvoices(prev => prev.map(x => x.id === inv.id ? { ...x, status: "PAID" } : x));
-                              toast.success("Marked as Paid");
-                            }}
-                            title="Mark as Paid"
-                          >
-                            ✓ Paid
-                          </button>
-                        )}
+                        <button
+                          className="btn-slds btn-slds-secondary"
+                          style={{ padding: "4px 8px", color: "#DC2626", borderColor: "#FCA5A5" }}
+                          onClick={() => {
+                            if (confirm(`Delete ${inv.type} #${inv.invoiceNumber}?`)) {
+                              deleteInvoice(inv.id);
+                              toast.success("Document deleted");
+                            }
+                          }}
+                          title="Delete"
+                        >
+                          <X size={13} />
+                        </button>
                       </div>
                     </td>
                   </tr>
                 );
               })}
-              {invoices.length === 0 && (
+              {filteredInvoices.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="empty-table-cell">
-                    No invoices yet. Click "New Invoice" or "New Proforma" to get started.
+                  <td colSpan={11} className="empty-table-cell">
+                    No {entityFilter === "ALL" ? "invoices or proformas" : entityFilter.toLowerCase() + "s"} found. Click above to create one.
                   </td>
                 </tr>
               )}
@@ -258,133 +283,113 @@ export default function InvoicePage() {
         </div>
       </div>
 
-      {/* Invoice Preview / Print Modal */}
-      {viewInvoice && (
-        <div className="command-palette-backdrop" onClick={() => setViewInvoice(null)}>
-          <div style={{ background: "white", borderRadius: 16, maxWidth: 720, width: "100%", maxHeight: "90vh", overflow: "auto", position: "relative" }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: "16px 24px", borderBottom: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "white", zIndex: 10 }}>
-              <div style={{ fontWeight: 800, fontSize: 16 }}>Invoice Preview — {viewInvoice.invoiceNumber}</div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="btn-slds btn-slds-primary" style={{ padding: "6px 14px" }} onClick={handlePrint}>
-                  <Printer size={14} /> Print / PDF
-                </button>
-                <button className="btn-slds btn-slds-secondary" style={{ padding: "6px 10px" }} onClick={() => setViewInvoice(null)}>
-                  <X size={15} />
-                </button>
-              </div>
-            </div>
-            <InvoiceTemplate invoice={viewInvoice} client={clients.find(c => c.id === viewInvoice.clientId)} />
-          </div>
-        </div>
-      )}
-
-      {/* Create Invoice / Proforma Modal */}
-      {modal?.open && (
+      {/* Create / Edit Invoice & Proforma Modal */}
+      {modal && (
         <div className="modal-overlay" onClick={() => setModal(null)}>
-          <div className="modal" style={{ maxWidth: 700, maxHeight: "90vh", overflow: "auto" }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header" style={{ background: modal.type === "INVOICE" ? "#0F172A" : "#2D1B69", color: "white", borderRadius: "16px 16px 0 0" }}>
-              <div>
-                <div className="modal-title" style={{ color: "white" }}>
-                  {modal.type === "INVOICE" ? "Create Tax Invoice" : "Create Proforma Invoice"}
-                </div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 2 }}>
-                  {form.invoiceNumber}
-                </div>
+          <div className="modal" style={{ maxWidth: 780, width: "95%" }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">
+                {modal.type === "INVOICE" ? "Create Tax Invoice" : "Create Proforma Invoice"}
               </div>
-              <button style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", padding: "4px 10px", borderRadius: 6, cursor: "pointer" }} onClick={() => setModal(null)}>✕</button>
+              <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px" }} onClick={() => setModal(null)}>✕</button>
             </div>
 
-            <div className="modal-body" style={{ display: "grid", gap: 16 }}>
-              {/* Header Row */}
+            <div className="modal-body" style={{ display: "grid", gap: 16, maxHeight: "78vh", overflowY: "auto" }}>
+              {/* Row 1: Document #, Date, Financial Year */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
                 <div className="form-group">
-                  <label className="form-label">Client *</label>
-                  <select className="form-select" value={form.clientId} onChange={e => setForm(f => ({ ...f, clientId: e.target.value }))}>
-                    <option value="">Select client</option>
-                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <label className="form-label" style={{ fontWeight: 700 }}>Document Number</label>
+                  <input className="form-input" value={form.invoiceNumber || ""} readOnly style={{ background: "#F1F5F9" }} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Date</label>
-                  <input className="form-input" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+                  <label className="form-label" style={{ fontWeight: 700 }}>Document Date *</label>
+                  <input className="form-input" type="date" value={form.date || ""} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">GST Rate (%)</label>
-                  <select className="form-select" value={form.gstRate} onChange={e => setForm(f => ({ ...f, gstRate: Number(e.target.value) }))}>
-                    <option value={0}>0% (Exempt)</option>
-                    <option value={5}>5%</option>
-                    <option value={12}>12%</option>
-                    <option value={18}>18%</option>
-                    <option value={28}>28%</option>
+                  <label className="form-label" style={{ fontWeight: 700 }}>Financial Year *</label>
+                  <select className="form-select" value={form.financialYear || selectedFY} onChange={e => setForm(f => ({ ...f, financialYear: e.target.value }))}>
+                    {fyOptions.map(fy => <option key={fy} value={fy}>FY {fy}</option>)}
                   </select>
                 </div>
               </div>
 
-              {/* Line Items */}
+              {/* Row 2: Client Name */}
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 700 }}>Client Name *</label>
+                <select className="form-select" value={form.clientId || ""} onChange={e => setForm(f => ({ ...f, clientId: e.target.value }))}>
+                  <option value="">Select a client...</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>{c.name} {c.pan ? `(PAN: ${c.pan})` : ""}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Items Table with Pre-built Description Dropdown Options */}
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", marginBottom: 8 }}>Line Items</div>
-                <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <label className="form-label" style={{ fontWeight: 700, margin: 0 }}>Service Items / Particulars</label>
+                  <button type="button" className="btn-slds btn-slds-secondary" style={{ padding: "3px 8px", fontSize: 11 }} onClick={addItem}>
+                    <Plus size={12} /> Add Item Row
+                  </button>
+                </div>
+
+                <div style={{ border: "1px solid #CBD5E1", borderRadius: 8, overflow: "hidden" }}>
+                  <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
                     <thead>
-                      <tr style={{ background: "#F1F5F9" }}>
-                        <th style={{ padding: "8px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#64748B" }}>Description</th>
-                        <th style={{ padding: "8px 12px", textAlign: "center", fontSize: 11, fontWeight: 700, color: "#64748B", width: 80 }}>HSN</th>
-                        <th style={{ padding: "8px 12px", textAlign: "center", fontSize: 11, fontWeight: 700, color: "#64748B", width: 70 }}>Qty</th>
-                        <th style={{ padding: "8px 12px", textAlign: "right", fontSize: 11, fontWeight: 700, color: "#64748B", width: 100 }}>Rate (₹)</th>
-                        <th style={{ padding: "8px 12px", textAlign: "right", fontSize: 11, fontWeight: 700, color: "#64748B", width: 100 }}>Amount (₹)</th>
-                        <th style={{ width: 36 }}></th>
+                      <tr style={{ background: "#F8FAFC", color: "#475569", textTransform: "uppercase", fontSize: 10, fontWeight: 700 }}>
+                        <th style={{ padding: "8px 10px", textAlign: "left" }}>Description / Service Options</th>
+                        <th style={{ padding: "8px 10px", width: 90, textAlign: "left" }}>HSN/SAC</th>
+                        <th style={{ padding: "8px 10px", width: 60, textAlign: "center" }}>Qty</th>
+                        <th style={{ padding: "8px 10px", width: 100, textAlign: "right" }}>Rate (₹)</th>
+                        <th style={{ padding: "8px 10px", width: 110, textAlign: "right" }}>Amount (₹)</th>
+                        <th style={{ padding: "8px 10px", width: 40 }}></th>
                       </tr>
                     </thead>
                     <tbody>
                       {(form.items || []).map((item, idx) => (
-                        <tr key={item.id} style={{ borderTop: "1px solid #E2E8F0" }}>
-                          <td style={{ padding: "6px 8px" }}>
-                            <input
-                              className="form-input"
-                              style={{ fontSize: 12, padding: "5px 8px" }}
-                              value={item.description}
-                              onChange={e => updateItem(idx, "description", e.target.value)}
-                              placeholder="Service description"
-                            />
+                        <tr key={item.id || idx} style={{ borderTop: "1px solid #F1F5F9" }}>
+                          <td style={{ padding: "6px 10px" }}>
+                            {/* Pre-built Description Options Dropdown + Input */}
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                              <select
+                                className="form-select"
+                                style={{ fontSize: 12, padding: "4px 8px", marginBottom: 2 }}
+                                value={PRESET_DESCRIPTIONS.includes(item.description) ? item.description : "CUSTOM"}
+                                onChange={e => {
+                                  if (e.target.value !== "CUSTOM") {
+                                    updateItem(idx, "description", e.target.value);
+                                  }
+                                }}
+                              >
+                                {PRESET_DESCRIPTIONS.map(desc => (
+                                  <option key={desc} value={desc}>{desc}</option>
+                                ))}
+                                <option value="CUSTOM">Type custom description below...</option>
+                              </select>
+                              <input
+                                className="form-input"
+                                style={{ fontSize: 12, padding: "4px 8px" }}
+                                value={item.description}
+                                onChange={e => updateItem(idx, "description", e.target.value)}
+                                placeholder="Service description..."
+                              />
+                            </div>
                           </td>
-                          <td style={{ padding: "6px 8px" }}>
-                            <input
-                              className="form-input"
-                              style={{ fontSize: 12, padding: "5px 8px", textAlign: "center" }}
-                              value={item.hsn}
-                              onChange={e => updateItem(idx, "hsn", e.target.value)}
-                              placeholder="998311"
-                            />
+                          <td style={{ padding: "6px 10px" }}>
+                            <input className="form-input" style={{ fontSize: 12, padding: "4px 8px" }} value={item.hsn} onChange={e => updateItem(idx, "hsn", e.target.value)} placeholder="998311" />
                           </td>
-                          <td style={{ padding: "6px 8px" }}>
-                            <input
-                              className="form-input"
-                              type="number"
-                              style={{ fontSize: 12, padding: "5px 8px", textAlign: "center" }}
-                              value={item.quantity}
-                              onChange={e => updateItem(idx, "quantity", Number(e.target.value))}
-                            />
+                          <td style={{ padding: "6px 10px" }}>
+                            <input className="form-input" type="number" style={{ fontSize: 12, padding: "4px 8px", textAlign: "center" }} value={item.quantity} onChange={e => updateItem(idx, "quantity", e.target.value)} />
                           </td>
-                          <td style={{ padding: "6px 8px" }}>
-                            <input
-                              className="form-input"
-                              type="number"
-                              style={{ fontSize: 12, padding: "5px 8px", textAlign: "right" }}
-                              value={item.rate || ""}
-                              onChange={e => updateItem(idx, "rate", Number(e.target.value))}
-                              placeholder="0"
-                            />
+                          <td style={{ padding: "6px 10px" }}>
+                            <input className="form-input" type="number" style={{ fontSize: 12, padding: "4px 8px", textAlign: "right" }} value={item.rate} onChange={e => updateItem(idx, "rate", e.target.value)} />
                           </td>
-                          <td style={{ padding: "6px 12px", textAlign: "right", fontWeight: 700, fontSize: 13, color: "#0F172A" }}>
+                          <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 700, color: "#0F172A" }}>
                             {formatCurrency(item.amount)}
                           </td>
-                          <td style={{ padding: "6px 4px" }}>
+                          <td style={{ padding: "6px 10px", textAlign: "center" }}>
                             {(form.items || []).length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => removeItem(idx)}
-                                style={{ background: "none", border: "none", color: "#DC2626", cursor: "pointer", padding: "4px" }}
-                              >
+                              <button type="button" style={{ background: "none", border: "none", color: "#DC2626", cursor: "pointer" }} onClick={() => removeItem(idx)}>
                                 <X size={14} />
                               </button>
                             )}
@@ -394,156 +399,155 @@ export default function InvoicePage() {
                     </tbody>
                   </table>
                 </div>
-                <button className="btn-slds btn-slds-secondary" style={{ marginTop: 10, fontSize: 12 }} onClick={addItem}>
-                  <Plus size={13} /> Add Line Item
-                </button>
               </div>
 
-              {/* Totals */}
-              <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10, padding: 14 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 4 }}>
-                  <span style={{ color: "#374151", fontSize: 13 }}>Subtotal:</span>
-                  <span style={{ fontWeight: 700, textAlign: "right", color: "#0F172A" }}>{formatCurrency(subtotal)}</span>
-                  <span style={{ color: "#374151", fontSize: 13 }}>GST ({form.gstRate}%):</span>
-                  <span style={{ fontWeight: 700, textAlign: "right", color: "#0F172A" }}>{formatCurrency(gstAmount)}</span>
-                  <span style={{ color: "#166534", fontSize: 15, fontWeight: 800, borderTop: "1px solid #BBF7D0", paddingTop: 6, marginTop: 4 }}>Total:</span>
-                  <span style={{ fontWeight: 900, fontSize: 18, color: "#15803D", textAlign: "right", borderTop: "1px solid #BBF7D0", paddingTop: 6, marginTop: 4 }}>
-                    {formatCurrency(total)}
-                  </span>
+              {/* Totals & Amount Received Input */}
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 20, paddingTop: 10, borderTop: "1px dashed #CBD5E1" }}>
+                <div style={{ flex: 1 }}>
+                  <label className="form-label" style={{ fontWeight: 700 }}>Notes / Payment Terms</label>
+                  <textarea className="form-input" rows={3} style={{ fontSize: 12 }} value={form.notes || ""} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
                 </div>
-              </div>
 
-              {/* Notes */}
-              <div className="form-group">
-                <label className="form-label">Notes / Terms</label>
-                <textarea
-                  className="form-input"
-                  style={{ minHeight: 70, resize: "vertical" }}
-                  value={form.notes}
-                  onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="Payment due within 30 days. Thank you for your business!"
-                />
+                <div style={{ width: 280, display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#64748B" }}>Subtotal:</span>
+                    <strong style={{ color: "#0F172A" }}>{formatCurrency(subtotal)}</strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: "#64748B" }}>GST Rate:</span>
+                    <select className="form-select" style={{ width: 80, padding: "2px 6px", fontSize: 12 }} value={form.gstRate} onChange={e => setForm(f => ({ ...f, gstRate: Number(e.target.value) }))}>
+                      <option value={0}>0%</option>
+                      <option value={5}>5%</option>
+                      <option value={12}>12%</option>
+                      <option value={18}>18%</option>
+                      <option value={28}>28%</option>
+                    </select>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#64748B" }}>GST Amount:</span>
+                    <strong style={{ color: "#0F172A" }}>{formatCurrency(gstAmount)}</strong>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 800, color: "#0F172A", paddingTop: 4, borderTop: "1px solid #CBD5E1" }}>
+                    <span>Total Amount:</span>
+                    <span style={{ color: "#1D4ED8" }}>{formatCurrency(total)}</span>
+                  </div>
+
+                  {/* Amount Received Input */}
+                  <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px dashed #CBD5E1" }}>
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: 12, color: "#059669" }}>
+                      Amount Received (₹)
+                    </label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      style={{ fontSize: 13, fontWeight: 700, color: "#059669" }}
+                      value={form.amountReceived || ""}
+                      onChange={e => setForm(f => ({ ...f, amountReceived: Number(e.target.value || 0) }))}
+                      placeholder="e.g. 5000"
+                    />
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, color: balanceDue > 0 ? "#DC2626" : "#059669", marginTop: 4 }}>
+                    <span>Balance Due:</span>
+                    <span>{formatCurrency(balanceDue)}</span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="modal-footer">
+            <div className="modal-footer" style={{ display: "flex", justifyContent: "space-between" }}>
               <button className="btn-slds btn-slds-secondary" onClick={() => setModal(null)}>Cancel</button>
-              <button className="btn-slds btn-slds-secondary" onClick={() => handleSave("DRAFT")} style={{ color: "#D97706" }}>
-                Save as Draft
-              </button>
-              <button className="btn-slds btn-slds-primary" onClick={() => handleSave("SENT")}>
-                <Send size={14} /> Save & Send
-              </button>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button className="btn-slds btn-slds-secondary" onClick={() => handleSave("DRAFT")}>Save as Draft</button>
+                <button className="btn-slds btn-slds-primary" onClick={() => handleSave("SENT")}>Save & Link to Banking</button>
+                <button className="btn-slds btn-slds-success" onClick={() => handleSave("PAID")}>Mark Paid & Save</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Detail / Print Preview Modal */}
+      {viewInvoice && (
+        <div className="modal-overlay" onClick={() => setViewInvoice(null)}>
+          <div className="modal" style={{ maxWidth: 740, width: "95%" }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header" style={{ background: "#0F172A", color: "white" }}>
+              <div className="modal-title">{viewInvoice.type} #{viewInvoice.invoiceNumber}</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn-slds btn-slds-primary" style={{ padding: "4px 10px", fontSize: 12 }} onClick={handlePrint}>
+                  <Printer size={13} /> Print / Save PDF
+                </button>
+                <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px", background: "rgba(255,255,255,0.2)", color: "white" }} onClick={() => setViewInvoice(null)}>✕</button>
+              </div>
+            </div>
+
+            <div className="modal-body" ref={printRef} style={{ padding: 32, background: "white", color: "#0F172A", fontFamily: "sans-serif" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+                <div>
+                  <h1 style={{ fontSize: 24, fontWeight: 900, color: "#1E293B", margin: 0 }}>zpluscrm Practice</h1>
+                  <p style={{ fontSize: 12, color: "#64748B", margin: "4px 0 0" }}>Chartered Accountants & Practice Management</p>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: viewInvoice.type === "INVOICE" ? "#1D4ED8" : "#C2410C" }}>
+                    {viewInvoice.type === "INVOICE" ? "TAX INVOICE" : "PROFORMA INVOICE"}
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#334155", marginTop: 4 }}>#{viewInvoice.invoiceNumber}</div>
+                  <div style={{ fontSize: 12, color: "#64748B" }}>Date: {viewInvoice.date}</div>
+                  <div style={{ fontSize: 12, color: "#64748B" }}>FY: {viewInvoice.financialYear || getCurrentFY()}</div>
+                </div>
+              </div>
+
+              {/* Billed To Client Details */}
+              <div style={{ background: "#F8FAFC", padding: 16, borderRadius: 8, marginBottom: 24 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Billed To Client</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#0F172A", marginTop: 4 }}>
+                  {viewInvoice.clientName || clients.find(c => c.id === viewInvoice.clientId)?.name}
+                </div>
+              </div>
+
+              {/* Items Table */}
+              <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse", marginBottom: 24 }}>
+                <thead>
+                  <tr style={{ background: "#0F172A", color: "white", textTransform: "uppercase", fontSize: 11, fontWeight: 700 }}>
+                    <th style={{ padding: "10px 12px", textAlign: "left" }}># Description</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", width: 80 }}>Qty</th>
+                    <th style={{ padding: "10px 12px", textAlign: "right", width: 110 }}>Rate</th>
+                    <th style={{ padding: "10px 12px", textAlign: "right", width: 120 }}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(viewInvoice.items || []).map((item, idx) => (
+                    <tr key={idx} style={{ borderBottom: "1px solid #E2E8F0" }}>
+                      <td style={{ padding: "10px 12px", fontWeight: 600 }}>{item.description}</td>
+                      <td style={{ padding: "10px 12px", textAlign: "center" }}>{item.quantity}</td>
+                      <td style={{ padding: "10px 12px", textAlign: "right" }}>{formatCurrency(item.rate)}</td>
+                      <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700 }}>{formatCurrency(item.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Totals */}
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
+                <div style={{ width: 280, fontSize: 13, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}><span>Subtotal:</span><strong>{formatCurrency(viewInvoice.subtotal)}</strong></div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}><span>GST ({viewInvoice.gstRate}%):</span><strong>{formatCurrency(viewInvoice.gstAmount)}</strong></div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 800, color: "#0F172A", borderTop: "2px solid #0F172A", paddingTop: 6 }}>
+                    <span>Total Amount:</span><span>{formatCurrency(viewInvoice.total)}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "#059669", fontWeight: 700 }}>
+                    <span>Amount Received:</span><span>{formatCurrency(viewInvoice.amountReceived || 0)}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", color: (viewInvoice.balanceDue || 0) > 0 ? "#DC2626" : "#059669", fontWeight: 800 }}>
+                    <span>Balance Due:</span><span>{formatCurrency(viewInvoice.balanceDue !== undefined ? viewInvoice.balanceDue : Math.max(0, viewInvoice.total - (viewInvoice.amountReceived || 0)))}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       )}
     </AppShell>
-  );
-}
-
-function InvoiceTemplate({ invoice, client }: { invoice: Invoice; client: any }) {
-  const gstRate = invoice.gstRate || 18;
-  const cgst = invoice.gstAmount / 2;
-  const sgst = invoice.gstAmount / 2;
-
-  return (
-    <div style={{ padding: "32px 40px", fontFamily: "Arial, sans-serif", color: "#0F172A", minHeight: 800 }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, borderBottom: "3px solid #0176D3", paddingBottom: 20 }}>
-        <div>
-          <div style={{ fontSize: 24, fontWeight: 900, color: "#0F172A" }}>
-            <span style={{ color: "#0F172A" }}>zplus</span>
-            <span style={{ color: "#54B400" }}>crm</span>
-          </div>
-          <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>Practice Management</div>
-          <div style={{ fontSize: 12, color: "#374151", marginTop: 2 }}>{FIRM_ADDRESS}</div>
-          <div style={{ fontSize: 12, color: "#374151" }}>GSTIN: {FIRM_GSTIN} | PAN: {FIRM_PAN}</div>
-          <div style={{ fontSize: 12, color: "#374151" }}>{FIRM_PHONE} | {FIRM_EMAIL}</div>
-        </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: "#0176D3" }}>
-            {invoice.type === "INVOICE" ? "TAX INVOICE" : "PROFORMA INVOICE"}
-          </div>
-          <div style={{ fontSize: 13, color: "#64748B", marginTop: 4 }}>No: {invoice.invoiceNumber}</div>
-          <div style={{ fontSize: 13, color: "#64748B" }}>Date: {invoice.date}</div>
-        </div>
-      </div>
-
-      {/* Bill To */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", marginBottom: 6 }}>Bill To</div>
-        <div style={{ padding: "12px 16px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8 }}>
-          <div style={{ fontSize: 16, fontWeight: 800 }}>{client?.name || "Client Name"}</div>
-          <div style={{ fontSize: 12, color: "#64748B" }}>{client?.type?.replace(/_/g, " ") || ""}</div>
-          {client?.gstin && <div style={{ fontSize: 12, color: "#374151" }}>GSTIN: {client.gstin}</div>}
-          {client?.pan && <div style={{ fontSize: 12, color: "#374151" }}>PAN: {client.pan}</div>}
-          {(client as any)?.address && <div style={{ fontSize: 12, color: "#374151" }}>{(client as any).address}</div>}
-        </div>
-      </div>
-
-      {/* Items Table */}
-      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 20, fontSize: 13 }}>
-        <thead>
-          <tr style={{ background: "#0F172A", color: "white" }}>
-            <th style={{ padding: "10px 12px", textAlign: "left", borderRadius: "8px 0 0 0" }}>#</th>
-            <th style={{ padding: "10px 12px", textAlign: "left" }}>Description</th>
-            <th style={{ padding: "10px 12px", textAlign: "center" }}>HSN</th>
-            <th style={{ padding: "10px 12px", textAlign: "center" }}>Qty</th>
-            <th style={{ padding: "10px 12px", textAlign: "right" }}>Rate (₹)</th>
-            <th style={{ padding: "10px 12px", textAlign: "right", borderRadius: "0 8px 0 0" }}>Amount (₹)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {invoice.items.map((item, i) => (
-            <tr key={item.id} style={{ background: i % 2 === 0 ? "#F8FAFC" : "#FFFFFF" }}>
-              <td style={{ padding: "10px 12px", borderBottom: "1px solid #E2E8F0" }}>{i + 1}</td>
-              <td style={{ padding: "10px 12px", borderBottom: "1px solid #E2E8F0" }}>{item.description}</td>
-              <td style={{ padding: "10px 12px", borderBottom: "1px solid #E2E8F0", textAlign: "center" }}>{item.hsn}</td>
-              <td style={{ padding: "10px 12px", borderBottom: "1px solid #E2E8F0", textAlign: "center" }}>{item.quantity}</td>
-              <td style={{ padding: "10px 12px", borderBottom: "1px solid #E2E8F0", textAlign: "right" }}>{item.rate.toLocaleString("en-IN")}</td>
-              <td style={{ padding: "10px 12px", borderBottom: "1px solid #E2E8F0", textAlign: "right", fontWeight: 700 }}>{item.amount.toLocaleString("en-IN")}</td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colSpan={5} style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600, background: "#F1F5F9" }}>Subtotal:</td>
-            <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, background: "#F1F5F9" }}>{invoice.subtotal.toLocaleString("en-IN")}</td>
-          </tr>
-          <tr>
-            <td colSpan={5} style={{ padding: "8px 12px", textAlign: "right", color: "#64748B" }}>CGST ({gstRate / 2}%):</td>
-            <td style={{ padding: "8px 12px", textAlign: "right", color: "#64748B" }}>{cgst.toLocaleString("en-IN")}</td>
-          </tr>
-          <tr>
-            <td colSpan={5} style={{ padding: "8px 12px", textAlign: "right", color: "#64748B" }}>SGST ({gstRate / 2}%):</td>
-            <td style={{ padding: "8px 12px", textAlign: "right", color: "#64748B" }}>{sgst.toLocaleString("en-IN")}</td>
-          </tr>
-          <tr style={{ background: "#0F172A", color: "white" }}>
-            <td colSpan={5} style={{ padding: "12px 12px", textAlign: "right", fontWeight: 800, fontSize: 15 }}>Total:</td>
-            <td style={{ padding: "12px 12px", textAlign: "right", fontWeight: 900, fontSize: 16 }}>₹ {invoice.total.toLocaleString("en-IN")}</td>
-          </tr>
-        </tfoot>
-      </table>
-
-      {/* Notes */}
-      {invoice.notes && (
-        <div style={{ marginTop: 16, padding: "12px 16px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", marginBottom: 4 }}>Notes & Terms</div>
-          <div style={{ fontSize: 12, color: "#374151" }}>{invoice.notes}</div>
-        </div>
-      )}
-
-      {/* Footer */}
-      <div style={{ marginTop: 32, paddingTop: 16, borderTop: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-        <div style={{ fontSize: 11, color: "#94A3B8" }}>
-          Generated by zpluscrm Practice Management System
-        </div>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ height: 40, width: 160, borderBottom: "1px solid #0F172A" }}></div>
-          <div style={{ fontSize: 11, color: "#64748B", marginTop: 6 }}>Authorized Signature</div>
-        </div>
-      </div>
-    </div>
   );
 }

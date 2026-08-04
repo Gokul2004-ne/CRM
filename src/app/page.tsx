@@ -22,9 +22,9 @@ export default function Dashboard() {
   const totalClients = clients.length;
   const totalServices = services.length;
 
-  const totalBilled = assignedServices.reduce((acc, curr) => acc + (curr.totalFee || curr.amountBilled || 0), 0);
-  const totalReceived = assignedServices.reduce((acc, curr) => acc + (curr.paidAmount || curr.amountReceived || 0), 0);
-  const totalPending = assignedServices.reduce((acc, curr) => acc + (curr.pendingAmount || curr.amountPending || 0), 0);
+  const totalBilled = assignedServices.reduce((acc, curr) => acc + ((curr as any).totalFee || curr.amountBilled || 0), 0);
+  const totalReceived = assignedServices.reduce((acc, curr) => acc + ((curr as any).paidAmount || curr.amountReceived || 0), 0);
+  const totalPending = assignedServices.reduce((acc, curr) => acc + ((curr as any).pendingAmount || curr.amountPending || 0), 0);
 
   // Chart data for April - March
   const months = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];

@@ -48,12 +48,12 @@ const serviceBlocks: ServiceBlock[] = [
 function RenderServiceLogo({ type }: { type: "CA" | "CM" | "CRM" | "CMR" }) {
   if (type === "CA") {
     return (
-      <div style={{ width: 96, height: 96, background: "#FFFFFF", borderRadius: 24, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 12px 30px rgba(0,0,0,0.4)", padding: 10 }}>
-        <svg viewBox="0 0 200 160" width="80" height="80" fill="none">
-          <path d="M 85 25 C 35 25 20 52 20 80 C 20 108 35 135 85 135" stroke="#0A466A" strokeWidth="22" strokeLinecap="round" />
-          <path d="M 110 135 L 150 25 L 190 135" stroke="#0A466A" strokeWidth="20" strokeLinejoin="round" strokeLinecap="round" />
-          <line x1="155" y1="50" x2="188" y2="135" stroke="#0A466A" strokeWidth="5" />
-          <path d="M 92 105 L 122 135 L 205 60" stroke="#66C02E" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
+      <div style={{ width: 90, height: 90, background: "#FFFFFF", borderRadius: 22, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 12px 30px rgba(0,0,0,0.35)", padding: 6, overflow: "hidden" }}>
+        <svg viewBox="0 0 220 160" style={{ width: "100%", height: "100%" }} fill="none">
+          <path d="M 85 25 C 35 25 20 52 20 80 C 20 108 35 135 85 135" stroke="#0A466A" strokeWidth="24" strokeLinecap="round" />
+          <path d="M 110 135 L 150 25 L 190 135" stroke="#0A466A" strokeWidth="22" strokeLinejoin="round" strokeLinecap="round" />
+          <line x1="155" y1="50" x2="188" y2="135" stroke="#0A466A" strokeWidth="6" />
+          <path d="M 92 105 L 122 135 L 205 60" stroke="#66C02E" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
     );
@@ -61,10 +61,10 @@ function RenderServiceLogo({ type }: { type: "CA" | "CM" | "CRM" | "CMR" }) {
 
   if (type === "CM") {
     return (
-      <div style={{ width: 96, height: 96, background: "#FFFFFF", borderRadius: 24, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 12px 30px rgba(0,0,0,0.4)", padding: 10 }}>
-        <svg viewBox="0 0 160 160" width="80" height="80" fill="none">
-          <path d="M 80 40 L 45 40 C 25 40 15 55 15 80 C 15 105 25 120 45 120 L 80 120" stroke="#00B050" strokeWidth="22" strokeLinecap="round" />
-          <path d="M 46 120 L 78 48 C 86 32 96 42 102 62 L 118 112 C 124 122 134 122 140 62 L 146 48" stroke="#1A1A1A" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
+      <div style={{ width: 90, height: 90, background: "#FFFFFF", borderRadius: 22, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 12px 30px rgba(0,0,0,0.35)", padding: 6, overflow: "hidden" }}>
+        <svg viewBox="0 0 160 160" style={{ width: "100%", height: "100%" }} fill="none">
+          <path d="M 80 40 L 45 40 C 25 40 15 55 15 80 C 15 105 25 120 45 120 L 80 120" stroke="#00B050" strokeWidth="24" strokeLinecap="round" />
+          <path d="M 46 120 L 78 48 C 86 32 96 42 102 62 L 118 112 C 124 122 134 122 140 62 L 146 48" stroke="#1A1A1A" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
     );
@@ -72,8 +72,8 @@ function RenderServiceLogo({ type }: { type: "CA" | "CM" | "CRM" | "CMR" }) {
 
   if (type === "CRM") {
     return (
-      <div style={{ width: 96, height: 96, background: "#FFFFFF", borderRadius: 24, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 16px 36px rgba(79, 70, 229, 0.6)", padding: 8 }}>
-        <svg viewBox="0 0 160 160" width="84" height="84">
+      <div style={{ width: 90, height: 90, background: "#FFFFFF", borderRadius: 22, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 16px 36px rgba(79, 70, 229, 0.6)", padding: 2, overflow: "hidden" }}>
+        <svg viewBox="0 0 160 160" style={{ width: "100%", height: "100%" }}>
           <path d="M 80 80 L 80 10 A 70 70 0 0 0 10 80 Z" fill="#2B80BF" />
           <path d="M 80 80 L 150 80 A 70 70 0 0 0 80 10 Z" fill="#54B400" />
           <path d="M 80 80 L 80 150 A 70 70 0 0 0 150 80 Z" fill="#D35400" />
@@ -96,8 +96,8 @@ function RenderServiceLogo({ type }: { type: "CA" | "CM" | "CRM" | "CMR" }) {
   }
 
   return (
-    <div style={{ width: 96, height: 96, background: "#00B4D8", borderRadius: 24, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 12px 30px rgba(0,0,0,0.4)", padding: 8 }}>
-      <svg viewBox="0 0 160 160" width="84" height="84">
+    <div style={{ width: 90, height: 90, background: "#00B4D8", borderRadius: 22, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 12px 30px rgba(0,0,0,0.35)", padding: 4, overflow: "hidden" }}>
+      <svg viewBox="0 0 160 160" style={{ width: "100%", height: "100%" }}>
         <rect x="30" y="85" width="16" height="35" fill="#4B5563" rx="2" />
         <rect x="52" y="70" width="16" height="50" fill="#4B5563" rx="2" />
         <rect x="74" y="60" width="16" height="60" fill="#4B5563" rx="2" />

@@ -94,9 +94,6 @@ export interface AssignedService {
   amountBilled: number;
   amountReceived: number;
   amountPending: number;
-  totalFee?: number;
-  paidAmount?: number;
-  pendingAmount?: number;
   status?: ServiceStatus;
   dueDate?: string;
 }
@@ -141,6 +138,37 @@ export interface Collaboration {
   type?: string;
   notes?: string;
   createdAt?: string;
+}
+
+export type InvoiceType = "PROFORMA" | "INVOICE";
+
+export interface InvoiceItem {
+  id: string;
+  description: string;
+  hsn?: string;
+  quantity: number;
+  rate: number;
+  amount: number;
+}
+
+export interface Invoice {
+  id: string;
+  type: InvoiceType;
+  invoiceNumber: string;
+  date: string;
+  financialYear?: string;
+  clientId: string;
+  clientName?: string;
+  items: InvoiceItem[];
+  subtotal: number;
+  gstRate: number;
+  gstAmount: number;
+  total: number;
+  amountReceived?: number;
+  balanceDue?: number;
+  notes?: string;
+  status: "DRAFT" | "SENT" | "PAID";
+  createdAt: string;
 }
 
 // Dashboard computed types
