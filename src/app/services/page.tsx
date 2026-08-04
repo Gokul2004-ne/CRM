@@ -7,6 +7,17 @@ import { Plus, Pencil, Trash2, Search, IndianRupee, Package } from "lucide-react
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 
+const PACKAGE_TYPES = [
+  { name: "Income Tax Return & Audit", defaultPrice: 7500 },
+  { name: "GST Compliance & Filing", defaultPrice: 5000 },
+  { name: "TDS & Statutory Compliance", defaultPrice: 4000 },
+  { name: "ROC & Company Secretarial", defaultPrice: 8500 },
+  { name: "Bookkeeping & Accounting", defaultPrice: 10000 },
+  { name: "Payroll & Labor Law Compliance", defaultPrice: 6000 },
+  { name: "Trademark & Business Registration", defaultPrice: 5000 },
+  { name: "Audit & Assurance Package", defaultPrice: 15000 },
+];
+
 const emptyService = (): Service => ({
   id: "", name: "", price: 0, recurrence: "ANNUAL", applicableMonths: [], dueDate: ""
 });
@@ -200,14 +211,54 @@ export default function PackagesPage() {
               <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px" }} onClick={() => setModal({ open: false, editing: null })}>✕</button>
             </div>
             <div className="modal-body" style={{ display: "grid", gap: 16 }}>
+              {/* Package Type Preset Selection */}
               <div className="form-group">
-                <label className="form-label">Package Name *</label>
+                <label className="form-label" style={{ fontWeight: 700 }}>Select Package Type *</label>
+                <select
+                  className="form-select"
+                  onChange={e => {
+                    const preset = PACKAGE_TYPES.find(p => p.name === e.target.value);
+                    if (preset) {
+                      setForm(f => ({ ...f, name: preset.name, price: f.price || preset.defaultPrice }));
+                    }
+                  }}
+                >
+                  <option value="">-- Select from package types --</option>
+                  {PACKAGE_TYPES.map(pt => (
+                    <option key={pt.name} value={pt.name}>{pt.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 700 }}>Package Name *</label>
                 <input
                   className="form-input"
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   placeholder="e.g. GST Filing Package"
                 />
+                {/* Quick Selection Chips */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                  {PACKAGE_TYPES.map(pt => (
+                    <button
+                      key={pt.name}
+                      type="button"
+                      className="btn-slds btn-slds-secondary"
+                      style={{
+                        padding: "4px 8px",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        background: form.name === pt.name ? "#EFF6FF" : "#FFFFFF",
+                        borderColor: form.name === pt.name ? "#2563EB" : "#CBD5E1",
+                        color: form.name === pt.name ? "#1D4ED8" : "#475569"
+                      }}
+                      onClick={() => setForm(f => ({ ...f, name: pt.name, price: f.price || pt.defaultPrice }))}
+                    >
+                      {pt.name}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label">Package Amount (₹) *</label>
