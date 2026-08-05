@@ -302,8 +302,39 @@ export default function ServicesPage() {
                       </td>
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-                          <Calendar size={12} color="#0176D3" />
-                          <span style={{ fontWeight: 700, color: "#0176D3" }}>{getDueDateLabel(ss)}</span>
+                          <Calendar size={13} color="#0176D3" />
+                          <select
+                            className="form-select"
+                            style={{
+                              fontSize: 12,
+                              padding: "4px 8px",
+                              fontWeight: 700,
+                              color: "#0176D3",
+                              background: "#EFF6FF",
+                              border: "1px solid #BFDBFE",
+                              borderRadius: 6,
+                              cursor: "pointer",
+                              minWidth: 125
+                            }}
+                            value={ss.dueDateDay || 15}
+                            onChange={(e) => {
+                              const newDay = Number(e.target.value);
+                              const updated: SubService = {
+                                ...ss,
+                                dueDateDay: newDay,
+                                applicableMonths: ss.applicableMonths && ss.applicableMonths.length > 0 ? ss.applicableMonths : [...ALL_MONTHS]
+                              };
+                              updateSubService(updated);
+                              toast.success(`Auto-saved! ${ss.name} due date set to ${newDay}${newDay === 1 || newDay === 21 || newDay === 31 ? "st" : newDay === 2 || newDay === 22 ? "nd" : newDay === 3 || newDay === 23 ? "rd" : "th"} of month.`);
+                            }}
+                            title="Click to edit due date day (auto-saves)"
+                          >
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                              <option key={day} value={day}>
+                                {day}{day === 1 || day === 21 || day === 31 ? "st" : day === 2 || day === 22 ? "nd" : day === 3 || day === 23 ? "rd" : "th"} of month
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       </td>
                       <td className="col-actions">

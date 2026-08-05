@@ -172,7 +172,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
       const combinedSubServices = [...(data.subServices || [])];
       localSubServices.forEach(lss => {
-        if (!combinedSubServices.some(ss => ss.id === lss.id)) {
+        const idx = combinedSubServices.findIndex(ss => ss.id === lss.id);
+        if (idx >= 0) {
+          combinedSubServices[idx] = { ...combinedSubServices[idx], ...lss };
+        } else {
           combinedSubServices.push(lss);
         }
       });
