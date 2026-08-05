@@ -75,3 +75,14 @@ export function getFYMonths(fy: string): Date[] {
   }
   return months;
 }
+
+export const ALL_MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
+export function getValidDateForMonthDay(year: number, monthIndex: number, targetDay: number): Date {
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const actualDay = Math.min(targetDay, daysInMonth);
+  return new Date(year, monthIndex, actualDay);
+}

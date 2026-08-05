@@ -313,92 +313,38 @@ export const useAppStore = create<AppState>()((set, get) => ({
     removeRequiredDocFromSupabase(id);
   },
 
-  // Assigned Services Sync & Automatic Banking Ledger Redirect
+  // Assigned Services Sync (Reflects ONLY in Compliance Calendar and Assigned Packages — NOT Banking or Ledger)
   addAssignedService: (a) => {
-    const newBanking: BankingEntry = {
-      id: `b-${a.id}`,
-      financialYear: a.financialYear,
-      clientId: a.clientId,
-      serviceId: a.serviceId,
-      subServiceId: a.subServiceIds?.[0] || null,
-      amountBilled: a.amountBilled || 0,
-      amountReceived: a.amountReceived || 0,
-      amountPending: Math.max(0, (a.amountBilled || 0) - (a.amountReceived || 0)),
-      paymentStatus: (a.amountReceived || 0) >= (a.amountBilled || 0) && (a.amountBilled || 0) > 0 ? "PAID" : (a.amountReceived || 0) > 0 ? "PARTIAL" : "PENDING",
-      remark: "Auto-synced from Assign Services"
-    };
-
     set((s) => {
-      const existingBkIndex = s.bankingEntries.findIndex(b => b.id === `b-${a.id}` || (b.clientId === a.clientId && b.serviceId === a.serviceId && b.financialYear === a.financialYear));
-      let updatedBkList = [...s.bankingEntries];
-      if (existingBkIndex >= 0) {
-        updatedBkList[existingBkIndex] = { ...updatedBkList[existingBkIndex], ...newBanking };
-      } else {
-        updatedBkList.push(newBanking);
-      }
       const nextAssigned = [...s.assignedServices, a];
       saveToLocal("assignedServices", nextAssigned);
-      saveToLocal("bankingEntries", updatedBkList);
       return {
-        assignedServices: nextAssigned,
-        bankingEntries: updatedBkList
+        assignedServices: nextAssigned
       };
     });
-
     syncAssignedServiceToSupabase(a);
-    syncBankingEntryToSupabase(newBanking);
   },
 
   updateAssignedService: (a) => {
-    const newBanking: BankingEntry = {
-      id: `b-${a.id}`,
-      financialYear: a.financialYear,
-      clientId: a.clientId,
-      serviceId: a.serviceId,
-      subServiceId: a.subServiceIds?.[0] || null,
-      amountBilled: a.amountBilled || 0,
-      amountReceived: a.amountReceived || 0,
-      amountPending: Math.max(0, (a.amountBilled || 0) - (a.amountReceived || 0)),
-      paymentStatus: (a.amountReceived || 0) >= (a.amountBilled || 0) && (a.amountBilled || 0) > 0 ? "PAID" : (a.amountReceived || 0) > 0 ? "PARTIAL" : "PENDING",
-      remark: "Auto-synced from Assign Services"
-    };
-
     set((s) => {
-      const existingBkIndex = s.bankingEntries.findIndex(b => b.id === `b-${a.id}` || (b.clientId === a.clientId && b.serviceId === a.serviceId && b.financialYear === a.financialYear));
-      let updatedBkList = [...s.bankingEntries];
-      if (existingBkIndex >= 0) {
-        updatedBkList[existingBkIndex] = { ...updatedBkList[existingBkIndex], amountBilled: a.amountBilled, amountReceived: a.amountReceived, amountPending: Math.max(0, a.amountBilled - a.amountReceived) };
-      } else {
-        updatedBkList.push(newBanking);
-      }
-
       const nextAssigned = s.assignedServices.map(x => x.id === a.id ? a : x);
       saveToLocal("assignedServices", nextAssigned);
-      saveToLocal("bankingEntries", updatedBkList);
-
       return {
-        assignedServices: nextAssigned,
-        bankingEntries: updatedBkList
+        assignedServices: nextAssigned
       };
     });
-
     syncAssignedServiceToSupabase(a);
-    syncBankingEntryToSupabase(newBanking);
   },
 
   deleteAssignedService: (id) => {
     set((s) => {
       const nextAssigned = s.assignedServices.filter(x => x.id !== id);
-      const nextBanking = s.bankingEntries.filter(x => x.id !== `b-${id}`);
       saveToLocal("assignedServices", nextAssigned);
-      saveToLocal("bankingEntries", nextBanking);
       return {
-        assignedServices: nextAssigned,
-        bankingEntries: nextBanking
+        assignedServices: nextAssigned
       };
     });
     removeAssignedServiceFromSupabase(id);
-    removeBankingEntryFromSupabase(`b-${id}`);
   },
 
   // Banking Sync

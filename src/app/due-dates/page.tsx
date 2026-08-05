@@ -2,7 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
-import { getDaysUntilDue, formatDate, getWhatsAppLink, formatCurrency, getFYMonths, getCurrentFY } from "@/lib/utils";
+import { getDaysUntilDue, formatDate, getWhatsAppLink, formatCurrency, getFYMonths, getCurrentFY, ALL_MONTHS, getValidDateForMonthDay } from "@/lib/utils";
 import { MessageCircle, Mail, Calendar, CheckCircle2, Clock, AlertCircle, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,11 +17,9 @@ export default function DueDatesPage() {
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
-  // Parse FY to get start year (e.g., "2024-25" → 2024)
   const fyStartYear = parseInt(selectedFY?.split("-")[0] || "2024");
 
-  // Map month names to actual calendar months
-  const MONTH_DATES: Record<string, { month: number; year: number }> = {
+  const monthYearMap: Record<string, { month: number; year: number }> = {
     "April": { month: 3, year: fyStartYear },
     "May": { month: 4, year: fyStartYear },
     "June": { month: 5, year: fyStartYear },
@@ -52,38 +50,39 @@ export default function DueDatesPage() {
         return { ...a, client, service, subs, daysLeft, dueDate, monthName, isConfiguredService: false };
       });
 
-    // 2. Direct Services configured under Services Directory (subServices)
+    // 2. Direct Services configured under Services Directory (subServices) with Multi-Month Perpetual Recurrence
     const configuredServiceItems: typeof assignedItems = [];
     subServices.forEach(ss => {
       const parentSvc = services.find(s => s.id === ss.serviceId);
-      const targetDueDateStr = ss.dueDate || (ss.dueDateDay ? `2026-08-${String(ss.dueDateDay).padStart(2, "0")}` : null);
+      const monthsList = (ss.applicableMonths && ss.applicableMonths.length > 0) ? ss.applicableMonths : ALL_MONTHS;
+      const targetDay = ss.dueDateDay || 15;
 
-      if (targetDueDateStr) {
-        const daysLeft = getDaysUntilDue(targetDueDateStr);
-        const dueDate = new Date(targetDueDateStr);
-        const monthIndex = dueDate.getMonth();
-        const monthName = ["January", "February", "March", "April", "May", "June",
-          "July", "August", "September", "October", "November", "December"][monthIndex];
+      monthsList.forEach(monthName => {
+        const my = monthYearMap[monthName];
+        if (my) {
+          const validDateObj = getValidDateForMonthDay(my.year, my.month, targetDay);
+          const daysLeft = getDaysUntilDue(validDateObj.toISOString());
 
-        configuredServiceItems.push({
-          id: `cfg_${ss.id}`,
-          clientId: ss.clientId || "",
-          serviceId: ss.serviceId,
-          subServiceIds: [ss.id],
-          financialYear: selectedFY || getCurrentFY(),
-          amountBilled: 0,
-          amountReceived: 0,
-          amountPending: 0,
-          status: "PENDING",
-          client: clients.find(c => c.id === ss.clientId) || { name: ss.clientName || "All Clients" } as any,
-          service: parentSvc || { name: ss.name } as any,
-          subs: [ss],
-          daysLeft,
-          dueDate: new Date(targetDueDateStr),
-          monthName,
-          isConfiguredService: true
-        });
-      }
+          configuredServiceItems.push({
+            id: `cfg_${ss.id}_${monthName}`,
+            clientId: ss.clientId || "",
+            serviceId: ss.serviceId,
+            subServiceIds: [ss.id],
+            financialYear: selectedFY || getCurrentFY(),
+            amountBilled: 0,
+            amountReceived: 0,
+            amountPending: 0,
+            status: "PENDING",
+            client: clients.find(c => c.id === ss.clientId) || { name: ss.clientName || "All Clients" } as any,
+            service: parentSvc || { name: ss.name } as any,
+            subs: [ss],
+            daysLeft,
+            dueDate: validDateObj,
+            monthName,
+            isConfiguredService: true
+          });
+        }
+      });
     });
 
     const combined = [...assignedItems, ...configuredServiceItems];
@@ -216,7 +215,7 @@ export default function DueDatesPage() {
                   <div>
                     <div style={{ fontWeight: 800, fontSize: 16 }}>{month}</div>
                     <div style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", marginTop: 2 }}>
-                      FY {selectedFY} • {MONTH_DATES[month]?.year}
+                      FY {selectedFY} • {monthYearMap[month]?.year}
                     </div>
                   </div>
                   <div style={{ textAlign: "right" }}>
@@ -288,7 +287,7 @@ export default function DueDatesPage() {
               <div style={{ padding: "14px 20px", borderBottom: "1px solid #F1F5F9", display: "flex", alignItems: "center", gap: 12 }}>
                 <Calendar size={18} color="#0176D3" />
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: 16, color: "#0F172A" }}>{selectedMonth} {MONTH_DATES[selectedMonth]?.year}</div>
+                  <div style={{ fontWeight: 800, fontSize: 16, color: "#0F172A" }}>{selectedMonth} {monthYearMap[selectedMonth]?.year}</div>
                   <div style={{ fontSize: 12, color: "#64748B" }}>{(itemsByMonth[selectedMonth] || []).length} compliance items</div>
                 </div>
               </div>
@@ -302,7 +301,7 @@ export default function DueDatesPage() {
                 <div key={month} className="data-table-wrapper" style={{ marginBottom: 16 }}>
                   <div style={{ padding: "12px 20px", borderBottom: "1px solid #F1F5F9", background: "#F8FAFC", display: "flex", alignItems: "center", gap: 10 }}>
                     <Calendar size={16} color="#0176D3" />
-                    <span style={{ fontWeight: 700, color: "#0F172A" }}>{month} {MONTH_DATES[month]?.year}</span>
+                    <span style={{ fontWeight: 700, color: "#0F172A" }}>{month} {monthYearMap[month]?.year}</span>
                     <span className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontSize: 11 }}>{items.length} items</span>
                   </div>
                   <MonthListView items={items} getStatusStyle={getStatusStyle} getWhatsAppLink={getWhatsAppLink} formatDate={formatDate} formatCurrency={formatCurrency} />

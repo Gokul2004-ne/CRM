@@ -58,7 +58,8 @@ export interface Service {
   name: string;
   price: number;
   recurrence?: Recurrence;
-  applicableMonths?: number[];
+  applicableMonths?: string[];
+  dueDateDay?: number;
   dueDate?: string;
 }
 
@@ -70,9 +71,10 @@ export interface SubService {
   serviceIds?: string[];
   clientId?: string;
   clientName?: string;
-  recurrence?: Recurrence | "MONTHLY" | "QUARTERLY" | "ANNUALLY";
+  recurrence?: Recurrence | "MONTHLY" | "QUARTERLY" | "ANNUALLY" | "CUSTOM";
+  applicableMonths?: string[];
+  dueDateDay?: number;
   dueDate?: string;
-  dueDateDay?: string; // For monthly: day of month
 }
 
 export interface RequiredDoc {

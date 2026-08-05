@@ -5,9 +5,9 @@ import { useState, useMemo } from "react";
 import { SubService, Service } from "@/lib/types";
 import { Plus, Pencil, Trash2, Search, Eye, Check, Sparkles, Calendar, RefreshCw, X, Layers } from "lucide-react";
 import { toast } from "sonner";
-import { formatDate } from "@/lib/utils";
+import { formatDate, ALL_MONTHS } from "@/lib/utils";
 
-type Recurrence = "MONTHLY" | "QUARTERLY" | "ANNUALLY";
+type Recurrence = "MONTHLY" | "QUARTERLY" | "ANNUALLY" | "CUSTOM";
 
 const recurrenceColors: Record<string, { bg: string; color: string }> = {
   MONTHLY: { bg: "#EFF6FF", color: "#1D4ED8" },
@@ -34,19 +34,45 @@ export interface SelectedServiceRow {
   id: string;
   name: string;
   recurrence: Recurrence;
-  dueDate: string;
-  dueDateDay: string;
+  applicableMonths: string[];
+  dueDateDay: number;
+  dueDate?: string;
 }
 
 const emptyRow = (defaultName = ""): SelectedServiceRow => ({
   id: `row_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
   name: defaultName,
   recurrence: "MONTHLY",
-  dueDate: "",
-  dueDateDay: "20"
+  applicableMonths: [...ALL_MONTHS],
+  dueDateDay: 15,
+  dueDate: ""
 });
 
-const empty = (): SubService => ({ id: "", serviceId: "", name: "", serviceIds: [], recurrence: "MONTHLY", dueDate: "" });
+const empty = (): SubService => ({ id: "", serviceId: "", name: "", serviceIds: [], recurrence: "MONTHLY", applicableMonths: [...ALL_MONTHS], dueDateDay: 15, dueDate: "" });
+
+function getDueDateLabel(ss: SubService): string {
+  if (ss.dueDateDay) {
+    const day = ss.dueDateDay;
+    const suffix = day === 1 || day === 21 || day === 31 ? "st" : day === 2 || day === 22 ? "nd" : day === 3 || day === 23 ? "rd" : "th";
+    const dayStr = `${day}${suffix}`;
+
+    if (ss.applicableMonths && ss.applicableMonths.length > 0) {
+      if (ss.applicableMonths.length === 12) {
+        return `${dayStr} of every month`;
+      } else if (ss.applicableMonths.length <= 3) {
+        const monthsShort = ss.applicableMonths.map(m => m.substring(0, 3)).join(", ");
+        return `${dayStr} (${monthsShort})`;
+      } else {
+        return `${dayStr} (${ss.applicableMonths.length} months/yr)`;
+      }
+    }
+    return `${dayStr} of month`;
+  }
+  if (ss.dueDate) {
+    return formatDate(ss.dueDate);
+  }
+  return "15th of month";
+}
 
 export default function ServicesPage() {
   const { clients, services, subServices, requiredDocs, addSubService, addSubServicesBatch, updateSubService, deleteSubService } = useAppStore();
@@ -80,8 +106,9 @@ export default function ServicesPage() {
       id: ss.id,
       name: ss.name,
       recurrence: ((ss as any).recurrence as Recurrence) || "MONTHLY",
-      dueDate: ss.dueDate || "",
-      dueDateDay: (ss as any).dueDateDay || "20"
+      applicableMonths: ss.applicableMonths || [...ALL_MONTHS],
+      dueDateDay: ss.dueDateDay || 15,
+      dueDate: ss.dueDate || ""
     }]);
     setServiceInput("");
     setModal({ open: true, editing: ss });
@@ -130,8 +157,9 @@ export default function ServicesPage() {
         ...form,
         name: row.name.trim(),
         recurrence: row.recurrence,
+        applicableMonths: row.applicableMonths || [...ALL_MONTHS],
+        dueDateDay: row.dueDateDay || 15,
         dueDate: row.dueDate,
-        dueDateDay: row.dueDateDay,
         serviceIds: [form.serviceId],
         clientId: form.clientId,
         clientName: form.clientName || clients.find(c => c.id === form.clientId)?.name || ""
@@ -155,8 +183,9 @@ export default function ServicesPage() {
         clientId: form.clientId,
         clientName: form.clientName || clients.find(c => c.id === form.clientId)?.name || "",
         recurrence: r.recurrence || "MONTHLY",
-        dueDate: r.dueDate || "",
-        dueDateDay: r.dueDateDay || ""
+        applicableMonths: r.applicableMonths || [...ALL_MONTHS],
+        dueDateDay: r.dueDateDay || 15,
+        dueDate: r.dueDate || ""
       }));
 
       if (addSubServicesBatch) {
@@ -168,15 +197,6 @@ export default function ServicesPage() {
     }
 
     setModal({ open: false, editing: null });
-  };
-
-  const getDueDateLabel = (ss: SubService) => {
-    if (!ss.dueDate) return "—";
-    const recurrence = (ss as any).recurrence;
-    if (recurrence === "MONTHLY") return `${ss.dueDate} of each month`;
-    if (recurrence === "QUARTERLY") return `Due: ${formatDate(ss.dueDate)}`;
-    if (recurrence === "ANNUALLY") return formatDate(ss.dueDate);
-    return ss.dueDate;
   };
 
   const packagesWithServices = useMemo(() => {
@@ -281,14 +301,10 @@ export default function ServicesPage() {
                         </span>
                       </td>
                       <td>
-                        {ss.dueDate ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-                            <Calendar size={12} color="#0176D3" />
-                            <span style={{ fontWeight: 600, color: "#334155" }}>{getDueDateLabel(ss)}</span>
-                          </div>
-                        ) : (
-                          <span style={{ color: "#94A3B8", fontSize: 12 }}>—</span>
-                        )}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                          <Calendar size={12} color="#0176D3" />
+                          <span style={{ fontWeight: 700, color: "#0176D3" }}>{getDueDateLabel(ss)}</span>
+                        </div>
                       </td>
                       <td className="col-actions">
                         <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
@@ -505,51 +521,8 @@ export default function ServicesPage() {
                           onChange={e => updateRow(idx, "name", e.target.value)}
                           placeholder="e.g. GSTR-1"
                         />
-                      </div>
-
-                      {/* Recurrence Selector */}
-                      <div style={{ flex: "0 0 130px" }}>
-                        <select
-                          className="form-select"
-                          style={{ fontSize: 12, padding: "8px 8px", background: "white" }}
-                          value={row.recurrence}
-                          onChange={e => updateRow(idx, "recurrence", e.target.value as Recurrence)}
-                        >
-                          <option value="MONTHLY">Monthly</option>
-                          <option value="QUARTERLY">Quarterly</option>
-                          <option value="ANNUALLY">Annually</option>
-                        </select>
-                      </div>
-
-                      {/* Due Date Field */}
-                      <div style={{ flex: "0 0 150px" }}>
-                        {row.recurrence === "MONTHLY" ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                            <input
-                              className="form-input"
-                              type="number"
-                              min={1}
-                              max={31}
-                              style={{ fontSize: 12, padding: "8px 8px", textAlign: "center", background: "white" }}
-                              value={row.dueDateDay || ""}
-                              onChange={e => updateRow(idx, "dueDateDay", e.target.value)}
-                              placeholder="20 (Day)"
-                            />
-                            <span style={{ fontSize: 11, color: "#64748B", whiteSpace: "nowrap" }}>th month</span>
-                          </div>
-                        ) : (
-                          <input
-                            className="form-input"
-                            type="date"
-                            style={{ fontSize: 12, padding: "7px 8px", background: "white" }}
-                            value={row.dueDate || ""}
-                            onChange={e => updateRow(idx, "dueDate", e.target.value)}
-                          />
-                        )}
-                      </div>
-
-                      {/* Plus Symbol (+) Beside Due Date to Append Below + Delete (✕) */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                            {/* Plus Symbol (+) Beside Service Name to Append Below + Delete (✕) */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
                         <button
                           type="button"
                           className="btn-slds btn-slds-primary"
@@ -567,10 +540,87 @@ export default function ServicesPage() {
                             onClick={() => removeRow(idx)}
                             title="Remove row"
                           >
-                            <X size={14} />
+                            <X size={15} />
                           </button>
                         )}
                       </div>
+
+                      {/* 1. Multi-Month Selector (12-Month Checkboxes) */}
+                      <div style={{ width: "100%", marginTop: 8, padding: 10, background: "#FFFFFF", borderRadius: 8, border: "1px solid #CBD5E1" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>
+                            🗓️ Select Applicable Months (Perpetual Yearly Recurrence):
+                          </span>
+                          <button
+                            type="button"
+                            className="btn-slds btn-slds-secondary"
+                            style={{ padding: "2px 8px", fontSize: 10, fontWeight: 700 }}
+                            onClick={() => {
+                              const isAll = (row.applicableMonths || []).length === 12;
+                              updateRow(idx, "applicableMonths", isAll ? [] : [...ALL_MONTHS]);
+                            }}
+                          >
+                            {(row.applicableMonths || []).length === 12 ? "Deselect All" : "Select All 12 Months"}
+                          </button>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
+                          {ALL_MONTHS.map(m => {
+                            const isChecked = (row.applicableMonths || []).includes(m);
+                            return (
+                              <label
+                                key={m}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  fontSize: 11,
+                                  fontWeight: isChecked ? 700 : 500,
+                                  color: isChecked ? "#1D4ED8" : "#475569",
+                                  padding: "5px 8px",
+                                  background: isChecked ? "#EFF6FF" : "#F8FAFC",
+                                  border: isChecked ? "1px solid #93C5FD" : "1px solid #E2E8F0",
+                                  borderRadius: 6,
+                                  cursor: "pointer",
+                                  userSelect: "none"
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={e => {
+                                    const current = row.applicableMonths || [];
+                                    const next = e.target.checked
+                                      ? [...current, m]
+                                      : current.filter(x => x !== m);
+                                    updateRow(idx, "applicableMonths", next);
+                                  }}
+                                />
+                                <span>{m.substring(0, 3)}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+
+                        {/* 2. Single Day Picker (1-31) */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, paddingTop: 8, borderTop: "1px dashed #E2E8F0" }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>
+                            ⏰ Due Day of Month (1–31):
+                          </span>
+                          <select
+                            className="form-select"
+                            style={{ width: 110, fontSize: 12, padding: "5px 8px", fontWeight: 700, background: "#F8FAFC" }}
+                            value={row.dueDateDay || 15}
+                            onChange={e => updateRow(idx, "dueDateDay", Number(e.target.value))}
+                          >
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                              <option key={day} value={day}>{day}{day === 1 ? "st" : day === 2 ? "nd" : day === 3 ? "rd" : "th"} day</option>
+                            ))}
+                          </select>
+                          <span style={{ fontSize: 11, color: "#64748B" }}>
+                            (Applies to all selected months perpetually every year. Days 29–31 auto-adjust for shorter months)
+                          </span>
+                        </div>
+                      </div>      </div>
                     </div>
                   ))}
                 </div>

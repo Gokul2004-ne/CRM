@@ -24,26 +24,6 @@ export default function BankingPage() {
   const filtered = useMemo(() => {
     const list = [...bankingEntries.filter(b => b.financialYear === selectedFY)];
 
-    assignedServices
-      .filter(a => a.financialYear === selectedFY)
-      .forEach(a => {
-        const hasEntry = list.some(b => b.clientId === a.clientId && b.serviceId === a.serviceId);
-        if (!hasEntry) {
-          list.push({
-            id: `b-${a.id}`,
-            financialYear: a.financialYear,
-            clientId: a.clientId,
-            serviceId: a.serviceId,
-            subServiceId: a.subServiceIds?.[0] || null,
-            amountBilled: a.amountBilled || 0,
-            amountReceived: a.amountReceived || 0,
-            amountPending: Math.max(0, (a.amountBilled || 0) - (a.amountReceived || 0)),
-            paymentStatus: (a.amountReceived || 0) >= (a.amountBilled || 0) && (a.amountBilled || 0) > 0 ? "PAID" : (a.amountReceived || 0) > 0 ? "PARTIAL" : "PENDING",
-            remark: "Auto-synced"
-          });
-        }
-      });
-
     // Apply search filter
     return list.filter(b => {
       const client = clients.find(c => c.id === b.clientId);
@@ -51,7 +31,7 @@ export default function BankingPage() {
       const q = search.toLowerCase();
       return (client?.name || "").toLowerCase().includes(q) || (service?.name || "").toLowerCase().includes(q);
     });
-  }, [bankingEntries, assignedServices, selectedFY, clients, services, search]);
+  }, [bankingEntries, selectedFY, clients, services, search]);
 
   // Dynamic totals based on filtered (search) results
   const totals = useMemo(() => ({

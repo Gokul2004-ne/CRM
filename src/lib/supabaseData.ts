@@ -94,6 +94,9 @@ export async function fetchAllCRMData() {
       serviceId: ss.service_id,
       name: ss.name,
       dueDate: ss.due_date,
+      dueDateDay: ss.due_date_day ? Number(ss.due_date_day) : undefined,
+      applicableMonths: ss.applicable_months || [],
+      recurrence: ss.recurrence || "MONTHLY",
     }));
 
     const formattedRequiredDocs: RequiredDoc[] = (requiredDocs || []).map((rd: any) => ({
@@ -234,7 +237,10 @@ export async function seedInitialDataToSupabase() {
       id: ss.id,
       service_id: ss.serviceId,
       name: ss.name,
-      due_date: ss.dueDate,
+      due_date: ss.dueDate || null,
+      due_date_day: ss.dueDateDay || null,
+      applicable_months: ss.applicableMonths || [],
+      recurrence: ss.recurrence || "MONTHLY",
     }));
     await supabase.from("sub_services").upsert(subServicesToInsert);
 
@@ -371,7 +377,10 @@ export async function syncSubServiceToSupabase(ss: SubService) {
     user_id: userId,
     service_id: ss.serviceId,
     name: ss.name,
-    due_date: ss.dueDate,
+    due_date: ss.dueDate || null,
+    due_date_day: ss.dueDateDay || null,
+    applicable_months: ss.applicableMonths || [],
+    recurrence: ss.recurrence || "MONTHLY",
   });
 }
 

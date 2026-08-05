@@ -3,9 +3,29 @@ import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
 import { AssignedService, SubService } from "@/lib/types";
-import { Plus, Pencil, Trash2, Search, Eye, MessageCircle, Mail, AlertTriangle, CheckCircle2, Clock, Circle } from "lucide-react";
-import { formatDate, getCurrentFY, getFYOptions, getWhatsAppLink } from "@/lib/utils";
+import { Plus, Pencil, Trash2, Search, Eye, MessageCircle, Mail, AlertTriangle, CheckCircle2, Clock, Circle, Calendar } from "lucide-react";
+import { formatDate, getCurrentFY, getFYOptions, getWhatsAppLink, ALL_MONTHS, getValidDateForMonthDay } from "@/lib/utils";
 import { toast } from "sonner";
+
+function getNextUpcomingDueDate(applicableMonths?: string[], targetDay: number = 15): string {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const monthIndices = (applicableMonths && applicableMonths.length > 0 ? applicableMonths : ALL_MONTHS)
+    .map(m => ALL_MONTHS.indexOf(m))
+    .filter(idx => idx >= 0)
+    .sort((a, b) => a - b);
+
+  for (const mIdx of monthIndices) {
+    const candidate = getValidDateForMonthDay(currentYear, mIdx, targetDay);
+    if (candidate >= new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
+      return candidate.toISOString().split("T")[0];
+    }
+  }
+
+  const firstMonthIdx = monthIndices[0] ?? 0;
+  const candidate = getValidDateForMonthDay(currentYear + 1, firstMonthIdx, targetDay);
+  return candidate.toISOString().split("T")[0];
+}
 
 type DeliveryStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED";
 
@@ -64,14 +84,14 @@ export default function AssignPage() {
   const openEdit = (a: AssignedService) => { setForm({ ...a }); setModal({ open: true, editing: a }); };
 
 const DEFAULT_SUB_SERVICES: SubService[] = [
-  { id: "ss_itr1", serviceId: "s1", name: "Income Tax Return (ITR-1/2/3/4)", recurrence: "ANNUALLY", dueDate: "2026-07-31" },
-  { id: "ss_tax_audit", serviceId: "s1", name: "Tax Audit u/s 44AB", recurrence: "ANNUALLY", dueDate: "2026-09-30" },
-  { id: "ss_adv_tax", serviceId: "s1", name: "Advance Tax Payment", recurrence: "QUARTERLY", dueDate: "2026-09-15" },
-  { id: "ss_gstr3b", serviceId: "s2", name: "GSTR 3B Return", recurrence: "MONTHLY", dueDate: "2026-08-20" },
-  { id: "ss_gstr1", serviceId: "s2", name: "GSTR 1 Return", recurrence: "MONTHLY", dueDate: "2026-08-11" },
-  { id: "ss_gstr9", serviceId: "s2", name: "GSTR 9 Annual Return", recurrence: "ANNUALLY", dueDate: "2026-12-31" },
-  { id: "ss_tds26q", serviceId: "s3", name: "TDS Return (26Q/27Q)", recurrence: "QUARTERLY", dueDate: "2026-07-31" },
-  { id: "ss_roc_aoc4", serviceId: "s4", name: "ROC Annual Filing (AOC-4/MGT-7)", recurrence: "ANNUALLY", dueDate: "2026-10-30" },
+  { id: "ss_itr1", serviceId: "s1", name: "Income Tax Return (ITR-1/2/3/4)", recurrence: "ANNUALLY", dueDateDay: 31, applicableMonths: ["July"] },
+  { id: "ss_tax_audit", serviceId: "s1", name: "Tax Audit u/s 44AB", recurrence: "ANNUALLY", dueDateDay: 30, applicableMonths: ["September"] },
+  { id: "ss_adv_tax", serviceId: "s1", name: "Advance Tax Payment", recurrence: "QUARTERLY", dueDateDay: 15, applicableMonths: ["June", "September", "December", "March"] },
+  { id: "ss_gstr3b", serviceId: "s2", name: "GSTR 3B Return", recurrence: "MONTHLY", dueDateDay: 20, applicableMonths: [...ALL_MONTHS] },
+  { id: "ss_gstr1", serviceId: "s2", name: "GSTR 1 Return", recurrence: "MONTHLY", dueDateDay: 11, applicableMonths: [...ALL_MONTHS] },
+  { id: "ss_gstr9", serviceId: "s2", name: "GSTR 9 Annual Return", recurrence: "ANNUALLY", dueDateDay: 31, applicableMonths: ["December"] },
+  { id: "ss_tds26q", serviceId: "s3", name: "TDS Return (26Q/27Q)", recurrence: "QUARTERLY", dueDateDay: 31, applicableMonths: ["July", "October", "January", "May"] },
+  { id: "ss_roc_aoc4", serviceId: "s4", name: "ROC Annual Filing (AOC-4/MGT-7)", recurrence: "ANNUALLY", dueDateDay: 30, applicableMonths: ["October"] },
 ];
 
   const availableSubServices = useMemo(() => {
@@ -104,13 +124,9 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
         // Create SEPARATE individual rows for each selected service
         targetSubIds.forEach((ssId: string, idx: number) => {
           const ssObj = subServices.find(s => s.id === ssId);
-          // Calculate Due Date based on form.durationMonths or form.dueDate
-          let calculatedDueDate = form.dueDate || new Date().toISOString().split("T")[0];
-          if (form.durationMonths && form.durationMonths > 0) {
-            const dt = new Date();
-            dt.setMonth(dt.getMonth() + Number(form.durationMonths));
-            calculatedDueDate = dt.toISOString().split("T")[0];
-          }
+          const targetDay = ssObj?.dueDateDay || 15;
+          const monthsList = ssObj?.applicableMonths && ssObj.applicableMonths.length > 0 ? ssObj.applicableMonths : ALL_MONTHS;
+          const calculatedDueDate = getNextUpcomingDueDate(monthsList, targetDay);
 
           const newRecord: AssignedService = {
             id: `as_${Date.now()}_${idx}_${Math.random().toString(36).substring(2,6)}`,
@@ -197,6 +213,7 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
                 <th>Client Name</th>
                 <th>Financial Year</th>
                 <th>Due Date</th>
+                <th>Days Left</th>
                 <th>Service Delivery Status</th>
                 <th className="col-actions">Actions</th>
               </tr>
@@ -206,7 +223,24 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
                 const client = clients.find(c => c.id === a.clientId);
                 const service = services.find(s => s.id === a.serviceId);
                 const subs = subServices.filter(ss => a.subServiceIds?.includes(ss.id));
-                const status = getDueStatus(a.dueDate);
+                const serviceNameStr = (subs[0]?.name || (a as any).serviceName || "").toLowerCase();
+                const subObj = subServices.find(ss => a.subServiceIds?.includes(ss.id)) 
+                  || subServices.find(ss => serviceNameStr && ss.name.toLowerCase().includes(serviceNameStr.split(" ")[0]))
+                  || DEFAULT_SUB_SERVICES.find(ss => a.subServiceIds?.includes(ss.id))
+                  || DEFAULT_SUB_SERVICES.find(ss => serviceNameStr && ss.name.toLowerCase().includes(serviceNameStr.split(" ")[0]));
+
+                // Dynamically sync Due Date from Master Service Configuration
+                let effectiveDueDateStr = a.dueDate;
+                if (subObj) {
+                  if (subObj.dueDateDay) {
+                    const monthsList = subObj.applicableMonths && subObj.applicableMonths.length > 0 ? subObj.applicableMonths : ALL_MONTHS;
+                    effectiveDueDateStr = getNextUpcomingDueDate(monthsList, subObj.dueDateDay);
+                  } else if (subObj.dueDate) {
+                    effectiveDueDateStr = subObj.dueDate;
+                  }
+                }
+
+                const status = getDueStatus(effectiveDueDateStr);
                 const deliveryStatus = (a.status as DeliveryStatus) || "PENDING";
                 const cfg = statusConfig[deliveryStatus];
                 const StatusIcon = cfg.icon;
@@ -254,27 +288,36 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
                     {/* 4. FY */}
                     <td><span className="badge" style={{ background: "#EFF6FF", color: "#1D4ED8" }}>FY {a.financialYear}</span></td>
 
-                    {/* 5. Due Date */}
+                    {/* 5. Due Date (Synced directly from Master Service configuration) */}
                     <td>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        <span style={{ fontWeight: 700, color: isRed ? "#DC2626" : isYellow ? "#B45309" : "#059669", fontSize: 13 }}>
-                          {a.dueDate ? formatDate(a.dueDate) : "-"}
-                        </span>
-                        <span
-                          className="badge-slds"
-                          style={{
-                            background: isRed ? "#DC2626" : isYellow ? "#F59E0B" : "#10B981",
-                            color: "white",
-                            fontWeight: 700,
-                            fontSize: 10,
-                            padding: "2px 6px",
-                            borderRadius: 6,
-                            width: "fit-content"
-                          }}
-                        >
-                          {status.label}
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <Calendar size={13} color={isRed ? "#DC2626" : "#0176D3"} />
+                        <span style={{ fontWeight: 800, color: isRed ? "#DC2626" : isYellow ? "#B45309" : "#0F172A", fontSize: 13 }}>
+                          {effectiveDueDateStr ? formatDate(effectiveDueDateStr) : "-"}
                         </span>
                       </div>
+                    </td>
+
+                    {/* 6. Days Left (NEW column beside Due Date) */}
+                    <td>
+                      <span
+                        className="badge-slds"
+                        style={{
+                          background: isRed ? "#DC2626" : isYellow ? "#D97706" : "#059669",
+                          color: "white",
+                          fontWeight: 700,
+                          fontSize: 11,
+                          padding: "4px 8px",
+                          borderRadius: 6,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          whiteSpace: "nowrap"
+                        }}
+                      >
+                        <Clock size={11} />
+                        {status.label}
+                      </span>
                     </td>
 
                     {/* 6. Delivery Status — clickable to cycle */}
@@ -348,7 +391,7 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="empty-table-cell">
+                  <td colSpan={8} className="empty-table-cell">
                     No assigned packages for FY {selectedFY}
                   </td>
                 </tr>
@@ -517,39 +560,6 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
                       </button>
                     );
                   })}
-                </div>
-              </div>
-
-              {/* 4. Service Duration / Number of Months & Due Date */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 4 }}>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>4. Duration (Months) *</label>
-                  <select
-                    className="form-select"
-                    value={form.durationMonths || 1}
-                    onChange={e => {
-                      const months = Number(e.target.value);
-                      const dt = new Date();
-                      dt.setMonth(dt.getMonth() + months);
-                      const computedStr = dt.toISOString().split("T")[0];
-                      setForm((f: any) => ({ ...f, durationMonths: months, dueDate: computedStr }));
-                    }}
-                  >
-                    <option value={1}>1 Month (Monthly)</option>
-                    <option value={3}>3 Months (Quarterly)</option>
-                    <option value={6}>6 Months (Half-Yearly)</option>
-                    <option value={12}>12 Months (1 Year / Annual)</option>
-                    <option value={24}>24 Months (2 Years)</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>Due Date</label>
-                  <input
-                    className="form-input"
-                    type="date"
-                    value={form.dueDate || new Date().toISOString().split("T")[0]}
-                    onChange={e => setForm((f: any) => ({ ...f, dueDate: e.target.value }))}
-                  />
                 </div>
               </div>
             </div>
