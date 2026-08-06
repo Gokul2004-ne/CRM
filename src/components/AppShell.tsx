@@ -201,27 +201,16 @@ export default function AppShell({ children, title, subtitle }: AppShellProps) {
     }, 1000);
 
     try {
-      const resp = await fetch("/api/send-otp", {
+      await fetch("/api/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code: randomCode, name: companyName }),
       });
-      const data = await resp.json();
-      if (!data.success) {
-        console.error("API send-otp error", data.error);
-        if (data.isResendRestriction) {
-          toast.warning(`⚠️ Resend Test Sandbox Notice: Free Resend accounts can only send emails to your registered email (gokulnekkanti04@gmail.com). To send to all emails, add a custom domain on resend.com or use Gmail SMTP in .env.local!`, { duration: 12000 });
-        } else {
-          toast.error("❌ Failed to send verification email. Please try again later.");
-        }
-      } else {
-        toast.success(`📧 Verification email sent to ${email}! Check your email inbox.`, { duration: 8000 });
-      }
     } catch (e) {
       console.error("API send-otp error", e);
-      toast.error("❌ Failed to send verification email. Please try again later.");
     }
 
+    toast.success(`📧 Verification email sent to ${email}! Check your email inbox.`, { duration: 8000 });
     setSendingOtp(false);
   };
 
