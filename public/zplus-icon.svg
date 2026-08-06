@@ -1,35 +1,60 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
   <defs>
-    <linearGradient id="blueGradIcon" x1="0%" y1="0%" x2="100%" y2="100%">
+    <!-- Deep Blue Arc Gradient -->
+    <linearGradient id="blueArc" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#0F4C81" />
       <stop offset="50%" stop-color="#0066D4" />
-      <stop offset="100%" stop-color="#0B2545" />
+      <stop offset="100%" stop-color="#0A2540" />
     </linearGradient>
-    <linearGradient id="blueLightIcon" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#1E88E5" />
-      <stop offset="100%" stop-color="#0052CC" />
-    </linearGradient>
-    <linearGradient id="greenGradIcon" x1="0%" y1="0%" x2="100%" y2="100%">
+
+    <!-- Lime Green Arc Gradient -->
+    <linearGradient id="greenArc" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#64DD17" />
-      <stop offset="100%" stop-color="#388E3C" />
+      <stop offset="60%" stop-color="#54B400" />
+      <stop offset="100%" stop-color="#2E7D32" />
+    </linearGradient>
+
+    <!-- Z Main Body Blue Gradient -->
+    <linearGradient id="zBlueMain" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1565C0" />
+      <stop offset="40%" stop-color="#0D47A1" />
+      <stop offset="100%" stop-color="#0A192F" />
+    </linearGradient>
+
+    <!-- Z Highlight Blue Gradient -->
+    <linearGradient id="zBlueHighlight" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1E88E5" />
+      <stop offset="100%" stop-color="#1565C0" />
+    </linearGradient>
+
+    <!-- Plus Symbol Green Gradient -->
+    <linearGradient id="plusGreen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#76FF03" />
+      <stop offset="50%" stop-color="#54B400" />
+      <stop offset="100%" stop-color="#33691E" />
     </linearGradient>
   </defs>
 
-  <!-- Top Blue Outer Arc -->
-  <path d="M 65 140 A 110 110 0 0 1 220 50" fill="none" stroke="url(#blueLightIcon)" stroke-width="12" stroke-linecap="round" />
+  <!-- Solid White Circular Base for Maximum Contrast in Dark/Light Tabs -->
+  <circle cx="250" cy="250" r="235" fill="#FFFFFF" />
 
-  <!-- Bottom Green Outer Arc -->
-  <path d="M 80 175 A 110 110 0 0 0 235 110" fill="none" stroke="url(#greenGradIcon)" stroke-width="11" stroke-linecap="round" />
+  <!-- Outer Blue Swoosh Arc (Top Left) -->
+  <path d="M 140 435 C 45 375 25 240 100 130 C 160 40 310 35 375 95" fill="none" stroke="url(#blueArc)" stroke-width="26" stroke-linecap="round" />
 
-  <!-- Stylized Z Symbol -->
-  <g transform="translate(68, 55) scale(0.6)">
-    <path d="M 30 20 L 175 20 L 70 140 L 175 140 L 170 170 L 15 170 L 120 50 L 30 50 Z" fill="url(#blueGradIcon)" />
-    <path d="M 120 50 L 175 20 L 70 140 Z" fill="url(#blueLightIcon)" opacity="0.4" />
-  </g>
+  <!-- Outer Green Swoosh Arc (Bottom Right) -->
+  <path d="M 165 440 C 265 480 400 440 445 330 C 470 270 445 190 380 135" fill="none" stroke="url(#greenArc)" stroke-width="22" stroke-linecap="round" />
 
-  <!-- Green Plus Symbol (+) -->
-  <g transform="translate(178, 62) scale(0.65)">
-    <rect x="25" y="0" width="22" height="70" rx="6" fill="url(#greenGradIcon)" />
-    <rect x="0" y="24" width="72" height="22" rx="6" fill="url(#greenGradIcon)" />
+  <!-- Stylized 3D Z Letter -->
+  <!-- Upper horizontal bar & diagonal slash -->
+  <path d="M 180 120 L 320 120 L 150 340 L 320 340 L 305 380 L 120 380 L 290 160 L 180 160 Z" fill="url(#zBlueMain)" />
+  <!-- Upper bevel facet for 3D depth -->
+  <path d="M 180 120 L 320 120 L 290 160 L 180 160 Z" fill="url(#zBlueHighlight)" />
+  <!-- Inner shadow facet -->
+  <path d="M 290 160 L 150 340 L 210 340 Z" fill="#0A192F" opacity="0.35" />
+
+  <!-- Bold Green Plus Icon (+) -->
+  <g transform="translate(295, 125)">
+    <rect x="32" y="0" width="36" height="100" rx="14" fill="url(#plusGreen)" />
+    <rect x="0" y="32" width="100" height="36" rx="14" fill="url(#plusGreen)" />
   </g>
 </svg>

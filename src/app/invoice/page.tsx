@@ -123,7 +123,11 @@ export default function InvoicePage() {
       toast.success(`${invoiceRecord.type} #${invoiceRecord.invoiceNumber} updated & saved!`);
     } else {
       addInvoice(invoiceRecord);
-      toast.success(`${invoiceRecord.type} #${invoiceRecord.invoiceNumber} created & linked to Banking Ledger!`);
+      if (invoiceRecord.type === "PROFORMA") {
+        toast.success(`Pro Forma #${invoiceRecord.invoiceNumber} saved to Invoices only (not posted to Banking Ledger)`);
+      } else {
+        toast.success(`${invoiceRecord.type} #${invoiceRecord.invoiceNumber} created & linked to Banking Ledger!`);
+      }
     }
 
     setModal(null);
@@ -484,11 +488,17 @@ export default function InvoicePage() {
               <button className="btn-slds btn-slds-secondary" onClick={() => setModal(null)}>Cancel</button>
               <div style={{ display: "flex", gap: 10 }}>
                 <button className="btn-slds btn-slds-secondary" onClick={() => handleSave("DRAFT")}>Save as Draft</button>
-                <button className="btn-slds btn-slds-primary" onClick={() => handleSave("SENT")}>
-                  {modal.type === "PROFORMA" ? "Save Proforma & Link Banking" : "Save & Link to Banking"}
-                </button>
-                {modal.type === "INVOICE" && (
-                  <button className="btn-slds btn-slds-success" onClick={() => handleSave("PAID")}>Mark Paid & Save</button>
+                {modal.type === "PROFORMA" ? (
+                  <button className="btn-slds btn-slds-primary" onClick={() => handleSave("SENT")}>
+                    Save Proforma
+                  </button>
+                ) : (
+                  <>
+                    <button className="btn-slds btn-slds-primary" onClick={() => handleSave("SENT")}>
+                      Save &amp; Link to Banking
+                    </button>
+                    <button className="btn-slds btn-slds-success" onClick={() => handleSave("PAID")}>Mark Paid &amp; Save</button>
+                  </>
                 )}
               </div>
             </div>

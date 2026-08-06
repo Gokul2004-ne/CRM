@@ -3,7 +3,7 @@ import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
 import { AssignedService, SubService } from "@/lib/types";
-import { Plus, Pencil, Trash2, Search, Eye, MessageCircle, Mail, AlertTriangle, CheckCircle2, Clock, Circle, Calendar } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Eye, MessageCircle, AlertTriangle, CheckCircle2, Clock, Circle, Calendar } from "lucide-react";
 import { formatDate, getCurrentFY, getFYOptions, getWhatsAppLink, ALL_MONTHS, getValidDateForMonthDay } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -34,6 +34,17 @@ const statusConfig = {
   IN_PROGRESS: { label: "In Progress", color: "#D97706", bg: "#FFFBEB", border: "#FCD34D", icon: Clock },
   COMPLETED: { label: "Completed", color: "#059669", bg: "#F0FDF4", border: "#6EE7B7", icon: CheckCircle2 },
 };
+
+const DEFAULT_SUB_SERVICES: SubService[] = [
+  { id: "ss_itr1", serviceId: "s1", name: "Income Tax Return (ITR-1/2/3/4)", recurrence: "ANNUALLY", dueDateDay: 31, applicableMonths: ["July"] },
+  { id: "ss_tax_audit", serviceId: "s1", name: "Tax Audit u/s 44AB", recurrence: "ANNUALLY", dueDateDay: 30, applicableMonths: ["September"] },
+  { id: "ss_adv_tax", serviceId: "s1", name: "Advance Tax Payment", recurrence: "QUARTERLY", dueDateDay: 15, applicableMonths: ["June", "September", "December", "March"] },
+  { id: "ss_gstr3b", serviceId: "s2", name: "GSTR 3B Return", recurrence: "MONTHLY", dueDateDay: 20, applicableMonths: [...ALL_MONTHS] },
+  { id: "ss_gstr1", serviceId: "s2", name: "GSTR 1 Return", recurrence: "MONTHLY", dueDateDay: 11, applicableMonths: [...ALL_MONTHS] },
+  { id: "ss_gstr9", serviceId: "s2", name: "GSTR 9 Annual Return", recurrence: "ANNUALLY", dueDateDay: 31, applicableMonths: ["December"] },
+  { id: "ss_tds26q", serviceId: "s3", name: "TDS Return (26Q/27Q)", recurrence: "QUARTERLY", dueDateDay: 31, applicableMonths: ["July", "October", "January", "May"] },
+  { id: "ss_roc_aoc4", serviceId: "s4", name: "ROC Annual Filing (AOC-4/MGT-7)", recurrence: "ANNUALLY", dueDateDay: 30, applicableMonths: ["October"] },
+];
 
 const empty = () => ({
   id: "", clientId: "", serviceId: "", subServiceIds: [],
@@ -83,17 +94,6 @@ export default function AssignPage() {
   const openAdd = () => { setForm(empty()); setModal({ open: true, editing: null }); };
   const openEdit = (a: AssignedService) => { setForm({ ...a }); setModal({ open: true, editing: a }); };
 
-const DEFAULT_SUB_SERVICES: SubService[] = [
-  { id: "ss_itr1", serviceId: "s1", name: "Income Tax Return (ITR-1/2/3/4)", recurrence: "ANNUALLY", dueDateDay: 31, applicableMonths: ["July"] },
-  { id: "ss_tax_audit", serviceId: "s1", name: "Tax Audit u/s 44AB", recurrence: "ANNUALLY", dueDateDay: 30, applicableMonths: ["September"] },
-  { id: "ss_adv_tax", serviceId: "s1", name: "Advance Tax Payment", recurrence: "QUARTERLY", dueDateDay: 15, applicableMonths: ["June", "September", "December", "March"] },
-  { id: "ss_gstr3b", serviceId: "s2", name: "GSTR 3B Return", recurrence: "MONTHLY", dueDateDay: 20, applicableMonths: [...ALL_MONTHS] },
-  { id: "ss_gstr1", serviceId: "s2", name: "GSTR 1 Return", recurrence: "MONTHLY", dueDateDay: 11, applicableMonths: [...ALL_MONTHS] },
-  { id: "ss_gstr9", serviceId: "s2", name: "GSTR 9 Annual Return", recurrence: "ANNUALLY", dueDateDay: 31, applicableMonths: ["December"] },
-  { id: "ss_tds26q", serviceId: "s3", name: "TDS Return (26Q/27Q)", recurrence: "QUARTERLY", dueDateDay: 31, applicableMonths: ["July", "October", "January", "May"] },
-  { id: "ss_roc_aoc4", serviceId: "s4", name: "ROC Annual Filing (AOC-4/MGT-7)", recurrence: "ANNUALLY", dueDateDay: 30, applicableMonths: ["October"] },
-];
-
   const availableSubServices = useMemo(() => {
     const list = subServices.length > 0 ? subServices : DEFAULT_SUB_SERVICES;
     if (!form.serviceId) return list;
@@ -107,21 +107,15 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
       return;
     }
 
-    // Determine subservices to assign
     const targetSubIds = (form.subServiceIds && form.subServiceIds.length > 0)
       ? form.subServiceIds
       : availableSubServices.map(ss => ss.id);
 
     if (modal.editing) {
-      const record: AssignedService = {
-        ...form,
-        id: form.id
-      };
-      updateAssignedService(record);
+      updateAssignedService({ ...form, id: form.id });
       toast.success("Assignment updated successfully!");
     } else {
       if (targetSubIds.length > 0) {
-        // Create SEPARATE individual rows for each selected service
         targetSubIds.forEach((ssId: string, idx: number) => {
           const ssObj = subServices.find(s => s.id === ssId);
           const targetDay = ssObj?.dueDateDay || 15;
@@ -134,9 +128,7 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
             serviceId: form.serviceId || ssObj?.serviceId || "",
             subServiceIds: [ssId],
             financialYear: selectedFY || getCurrentFY(),
-            amountBilled: 0,
-            amountReceived: 0,
-            amountPending: 0,
+            amountBilled: 0, amountReceived: 0, amountPending: 0,
             status: "PENDING",
             dueDate: ssObj?.dueDate || calculatedDueDate
           };
@@ -144,25 +136,18 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
         });
         toast.success(`Assigned ${targetSubIds.length} service(s) to client in separate rows!`);
       } else {
-        // Fallback: Assign package directly if no subservices configured under package
         const pkgObj = services.find(s => s.id === form.serviceId);
         const newRecord: AssignedService = {
           id: `as_${Date.now()}_${Math.random().toString(36).substring(2,6)}`,
-          clientId: form.clientId,
-          serviceId: form.serviceId,
-          subServiceIds: [],
+          clientId: form.clientId, serviceId: form.serviceId, subServiceIds: [],
           financialYear: selectedFY || getCurrentFY(),
-          amountBilled: pkgObj?.price || 0,
-          amountReceived: 0,
-          amountPending: pkgObj?.price || 0,
-          status: "PENDING",
-          dueDate: new Date().toISOString().split("T")[0]
+          amountBilled: pkgObj?.price || 0, amountReceived: 0, amountPending: pkgObj?.price || 0,
+          status: "PENDING", dueDate: new Date().toISOString().split("T")[0]
         };
         addAssignedService(newRecord);
         toast.success(`Package "${pkgObj?.name || 'Package'}" assigned to client!`);
       }
     }
-
     setModal({ open: false, editing: null });
   };
 
@@ -183,8 +168,6 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
     toast.success(`Status updated to ${statusConfig[next].label}`);
   };
 
-  const fyOptions = getFYOptions();
-
   return (
     <AppShell title="Assign Packages" subtitle="Assign packages to clients with due date tracking">
       <div className="data-table-wrapper">
@@ -198,7 +181,6 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
           <button className="btn-slds btn-slds-primary" onClick={openAdd}><Plus size={15} /> Assign Package</button>
         </div>
 
-        {/* Priority Alert Banner */}
         <div style={{ padding: "10px 16px", background: "#FEF2F2", borderBottom: "1px solid #FECACA", display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#991B1B", fontWeight: 700 }}>
           <AlertTriangle size={16} color="#DC2626" />
           <span>Priority Alert: Approaching / Overdue Due Dates are automatically highlighted RED on top.</span>
@@ -229,7 +211,6 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
                   || DEFAULT_SUB_SERVICES.find(ss => a.subServiceIds?.includes(ss.id))
                   || DEFAULT_SUB_SERVICES.find(ss => serviceNameStr && ss.name.toLowerCase().includes(serviceNameStr.split(" ")[0]));
 
-                // Dynamically sync Due Date from Master Service Configuration
                 let effectiveDueDateStr = a.dueDate;
                 if (subObj) {
                   if (subObj.dueDateDay) {
@@ -257,38 +238,20 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
                     }}
                   >
                     <td className="col-num">{i + 1}</td>
-
-                    {/* 1. Service Name */}
                     <td>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                         {(() => {
                           const foundSubs = subServices.filter(ss => a.subServiceIds?.includes(ss.id));
-                          if (foundSubs.length > 0) {
-                            return foundSubs.map(ss => (
-                              <span key={ss.id} className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700, fontSize: 12 }}>{ss.name}</span>
-                            ));
-                          }
+                          if (foundSubs.length > 0) return foundSubs.map(ss => (<span key={ss.id} className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700, fontSize: 12 }}>{ss.name}</span>));
                           const defaultSubs = DEFAULT_SUB_SERVICES.filter(ss => a.subServiceIds?.includes(ss.id));
-                          if (defaultSubs.length > 0) {
-                            return defaultSubs.map(ss => (
-                              <span key={ss.id} className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700, fontSize: 12 }}>{ss.name}</span>
-                            ));
-                          }
+                          if (defaultSubs.length > 0) return defaultSubs.map(ss => (<span key={ss.id} className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700, fontSize: 12 }}>{ss.name}</span>));
                           const pkgName = service?.name || (a as any).serviceName || (a.subServiceIds && a.subServiceIds[0]) || "Service";
-                          return (
-                            <span className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700, fontSize: 12 }}>{pkgName}</span>
-                          );
+                          return (<span className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700, fontSize: 12 }}>{pkgName}</span>);
                         })()}
                       </div>
                     </td>
-
-                    {/* 2. Client Name */}
                     <td style={{ fontWeight: 800, color: "#0F172A" }}>{client?.name || "-"}</td>
-
-                    {/* 4. FY */}
                     <td><span className="badge" style={{ background: "#EFF6FF", color: "#1D4ED8" }}>FY {a.financialYear}</span></td>
-
-                    {/* 5. Due Date (Synced directly from Master Service configuration) */}
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <Calendar size={13} color={isRed ? "#DC2626" : "#0176D3"} />
@@ -297,93 +260,25 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
                         </span>
                       </div>
                     </td>
-
-                    {/* 6. Days Left (NEW column beside Due Date) */}
                     <td>
-                      <span
-                        className="badge-slds"
-                        style={{
-                          background: isRed ? "#DC2626" : isYellow ? "#D97706" : "#059669",
-                          color: "white",
-                          fontWeight: 700,
-                          fontSize: 11,
-                          padding: "4px 8px",
-                          borderRadius: 6,
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          whiteSpace: "nowrap"
-                        }}
-                      >
-                        <Clock size={11} />
+                      <span style={{ fontWeight: 800, fontSize: 12, color: isRed ? "#DC2626" : isYellow ? "#B45309" : "#059669", background: isRed ? "#FEE2E2" : isYellow ? "#FEF3C7" : "#DCFCE7", padding: "3px 8px", borderRadius: 12 }}>
                         {status.label}
                       </span>
                     </td>
-
-                    {/* 6. Delivery Status — clickable to cycle */}
                     <td>
                       <button
                         onClick={() => handleStatusCycle(a)}
-                        title="Click to update status"
-                        style={{
-                          padding: "6px 12px",
-                          borderRadius: 8,
-                          border: `1px solid ${cfg.border}`,
-                          background: cfg.bg,
-                          color: cfg.color,
-                          fontWeight: 700,
-                          fontSize: 12,
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                          transition: "all 0.15s",
-                        }}
+                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 20, cursor: "pointer", transition: "all 0.15s" }}
                       >
-                        <StatusIcon size={13} />
-                        {cfg.label}
+                        <StatusIcon size={14} color={cfg.color} />
+                        <span style={{ fontSize: 12, fontWeight: 700, color: cfg.color }}>{cfg.label}</span>
                       </button>
                     </td>
-
-                    {/* 7. Actions */}
                     <td className="col-actions">
-                      <div style={{ display: "flex", justifyContent: "center", gap: 4 }}>
-                        <button
-                          className="btn-slds btn-slds-primary"
-                          style={{ padding: "4px 8px", fontSize: 11 }}
-                          onClick={() => setViewDetailModal({ open: true, assignment: a })}
-                          title="View Details"
-                        >
-                          <Eye size={13} />
-                        </button>
-                        {client?.phone && (
-                          <a
-                            href={getWhatsAppLink(client.phone, `Hello ${client.name}, this is a reminder for ${service?.name} due on ${formatDate(a.dueDate || "")}.`)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn-slds btn-slds-success"
-                            style={{ padding: "4px 8px", fontSize: 11 }}
-                            title="WhatsApp"
-                          >
-                            <MessageCircle size={13} />
-                          </a>
-                        )}
-                        {client?.email && (
-                          <a
-                            href={`mailto:${client.email}?subject=${encodeURIComponent(`Reminder: ${service?.name}`)}&body=${encodeURIComponent(`Dear ${client.name},\n\nThis is a reminder that ${service?.name} is due on ${formatDate(a.dueDate || "")}.\n\nThank you!`)}`}
-                            className="btn-slds btn-slds-secondary"
-                            style={{ padding: "4px 8px", fontSize: 11, color: "#0284C7" }}
-                            title="Send Email"
-                          >
-                            <Mail size={13} />
-                          </a>
-                        )}
-                        <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px" }} onClick={() => openEdit(a)} title="Edit">
-                          <Pencil size={13} />
-                        </button>
-                        <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px", color: "#DC2626", borderColor: "#FCA5A5" }} onClick={() => { deleteAssignedService(a.id); toast.success("Removed"); }} title="Delete">
-                          <Trash2 size={13} />
-                        </button>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button className="icon-btn-slds" title="View Details" onClick={() => setViewDetailModal({ open: true, assignment: a })}><Eye size={14} color="#0176D3" /></button>
+                        <button className="icon-btn-slds" title="Edit Assignment" onClick={() => openEdit(a)}><Pencil size={14} color="#64748B" /></button>
+                        <button className="icon-btn-slds" title="Delete" onClick={() => { if (confirm("Delete this assigned package?")) deleteAssignedService(a.id); }}><Trash2 size={14} color="#DC2626" /></button>
                       </div>
                     </td>
                   </tr>
@@ -391,8 +286,8 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="empty-table-cell">
-                    No assigned packages for FY {selectedFY}
+                  <td colSpan={8} style={{ textAlign: "center", padding: 40, color: "#64748B" }}>
+                    No assigned packages found. Click "+ Assign Package" to get started!
                   </td>
                 </tr>
               )}
@@ -401,67 +296,42 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
         </div>
       </div>
 
-      {/* View Detail Modal */}
+      {/* Modal: View Details */}
       {viewDetailModal.open && viewDetailModal.assignment && (
-        <div className="command-palette-backdrop" onClick={() => setViewDetailModal({ open: false, assignment: null })}>
-          <div className="command-palette-card" style={{ maxWidth: 540 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => setViewDetailModal({ open: false, assignment: null })}>
+          <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
             {(() => {
-              const assign = viewDetailModal.assignment!;
+              const assign = viewDetailModal.assignment;
               const client = clients.find(c => c.id === assign.clientId);
               const service = services.find(s => s.id === assign.serviceId);
               const subs = subServices.filter(ss => assign.subServiceIds?.includes(ss.id));
-              const status = getDueStatus(assign.dueDate);
-              const isRed = status.category === "RED";
               const deliveryStatus = (assign.status as DeliveryStatus) || "PENDING";
               const cfg = statusConfig[deliveryStatus];
               const StatusIcon = cfg.icon;
 
               return (
                 <>
-                  <div style={{ padding: "18px 24px", background: isRed ? "#7F1D1D" : "#0F172A", color: "white", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontSize: 18, fontWeight: 800 }}>{client?.name || "Client Record"}</div>
-                      <div style={{ fontSize: 12, color: "#94A3B8" }}>Assigned Package Details</div>
-                    </div>
-                    <button className="btn-slds btn-slds-secondary" style={{ background: "rgba(255,255,255,0.15)", color: "white", border: "none" }} onClick={() => setViewDetailModal({ open: false, assignment: null })}>✕</button>
+                  <div className="modal-header">
+                    <div className="modal-title">Assignment Details</div>
+                    <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px" }} onClick={() => setViewDetailModal({ open: false, assignment: null })}>✕</button>
                   </div>
-
-                  <div style={{ padding: 24, display: "grid", gap: 16 }}>
-                    <div style={{ padding: 14, background: isRed ? "#FEF2F2" : "#F8FAFC", border: `1px solid ${isRed ? "#FCA5A5" : "#E2E8F0"}`, borderRadius: 10 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Due Date Status</div>
-                      <div style={{ fontSize: 18, fontWeight: 900, color: isRed ? "#DC2626" : "#059669", marginTop: 2 }}>
-                        {assign.dueDate ? formatDate(assign.dueDate) : "No Due Date"} — {status.label}
-                      </div>
+                  <div className="modal-body" style={{ display: "grid", gap: 16 }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", marginBottom: 4 }}>Client Name</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: "#0F172A" }}>{client?.name}</div>
                     </div>
-
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>Client</div>
-                        <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>{client?.name}</div>
-                        <div style={{ fontSize: 12, color: "#0176D3" }}>{client?.mobile || client?.phone}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>Financial Year</div>
-                        <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>FY {assign.financialYear}</div>
-                      </div>
-                    </div>
-
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", marginBottom: 4 }}>Package</div>
                       <div style={{ fontSize: 15, fontWeight: 800, color: "#0176D3" }}>{service?.name}</div>
                     </div>
-
                     {subs.length > 0 && (
                       <div>
                         <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", marginBottom: 6 }}>Services</div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                          {subs.map(ss => (
-                            <span key={ss.id} className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700 }}>{ss.name}</span>
-                          ))}
+                          {subs.map(ss => (<span key={ss.id} className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700 }}>{ss.name}</span>))}
                         </div>
                       </div>
                     )}
-
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", marginBottom: 6 }}>Service Delivery Status</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 8, width: "fit-content" }}>
@@ -469,17 +339,9 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
                         <span style={{ fontWeight: 700, color: cfg.color }}>{cfg.label}</span>
                       </div>
                     </div>
-
                     <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <a
-                        href={getWhatsAppLink(client?.mobile || "", `Hello ${client?.name}, this is a reminder for ${service?.name} due on ${formatDate(assign.dueDate || "")}.`)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn-slds btn-slds-success"
-                        style={{ padding: "6px 14px" }}
-                      >
-                        <MessageCircle size={14} />
-                        <span>Send WhatsApp Reminder</span>
+                      <a href={getWhatsAppLink(client?.mobile || "", `Hello ${client?.name}, reminder for ${service?.name} due on ${formatDate(assign.dueDate || "")}.`)} target="_blank" rel="noreferrer" className="btn-slds btn-slds-success" style={{ padding: "6px 14px" }}>
+                        <MessageCircle size={14} /><span>Send WhatsApp Reminder</span>
                       </a>
                       <button className="btn-slds btn-slds-secondary" onClick={() => setViewDetailModal({ open: false, assignment: null })}>Close</button>
                     </div>
@@ -491,7 +353,7 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
         </div>
       )}
 
-      {/* Assign Package Modal */}
+      {/* Modal: Assign Package */}
       {modal.open && (
         <div className="modal-overlay" onClick={() => setModal({ open: false, editing: null })}>
           <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
@@ -500,7 +362,6 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
               <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px" }} onClick={() => setModal({ open: false, editing: null })}>✕</button>
             </div>
             <div className="modal-body" style={{ display: "grid", gap: 14 }}>
-
               <div className="form-group">
                 <label className="form-label" style={{ fontWeight: 700 }}>1. Client Name *</label>
                 <select className="form-select" value={form.clientId} onChange={e => setForm((f: any) => ({ ...f, clientId: e.target.value }))}>
@@ -521,20 +382,14 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
                 </select>
               </div>
 
-              {/* 3. Select Services Options (Always Visible) */}
               <div className="form-group">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                   <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>3. Select Services *</label>
-                  <button
-                    type="button"
-                    className="btn-slds btn-slds-secondary"
-                    style={{ padding: "2px 8px", fontSize: 10 }}
-                    onClick={() => {
-                      const allIds = availableSubServices.map(ss => ss.id);
-                      const isAllSelected = allIds.every(id => (form.subServiceIds || []).includes(id));
-                      setForm((f: any) => ({ ...f, subServiceIds: isAllSelected ? [] : allIds }));
-                    }}
-                  >
+                  <button type="button" className="btn-slds btn-slds-secondary" style={{ padding: "2px 8px", fontSize: 10 }} onClick={() => {
+                    const allIds = availableSubServices.map(ss => ss.id);
+                    const isAllSelected = allIds.every(id => (form.subServiceIds || []).includes(id));
+                    setForm((f: any) => ({ ...f, subServiceIds: isAllSelected ? [] : allIds }));
+                  }}>
                     {availableSubServices.every(ss => (form.subServiceIds || []).includes(ss.id)) ? "Deselect All" : "Select All"}
                   </button>
                 </div>
@@ -543,17 +398,9 @@ const DEFAULT_SUB_SERVICES: SubService[] = [
                     const isSelected = (form.subServiceIds || []).includes(ss.id);
                     return (
                       <button
-                        key={ss.id}
-                        type="button"
+                        key={ss.id} type="button"
                         className={`btn-slds ${isSelected ? "btn-slds-primary" : "btn-slds-secondary"}`}
-                        style={{
-                          padding: "6px 12px",
-                          fontSize: 12,
-                          fontWeight: 700,
-                          background: isSelected ? "#0176D3" : "#FFFFFF",
-                          color: isSelected ? "#FFFFFF" : "#334155",
-                          border: isSelected ? "1px solid #0176D3" : "1px solid #CBD5E1"
-                        }}
+                        style={{ padding: "6px 12px", fontSize: 12, fontWeight: 700, background: isSelected ? "#0176D3" : "#FFFFFF", color: isSelected ? "#FFFFFF" : "#334155", border: isSelected ? "1px solid #0176D3" : "1px solid #CBD5E1" }}
                         onClick={() => toggleSubService(ss.id)}
                       >
                         {isSelected ? "✓ " : "+ "}{ss.name}

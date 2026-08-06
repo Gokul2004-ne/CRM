@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { useAuth } from "@/context/AuthContext";
-import { Bell, Search, Grid, Plus, UserPlus, FilePlus, LogOut, LogIn, KeyRound } from "lucide-react";
+import { Bell, Search, Grid, Plus, UserPlus, FilePlus, LogOut, LogIn, KeyRound, StickyNote } from "lucide-react";
 import { getFYOptions } from "@/lib/utils";
 import GlobalSearchModal from "./GlobalSearchModal";
+import FloatingNotes from "./FloatingNotes";
 import Link from "next/link";
 
 interface TopbarProps {
@@ -21,6 +22,7 @@ export default function Topbar({ title, subtitle, onOpenSearch }: TopbarProps) {
   const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false);
   const [isAppLauncherOpen, setIsAppLauncherOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isNotesOpen, setIsNotesOpen] = useState(false);
   const fyOptions = getFYOptions();
 
   return (
@@ -118,6 +120,16 @@ export default function Topbar({ title, subtitle, onOpenSearch }: TopbarProps) {
               <option key={fy} value={fy}>FY {fy}</option>
             ))}
           </select>
+
+          {/* Notes Button */}
+          <button
+            className="icon-btn-slds"
+            title="Quick Notes"
+            onClick={() => setIsNotesOpen(prev => !prev)}
+            style={isNotesOpen ? { background: "rgba(99,102,241,0.15)", color: "#818CF8" } : undefined}
+          >
+            <StickyNote size={17} />
+          </button>
 
           {/* Notification Button */}
           <button className="icon-btn-slds" title="Notifications">
@@ -230,6 +242,9 @@ export default function Topbar({ title, subtitle, onOpenSearch }: TopbarProps) {
 
       {/* Global Search Modal */}
       <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+
+      {/* Floating Notes Panel */}
+      <FloatingNotes isOpen={isNotesOpen} onClose={() => setIsNotesOpen(false)} />
     </>
   );
 }

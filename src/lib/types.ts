@@ -87,6 +87,18 @@ export interface RequiredDoc {
   fileType?: string;
 }
 
+export type ProgressStatus = "To-do" | "In-progress" | "Completed";
+
+export interface OneTimeService {
+  id: string;
+  clientName: string;
+  serviceName: string;
+  dueDate?: string;
+  progress: ProgressStatus;
+  notes?: string;
+  createdAt?: string;
+}
+
 export interface AssignedService {
   id: string;
   clientId: string;

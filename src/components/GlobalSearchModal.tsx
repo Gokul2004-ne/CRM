@@ -3,9 +3,9 @@ import { useState, useEffect } from "react";
 import { useAppStore } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import {
-  Search, Users, MessageSquare, Briefcase, Layers,
+  Search, Users, MessageSquare, Package, Layers,
   FileText, ClipboardList, Building2, Calendar, PenTool,
-  Settings, ArrowRight, X, Handshake
+  Settings, ArrowRight, X, Handshake, Sparkles, LayoutDashboard, Receipt, CreditCard
 } from "lucide-react";
 
 interface GlobalSearchModalProps {
@@ -16,15 +16,17 @@ interface GlobalSearchModalProps {
 export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
   const [query, setQuery] = useState("");
   const router = useRouter();
-  const { clients, leads, services, subServices, collaborations } = useAppStore();
+  const { clients, leads, services, subServices, collaborations, oneTimeServices } = useAppStore();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
-    window.addEventListener("keydown", handleKeyDown);
+    if (isOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -33,19 +35,23 @@ export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModal
     onClose();
   };
 
+  // Correct Navigation items corresponding exactly to Sidebar menu labels
   const navResults = [
-    { label: "Dashboard", path: "/", icon: Search },
-    { label: "Clients", path: "/clients", icon: Users },
-    { label: "Collaborations", path: "/collaborations", icon: Handshake },
-    { label: "WhatsApp Leads", path: "/leads", icon: MessageSquare },
-    { label: "Services", path: "/services", icon: Briefcase },
-    { label: "Sub Services", path: "/sub-services", icon: Layers },
-    { label: "Required Docs", path: "/required-docs", icon: FileText },
-    { label: "Assign Services", path: "/assign", icon: ClipboardList },
-    { label: "Banking", path: "/banking", icon: Building2 },
-    { label: "Due Dates", path: "/due-dates", icon: Calendar },
-    { label: "Document Drafts", path: "/drafts", icon: PenTool },
-    { label: "Settings", path: "/settings", icon: Settings },
+    { label: "Dashboard", path: "/", icon: LayoutDashboard, category: "Core CRM" },
+    { label: "Clients", path: "/clients", icon: Users, category: "Core CRM" },
+    { label: "Collaborations", path: "/collaborations", icon: Handshake, category: "Core CRM" },
+    { label: "WhatsApp Leads", path: "/leads", icon: MessageSquare, category: "Core CRM" },
+    { label: "Packages", path: "/services", icon: Package, category: "Operations & Packages" },
+    { label: "Services", path: "/sub-services", icon: Layers, category: "Operations & Packages" },
+    { label: "Required Docs", path: "/required-docs", icon: FileText, category: "Operations & Packages" },
+    { label: "Assign Packages", path: "/assign", icon: ClipboardList, category: "Operations & Packages" },
+    { label: "One Time Service", path: "/one-time-services", icon: Sparkles, category: "Operations & Packages" },
+    { label: "Banking & Ledger", path: "/banking", icon: Building2, category: "Financials & Billing" },
+    { label: "Compliance Calendar", path: "/due-dates", icon: Calendar, category: "Financials & Billing" },
+    { label: "Invoices", path: "/invoice", icon: Receipt, category: "Financials & Billing" },
+    { label: "Document Drafts", path: "/drafts", icon: PenTool, category: "Financials & Billing" },
+    { label: "Subscription", path: "/subscription", icon: CreditCard, category: "Enterprise" },
+    { label: "Settings", path: "/settings", icon: Settings, category: "Enterprise" },
   ].filter(item => item.label.toLowerCase().includes(query.toLowerCase()));
 
   const filteredClients = clients.filter(c =>
@@ -69,54 +75,190 @@ export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModal
     s.name.toLowerCase().includes(query.toLowerCase())
   ).slice(0, 4);
 
+  const filteredOneTime = (oneTimeServices || []).filter(ots =>
+    ots.clientName.toLowerCase().includes(query.toLowerCase()) ||
+    ots.serviceName.toLowerCase().includes(query.toLowerCase())
+  ).slice(0, 4);
+
   return (
-    <div className="command-palette-backdrop" onClick={onClose}>
-      <div className="command-palette-card" onClick={e => e.stopPropagation()}>
-        <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid #E2E8F0", paddingRight: 16 }}>
-          <Search size={20} style={{ marginLeft: 16, color: "#94A3B8" }} />
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        backgroundColor: "rgba(15, 23, 42, 0.75)",
+        backdropFilter: "blur(12px)",
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "center",
+        paddingTop: "80px",
+        fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: "640px",
+          background: "#0F172A",
+          border: "1.5px solid #1E293B",
+          borderRadius: "20px",
+          boxShadow: "0 25px 60px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(99, 102, 241, 0.2)",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          maxHeight: "80vh",
+        }}
+      >
+        {/* Header Search Input Bar */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "16px 20px",
+            borderBottom: "1px solid #1E293B",
+            background: "#0F172A",
+            gap: 12,
+          }}
+        >
+          <Search size={20} style={{ color: "#6366F1", flexShrink: 0 }} />
           <input
             autoFocus
             type="text"
-            className="command-palette-input"
-            placeholder="Search Clients, Leads, Services, or jump to page... (Press Esc to close)"
+            placeholder="Search Clients, Leads, Packages, or jump to page..."
             value={query}
             onChange={e => setQuery(e.target.value)}
+            style={{
+              flex: 1,
+              background: "transparent",
+              border: "none",
+              outline: "none",
+              fontSize: "15px",
+              fontWeight: 600,
+              color: "#F8FAFC",
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+            }}
           />
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
-            <X size={18} />
+          <button
+            onClick={onClose}
+            style={{
+              background: "#1E293B",
+              border: "1px solid #334155",
+              borderRadius: "6px",
+              padding: "3px 8px",
+              fontSize: "11px",
+              fontWeight: 700,
+              color: "#94A3B8",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            ESC
           </button>
         </div>
 
-        <div className="command-palette-results">
+        {/* Results Container */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px 16px" }}>
+          
           {/* Navigation Pages */}
           {navResults.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#94A3B8", padding: "6px 12px" }}>
-                Pages & Navigation
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748B", padding: "4px 10px 8px" }}>
+                Pages &amp; Navigation
               </div>
-              {navResults.map((item) => (
-                <div key={item.path} className="command-item" onClick={() => navigateTo(item.path)}>
-                  <item.icon size={16} color="#0176D3" />
-                  <span style={{ fontSize: 14, fontWeight: 600, color: "#0F172A" }}>{item.label}</span>
-                  <ArrowRight size={14} style={{ marginLeft: "auto", color: "#CBD5E1" }} />
-                </div>
-              ))}
+              {navResults.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.path}
+                    onClick={() => navigateTo(item.path)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "10px 12px",
+                      borderRadius: "10px",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                      marginBottom: "2px",
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLDivElement).style.background = "#1E293B";
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLDivElement).style.background = "transparent";
+                    }}
+                  >
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(99, 102, 241, 0.12)", border: "1px solid rgba(99, 102, 241, 0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <Icon size={16} color="#818CF8" />
+                    </div>
+                    <span style={{ fontSize: "14px", fontWeight: 700, color: "#E2E8F0" }}>{item.label}</span>
+                    <span style={{ fontSize: "11px", fontWeight: 600, color: "#475569", marginLeft: "auto", background: "#1E293B", padding: "2px 8px", borderRadius: 4 }}>
+                      {item.category}
+                    </span>
+                    <ArrowRight size={14} style={{ color: "#64748B" }} />
+                  </div>
+                );
+              })}
             </div>
           )}
 
           {/* Matching Clients */}
           {query.trim().length > 0 && filteredClients.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#94A3B8", padding: "6px 12px" }}>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748B", padding: "4px 10px 8px" }}>
                 Clients ({filteredClients.length})
               </div>
               {filteredClients.map((client) => (
-                <div key={client.id} className="command-item" onClick={() => navigateTo("/clients")}>
-                  <Users size={16} color="#10B981" />
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0F172A" }}>{client.name}</div>
-                    <div style={{ fontSize: 11, color: "#64748B" }}>PAN: {client.pan} | Type: {client.type}</div>
+                <div
+                  key={client.id}
+                  onClick={() => navigateTo("/clients")}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: "10px", cursor: "pointer", transition: "all 0.15s ease", marginBottom: "2px",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = "#1E293B"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
+                >
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(16, 185, 129, 0.12)", border: "1px solid rgba(16, 185, 129, 0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Users size={16} color="#10B981" />
                   </div>
+                  <div>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#E2E8F0" }}>{client.name}</div>
+                    <div style={{ fontSize: "11.5px", color: "#64748B" }}>PAN: {client.pan || "N/A"} | Mobile: {client.mobile}</div>
+                  </div>
+                  <ArrowRight size={14} style={{ marginLeft: "auto", color: "#64748B" }} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Matching One Time Services */}
+          {query.trim().length > 0 && filteredOneTime.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748B", padding: "4px 10px 8px" }}>
+                One Time Services ({filteredOneTime.length})
+              </div>
+              {filteredOneTime.map((ots) => (
+                <div
+                  key={ots.id}
+                  onClick={() => navigateTo("/one-time-services")}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: "10px", cursor: "pointer", transition: "all 0.15s ease", marginBottom: "2px",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = "#1E293B"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
+                >
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(99, 102, 241, 0.12)", border: "1px solid rgba(99, 102, 241, 0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Sparkles size={16} color="#818CF8" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#E2E8F0" }}>{ots.serviceName}</div>
+                    <div style={{ fontSize: "11.5px", color: "#64748B" }}>Client: {ots.clientName} | Progress: {ots.progress}</div>
+                  </div>
+                  <ArrowRight size={14} style={{ marginLeft: "auto", color: "#64748B" }} />
                 </div>
               ))}
             </div>
@@ -124,17 +266,28 @@ export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModal
 
           {/* Matching Collaborations */}
           {query.trim().length > 0 && filteredCollaborations.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#94A3B8", padding: "6px 12px" }}>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748B", padding: "4px 10px 8px" }}>
                 Collaborations ({filteredCollaborations.length})
               </div>
               {filteredCollaborations.map((collab) => (
-                <div key={collab.id} className="command-item" onClick={() => navigateTo("/collaborations")}>
-                  <Handshake size={16} color="#0284C7" />
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0F172A" }}>{collab.name}</div>
-                    <div style={{ fontSize: 11, color: "#64748B" }}>Number: {collab.number} | Email: {collab.email}</div>
+                <div
+                  key={collab.id}
+                  onClick={() => navigateTo("/collaborations")}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: "10px", cursor: "pointer", transition: "all 0.15s ease", marginBottom: "2px",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = "#1E293B"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
+                >
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(14, 165, 233, 0.12)", border: "1px solid rgba(14, 165, 233, 0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Handshake size={16} color="#38BDF8" />
                   </div>
+                  <div>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#E2E8F0" }}>{collab.name}</div>
+                    <div style={{ fontSize: "11.5px", color: "#64748B" }}>Number: {collab.number} | Email: {collab.email}</div>
+                  </div>
+                  <ArrowRight size={14} style={{ marginLeft: "auto", color: "#64748B" }} />
                 </div>
               ))}
             </div>
@@ -142,42 +295,64 @@ export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModal
 
           {/* Matching Leads */}
           {query.trim().length > 0 && filteredLeads.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#94A3B8", padding: "6px 12px" }}>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748B", padding: "4px 10px 8px" }}>
                 WhatsApp Leads ({filteredLeads.length})
               </div>
               {filteredLeads.map((lead) => (
-                <div key={lead.id} className="command-item" onClick={() => navigateTo("/leads")}>
-                  <MessageSquare size={16} color="#F59E0B" />
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0F172A" }}>{lead.name}</div>
-                    <div style={{ fontSize: 11, color: "#64748B" }}>Phone: {lead.phone} | Status: {lead.status}</div>
+                <div
+                  key={lead.id}
+                  onClick={() => navigateTo("/leads")}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: "10px", cursor: "pointer", transition: "all 0.15s ease", marginBottom: "2px",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = "#1E293B"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
+                >
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(245, 158, 11, 0.12)", border: "1px solid rgba(245, 158, 11, 0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <MessageSquare size={16} color="#FBBF24" />
                   </div>
+                  <div>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#E2E8F0" }}>{lead.name}</div>
+                    <div style={{ fontSize: "11.5px", color: "#64748B" }}>Phone: {lead.phone || lead.mobile}</div>
+                  </div>
+                  <ArrowRight size={14} style={{ marginLeft: "auto", color: "#64748B" }} />
                 </div>
               ))}
             </div>
           )}
 
-          {/* Matching Services */}
+          {/* Matching Packages */}
           {query.trim().length > 0 && filteredServices.length > 0 && (
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#94A3B8", padding: "6px 12px" }}>
-                Services ({filteredServices.length})
+              <div style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748B", padding: "4px 10px 8px" }}>
+                Packages ({filteredServices.length})
               </div>
               {filteredServices.map((service) => (
-                <div key={service.id} className="command-item" onClick={() => navigateTo("/services")}>
-                  <Briefcase size={16} color="#8B5CF6" />
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0F172A" }}>{service.name}</div>
-                    <div style={{ fontSize: 11, color: "#64748B" }}>Pricing: ₹{service.price}</div>
+                <div
+                  key={service.id}
+                  onClick={() => navigateTo("/services")}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: "10px", cursor: "pointer", transition: "all 0.15s ease", marginBottom: "2px",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = "#1E293B"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
+                >
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(168, 85, 247, 0.12)", border: "1px solid rgba(168, 85, 247, 0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Package size={16} color="#C084FC" />
                   </div>
+                  <div>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#E2E8F0" }}>{service.name}</div>
+                    <div style={{ fontSize: "11.5px", color: "#64748B" }}>Price: ₹{service.price}</div>
+                  </div>
+                  <ArrowRight size={14} style={{ marginLeft: "auto", color: "#64748B" }} />
                 </div>
               ))}
             </div>
           )}
 
-          {query.trim().length > 0 && navResults.length === 0 && filteredClients.length === 0 && filteredCollaborations.length === 0 && filteredLeads.length === 0 && filteredServices.length === 0 && (
-            <div style={{ padding: 24, textAlign: "center", color: "#64748B", fontSize: 14 }}>
+          {query.trim().length > 0 && navResults.length === 0 && filteredClients.length === 0 && filteredCollaborations.length === 0 && filteredLeads.length === 0 && filteredServices.length === 0 && filteredOneTime.length === 0 && (
+            <div style={{ padding: "32px 20px", textAlign: "center", color: "#64748B", fontSize: "14px", fontWeight: 600 }}>
               No matches found for "{query}"
             </div>
           )}

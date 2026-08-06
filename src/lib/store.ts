@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import {
   Client, Service, SubService, RequiredDoc,
-  AssignedService, BankingEntry, Lead, DocumentDraft, Collaboration, Invoice
+  AssignedService, BankingEntry, Lead, DocumentDraft, Collaboration, Invoice, OneTimeService
 } from "./types";
 import { getCurrentFY } from "./utils";
 import {
@@ -78,6 +78,7 @@ interface AppState {
   drafts: DocumentDraft[];
   collaborations: Collaboration[];
   invoices: Invoice[];
+  oneTimeServices: OneTimeService[];
   selectedFY: string;
   sidebarCollapsed: boolean;
   isLoadingSupabase: boolean;
@@ -137,6 +138,11 @@ interface AppState {
   addInvoice: (inv: Invoice) => void;
   updateInvoice: (inv: Invoice) => void;
   deleteInvoice: (id: string) => void;
+
+  // Actions - One Time Services
+  addOneTimeService: (ots: OneTimeService) => void;
+  updateOneTimeService: (ots: OneTimeService) => void;
+  deleteOneTimeService: (id: string) => void;
 }
 
 export const useAppStore = create<AppState>()((set, get) => ({
@@ -150,6 +156,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   drafts: loadFromLocal("drafts", []),
   collaborations: loadFromLocal("collaborations", []),
   invoices: loadFromLocal("invoices", []),
+  oneTimeServices: loadFromLocal("oneTimeServices", []),
   selectedFY: getCurrentFY(),
   sidebarCollapsed: false,
   isLoadingSupabase: false,
@@ -494,25 +501,27 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const next = [inv, ...s.invoices];
       saveToLocal("invoices", next);
 
-      // Auto-link with Banking Ledger if amount received > 0 or invoice paid
-      const rcv = inv.amountReceived || (inv.status === "PAID" ? inv.total : 0);
-      const billed = inv.total || 0;
-      if (inv.clientId && (billed > 0 || rcv > 0)) {
-        const bEntry: BankingEntry = {
-          id: `b_inv_${inv.id}`,
-          financialYear: inv.financialYear || s.selectedFY || getCurrentFY(),
-          clientId: inv.clientId,
-          serviceId: s.services[0]?.id || "s1",
-          amountBilled: billed,
-          amountReceived: rcv,
-          amountPending: Math.max(0, billed - rcv),
-          paymentStatus: rcv >= billed ? "PAID" : rcv > 0 ? "PARTIAL" : "PENDING",
-          remark: `${inv.type} #${inv.invoiceNumber} payment record`
-        };
-        const nextBanking = [...s.bankingEntries.filter(b => b.id !== bEntry.id), bEntry];
-        saveToLocal("banking", nextBanking);
-        syncBankingEntryToSupabase(bEntry);
-        return { invoices: next, bankingEntries: nextBanking };
+      // Only link with Banking Ledger for INVOICE type (NOT PROFORMA)
+      if (inv.type !== "PROFORMA" && inv.clientId) {
+        const rcv = inv.amountReceived || (inv.status === "PAID" ? inv.total : 0);
+        const billed = inv.total || 0;
+        if (billed > 0 || rcv > 0) {
+          const bEntry: BankingEntry = {
+            id: `b_inv_${inv.id}`,
+            financialYear: inv.financialYear || s.selectedFY || getCurrentFY(),
+            clientId: inv.clientId,
+            serviceId: s.services[0]?.id || "s1",
+            amountBilled: billed,
+            amountReceived: rcv,
+            amountPending: Math.max(0, billed - rcv),
+            paymentStatus: rcv >= billed ? "PAID" : rcv > 0 ? "PARTIAL" : "PENDING",
+            remark: `${inv.type} #${inv.invoiceNumber} payment record`
+          };
+          const nextBanking = [...s.bankingEntries.filter(b => b.id !== bEntry.id), bEntry];
+          saveToLocal("banking", nextBanking);
+          syncBankingEntryToSupabase(bEntry);
+          return { invoices: next, bankingEntries: nextBanking };
+        }
       }
 
       return { invoices: next };
@@ -523,10 +532,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const next = s.invoices.map(x => x.id === inv.id ? inv : x);
       saveToLocal("invoices", next);
 
-      // Sync with Banking Ledger
-      const rcv = inv.amountReceived || (inv.status === "PAID" ? inv.total : 0);
-      const billed = inv.total || 0;
-      if (inv.clientId) {
+      // Only sync with Banking Ledger for INVOICE type (NOT PROFORMA)
+      if (inv.type !== "PROFORMA" && inv.clientId) {
+        const rcv = inv.amountReceived || (inv.status === "PAID" ? inv.total : 0);
+        const billed = inv.total || 0;
         const bEntry: BankingEntry = {
           id: `b_inv_${inv.id}`,
           financialYear: inv.financialYear || s.selectedFY || getCurrentFY(),
@@ -560,6 +569,29 @@ export const useAppStore = create<AppState>()((set, get) => ({
       removeBankingEntryFromSupabase(targetBankingId);
 
       return { invoices: nextInvoices, bankingEntries: nextBanking };
+    });
+  },
+
+  // Actions - One Time Services
+  addOneTimeService: (ots) => {
+    set((s) => {
+      const next = [ots, ...s.oneTimeServices];
+      saveToLocal("oneTimeServices", next);
+      return { oneTimeServices: next };
+    });
+  },
+  updateOneTimeService: (ots) => {
+    set((s) => {
+      const next = s.oneTimeServices.map(x => x.id === ots.id ? ots : x);
+      saveToLocal("oneTimeServices", next);
+      return { oneTimeServices: next };
+    });
+  },
+  deleteOneTimeService: (id) => {
+    set((s) => {
+      const next = s.oneTimeServices.filter(x => x.id !== id);
+      saveToLocal("oneTimeServices", next);
+      return { oneTimeServices: next };
     });
   },
 }));
