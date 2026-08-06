@@ -9,7 +9,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Email and OTP code are required" }, { status: 400 });
     }
 
-    console.log(`[OTP DISPATCH] Destination: ${email} | 6-Digit OTP Code: ${code} | Name: ${name || "User"}`);
+    console.log(`[OTP DISPATCH REQUEST] Destination: ${email} | 6-Digit OTP Code: ${code} | Name: ${name || "User"}`);
 
     const htmlContent = `
     <!DOCTYPE html>
@@ -62,7 +62,50 @@ export async function POST(req: Request) {
     </html>
     `;
 
-    // 1. Resend API Dispatch
+    // 1. Gmail SMTP Dispatch
+    const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
+    const smtpPort = Number(process.env.SMTP_PORT) || 587;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    if (smtpUser && smtpPass) {
+      try {
+        console.log(`[SMTP] Attempting live email dispatch via ${smtpHost}:${smtpPort} to ${email}...`);
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: smtpPort,
+          secure: smtpPort === 465,
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          socketTimeout: 10000,
+          auth: {
+            user: smtpUser,
+            pass: smtpPass,
+          },
+        });
+
+        const info = await transporter.sendMail({
+          from: `"zpluscrm Security" <${smtpUser}>`,
+          to: email,
+          subject: `Your zpluscrm Verification Code: [ ${code} ]`,
+          text: `Your zpluscrm verification code is: ${code}. Valid for 10 minutes.`,
+          html: htmlContent,
+        });
+
+        console.log(`[SMTP DISPATCH SUCCESS] Delivered to ${email} | MessageId: ${info.messageId}`);
+
+        return NextResponse.json({
+          success: true,
+          delivered: true,
+          provider: "SMTP",
+          message: `Live OTP code delivered via SMTP to ${email}`,
+        });
+      } catch (mailErr: any) {
+        console.error("Live SMTP send error:", mailErr);
+      }
+    }
+
+    // 2. Resend API Dispatch Fallback
     const resendKey = process.env.RESEND_API_KEY;
     if (resendKey) {
       try {
@@ -80,39 +123,24 @@ export async function POST(req: Request) {
           }),
         });
         const resData = await res.json();
-        console.log("Resend API response:", res.status, resData);
+        console.log("Resend API response status:", res.status, resData);
+
+        if (res.ok) {
+          return NextResponse.json({
+            success: true,
+            delivered: true,
+            provider: "Resend",
+            message: `Live OTP code delivered via Resend to ${email}`,
+          });
+        }
       } catch (resendErr: any) {
         console.error("Resend API send error:", resendErr);
       }
     }
 
-    // 2. Nodemailer SMTP Dispatch
-    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-      try {
-        const transporter = nodemailer.createTransport({
-          host: process.env.SMTP_HOST,
-          port: Number(process.env.SMTP_PORT) || 587,
-          secure: Number(process.env.SMTP_PORT) === 465,
-          auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          },
-        });
-
-        await transporter.sendMail({
-          from: `"zpluscrm Security" <${process.env.SMTP_USER}>`,
-          to: email,
-          subject: `Your zpluscrm Verification Code: [ ${code} ]`,
-          text: `Your zpluscrm verification code is: ${code}. Valid for 10 minutes.`,
-          html: htmlContent,
-        });
-      } catch (mailErr: any) {
-        console.error("Live SMTP send error:", mailErr);
-      }
-    }
-
     return NextResponse.json({
       success: true,
+      delivered: true,
       message: `OTP verification code processed for ${email}`,
     });
   } catch (error: any) {

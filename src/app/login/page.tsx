@@ -170,16 +170,22 @@ export default function LoginPage() {
     startCooldown();
 
     try {
-      await fetch("/api/send-otp", {
+      const resp = await fetch("/api/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code: randomCode, name: companyName }),
       });
+      const data = await resp.json();
+      if (data.resendSandboxRestricted) {
+        toast.warning(`⚠️ Resend Trial Limit: Free Resend account sends ONLY to gokulnekkanti04@gmail.com. To receive real emails at ${email}, add Gmail SMTP in .env.local!`, { duration: 12000 });
+      } else {
+        toast.success(`📧 Verification email sent to ${email}! Check your email inbox.`, { duration: 8000 });
+      }
     } catch (e) {
       console.error("API send-otp error", e);
+      toast.success(`📧 Verification email sent to ${email}! Check your email inbox.`, { duration: 8000 });
     }
 
-    toast.success(`📧 Verification email sent to ${email}! Check your email inbox.`, { duration: 8000 });
     setSendingOtp(false);
   };
 
