@@ -118,6 +118,7 @@ export default function LoginPage() {
   const [showConfirmPwd, setShowConfirmPwd] = useState(false);
 
   // ─── OTP flow states ──────────────────────────────────────────────────────
+  const [generatedOtp, setGeneratedOtp] = useState<string>("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpValue, setOtpValue] = useState("");
   const [emailVerified, setEmailVerified] = useState(false);
@@ -161,49 +162,56 @@ export default function LoginPage() {
       return;
     }
     setSendingOtp(true);
+
+    // Generate random 6-digit OTP code (e.g. 849201)
+    const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(randomCode);
+    setOtpSent(true);
+    startCooldown();
+
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { shouldCreateUser: true },
+      const resp = await fetch("/api/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code: randomCode, name: companyName }),
       });
-      if (error) {
-        toast.error(error.message || "Failed to send OTP");
+      const data = await resp.json();
+      if (!data.success) {
+        console.error("API send-otp error", data.error);
+        if (data.isResendRestriction) {
+          toast.warning(`⚠️ Resend Test Sandbox Notice: Free Resend accounts can only send emails to your registered email (gokulnekkanti04@gmail.com). To send to all emails, add a custom domain on resend.com or use Gmail SMTP in .env.local!`, { duration: 12000 });
+        } else {
+          toast.error("❌ Failed to send verification email. Please try again later.");
+        }
       } else {
-        setOtpSent(true);
-        startCooldown();
-        toast.success(`OTP sent to ${email}! Check your inbox.`);
+        toast.success(`📧 Verification email sent to ${email}! Check your email inbox.`, { duration: 8000 });
       }
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to send OTP");
-    } finally {
-      setSendingOtp(false);
+    } catch (e) {
+      console.error("API send-otp error", e);
+      toast.error("❌ Failed to send verification email. Please try again later.");
     }
+
+    setSendingOtp(false);
   };
 
   // ─── OTP: Verify ─────────────────────────────────────────────────────────
-  const handleVerifyOtp = async () => {
-    if (!otpValue || otpValue.length < 4) {
-      toast.error("Please enter the OTP sent to your email");
+  const handleVerifyOtp = () => {
+    if (!otpValue || otpValue.trim().length === 0) {
+      toast.error("Please enter the 6-digit OTP code");
       return;
     }
     setVerifyingOtp(true);
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        email,
-        token: otpValue,
-        type: "email",
-      });
-      if (error) {
-        toast.error(error.message || "Invalid or expired OTP");
-      } else {
-        setEmailVerified(true);
-        toast.success("Email verified! Now set your password.");
-      }
-    } catch (err: any) {
-      toast.error(err?.message || "OTP verification failed");
-    } finally {
-      setVerifyingOtp(false);
+    const trimmed = otpValue.trim();
+
+    // STRICT CHECK: Must match the exact generated 6-digit OTP code!
+    if (generatedOtp && trimmed === generatedOtp) {
+      setEmailVerified(true);
+      toast.success("✓ Email verified successfully! Now create your password.");
+    } else {
+      setEmailVerified(false);
+      toast.error("❌ Invalid OTP code. Please enter the correct 6-digit code sent to your email.");
     }
+    setVerifyingOtp(false);
   };
 
   // ─── Form Submit ──────────────────────────────────────────────────────────
@@ -248,8 +256,13 @@ export default function LoginPage() {
           data: { company_name: companyName },
         });
         if (pwdErr) {
-          // Fallback: sign up with email+password if not yet logged in via OTP
+          // Fallback: sign up with email+password if not yet logged in
           const { error: signupErr } = await signUpWithEmail(email, password);
+          if (signupErr && signupErr.message === "confirmation_required") {
+            toast.info("Account created! Check your inbox for the confirmation email from Supabase, click the link, then sign in.");
+            setSubmitting(false);
+            return;
+          }
           if (signupErr) {
             toast.error(signupErr.message || "Failed to create account");
           } else {
@@ -529,8 +542,8 @@ export default function LoginPage() {
                     Confirm
                   </button>
                 </div>
-                <p style={{ fontSize: 11, color: "#64748B", marginTop: 6 }}>
-                  📧 A 6-digit code was sent to <strong style={{ color: "#94A3B8" }}>{email}</strong>. Check spam if not seen.
+                <p style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 6, lineHeight: 1.5 }}>
+                  📩 A 6-digit verification code was sent to <strong style={{ color: "#F8FAFC" }}>{email}</strong>. Check your inbox or spam folder.
                 </p>
               </div>
             )}
