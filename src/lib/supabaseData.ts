@@ -20,34 +20,14 @@ function getMockSessionUserId(): string | undefined {
 
 async function safeTableFetch(tableName: string, userId?: string) {
   try {
-    // Fetch rows belonging to this user
-    const userRows: any[] = [];
-    if (userId) {
-      const { data, error } = await supabase.from(tableName).select("*").eq("user_id", userId);
-      if (!error && data) userRows.push(...data);
+    if (!userId) return [];
+    // Strict isolation: ONLY fetch records matching the current user's userId
+    const { data, error } = await supabase.from(tableName).select("*").eq("user_id", userId);
+    if (error) {
+      console.warn(`Supabase fetch for table ${tableName} returned error:`, error);
+      return [];
     }
-
-    // Also fetch rows with null user_id (data saved before user-scoping fix)
-    const { data: nullRows, error: nullError } = await supabase.from(tableName).select("*").is("user_id", null);
-    const unclaimedRows = (!nullError && nullRows) ? nullRows : [];
-
-    // Merge: avoid duplicates by id
-    const allRows = [...userRows];
-    unclaimedRows.forEach((row: any) => {
-      if (!allRows.some((r: any) => r.id === row.id)) {
-        allRows.push(row);
-      }
-    });
-
-    // Claim unclaimed rows by updating their user_id to this user
-    if (userId && unclaimedRows.length > 0) {
-      const ids = unclaimedRows.map((r: any) => r.id);
-      supabase.from(tableName).update({ user_id: userId }).in("id", ids).then(() => {
-        // Silent background update
-      });
-    }
-
-    return allRows;
+    return data || [];
   } catch {
     return [];
   }
@@ -60,6 +40,20 @@ export async function fetchAllCRMData() {
     // Use real Supabase user ID if available, otherwise fall back to mock session user ID
     const userId = user?.id || getMockSessionUserId();
 
+    const targetSaivaralaId = "usr_saivarala33_gmail_com";
+
+    // ── MIGRATION HACK: Re-assign legacy null user_id records to saivarala33@gmail.com ──
+    if (userId === targetSaivaralaId) {
+      const tablesToClaim = [
+        "clients", "services", "sub_services", "required_docs",
+        "assigned_services", "banking_entries", "leads", "drafts",
+        "collaborations", "invoices", "one_time_services"
+      ];
+      await Promise.all(tablesToClaim.map(table =>
+        supabase.from(table).update({ user_id: targetSaivaralaId }).is("user_id", null)
+      )).catch(() => {});
+    }
+
     const [
       clients,
       services,
@@ -70,6 +64,8 @@ export async function fetchAllCRMData() {
       leads,
       drafts,
       collaborations,
+      invoices,
+      oneTimeServices,
     ] = await Promise.all([
       safeTableFetch("clients", userId),
       safeTableFetch("services", userId),
@@ -80,6 +76,8 @@ export async function fetchAllCRMData() {
       safeTableFetch("leads", userId),
       safeTableFetch("drafts", userId),
       safeTableFetch("collaborations", userId),
+      safeTableFetch("invoices", userId),
+      safeTableFetch("one_time_services", userId),
     ]);
 
     const formattedClients: Client[] = (clients || []).map((c: any) => ({
@@ -191,8 +189,36 @@ export async function fetchAllCRMData() {
       createdAt: c.created_at,
     }));
 
-    // If tables are empty in Supabase, new user starts with a clean workspace
-    // (no mock data seeding — each user's data is their own)
+    const formattedInvoices: any[] = (invoices || []).map((inv: any) => ({
+      id: inv.id,
+      type: inv.type,
+      invoiceNumber: inv.invoice_number,
+      date: inv.date,
+      financialYear: inv.financial_year,
+      clientId: inv.client_id,
+      clientName: inv.client_name,
+      items: inv.items || [],
+      subtotal: Number(inv.subtotal || 0),
+      gstRate: Number(inv.gst_rate || 0),
+      gstAmount: Number(inv.gst_amount || 0),
+      total: Number(inv.total || 0),
+      amountReceived: Number(inv.amount_received || 0),
+      balanceDue: Number(inv.balance_due || 0),
+      notes: inv.notes,
+      status: inv.status,
+      createdAt: inv.created_at,
+    }));
+
+    const formattedOneTimeServices: any[] = (oneTimeServices || []).map((ots: any) => ({
+      id: ots.id,
+      clientName: ots.client_name,
+      serviceName: ots.service_name,
+      dueDate: ots.due_date,
+      progress: ots.progress,
+      notes: ots.notes,
+      createdAt: ots.created_at,
+    }));
+
     return {
       clients: formattedClients,
       services: formattedServices,
@@ -203,6 +229,8 @@ export async function fetchAllCRMData() {
       leads: formattedLeads,
       drafts: formattedDrafts,
       collaborations: formattedCollaborations,
+      invoices: formattedInvoices,
+      oneTimeServices: formattedOneTimeServices,
     };
   } catch (error) {
     console.error("Error fetching CRM data from Supabase:", error);
@@ -417,5 +445,69 @@ export async function removeCollaborationFromSupabase(id: string) {
     await supabase.from("collaborations").delete().eq("id", id);
   } catch (err) {
     console.error("Error removing collaboration from Supabase:", err);
+  }
+}
+
+// Invoices Sync
+export async function syncInvoiceToSupabase(inv: any) {
+  try {
+    const userId = await getUserId();
+    await supabase.from("invoices").upsert({
+      id: inv.id,
+      user_id: userId,
+      type: inv.type,
+      invoice_number: inv.invoiceNumber,
+      date: inv.date,
+      financial_year: inv.financialYear,
+      client_id: inv.clientId,
+      client_name: inv.clientName,
+      items: inv.items,
+      subtotal: inv.subtotal,
+      gst_rate: inv.gstRate,
+      gst_amount: inv.gstAmount,
+      total: inv.total,
+      amount_received: inv.amountReceived,
+      balance_due: inv.balanceDue,
+      notes: inv.notes,
+      status: inv.status,
+      created_at: inv.createdAt || new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("Error syncing invoice to Supabase:", err);
+  }
+}
+
+export async function removeInvoiceFromSupabase(id: string) {
+  try {
+    await supabase.from("invoices").delete().eq("id", id);
+  } catch (err) {
+    console.error("Error removing invoice from Supabase:", err);
+  }
+}
+
+// One Time Services Sync
+export async function syncOneTimeServiceToSupabase(ots: any) {
+  try {
+    const userId = await getUserId();
+    await supabase.from("one_time_services").upsert({
+      id: ots.id,
+      user_id: userId,
+      client_name: ots.clientName,
+      service_name: ots.serviceName,
+      due_date: ots.dueDate || null,
+      progress: ots.progress,
+      notes: ots.notes,
+      created_at: ots.createdAt || new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("Error syncing one-time service to Supabase:", err);
+  }
+}
+
+export async function removeOneTimeServiceFromSupabase(id: string) {
+  try {
+    await supabase.from("one_time_services").delete().eq("id", id);
+  } catch (err) {
+    console.error("Error removing one-time service from Supabase:", err);
   }
 }

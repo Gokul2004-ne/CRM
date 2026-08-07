@@ -23,7 +23,11 @@ import {
   syncDraftToSupabase,
   removeDraftFromSupabase,
   syncCollaborationToSupabase,
-  removeCollaborationFromSupabase
+  removeCollaborationFromSupabase,
+  syncInvoiceToSupabase,
+  removeInvoiceFromSupabase,
+  syncOneTimeServiceToSupabase,
+  removeOneTimeServiceFromSupabase
 } from "./supabaseData";
 
 // User-Scoped LocalStorage Persistence Helpers (Strict Multi-Tenant Privacy)
@@ -282,10 +286,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("oneTimeServices", mergedLocalOneTime);
 
       // Sync any migrated old data up to Supabase
-      if (oldClients.length > 0 || oldServices.length > 0 || oldAssigned.length > 0) {
+      if (oldClients.length > 0 || oldServices.length > 0 || oldAssigned.length > 0 || oldInvoices.length > 0) {
         const { syncClientToSupabase, syncServiceToSupabase, syncSubServiceToSupabase,
                 syncAssignedServiceToSupabase, syncLeadToSupabase, syncDraftToSupabase,
-                syncCollaborationToSupabase, syncBankingEntryToSupabase } = await import("./supabaseData");
+                syncCollaborationToSupabase, syncBankingEntryToSupabase,
+                syncInvoiceToSupabase, syncOneTimeServiceToSupabase } = await import("./supabaseData");
         finalClients.forEach(c => syncClientToSupabase(c));
         finalServices.forEach(s => syncServiceToSupabase(s));
         finalSubServices.forEach(ss => syncSubServiceToSupabase(ss));
@@ -294,6 +299,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
         finalDrafts.forEach(d => syncDraftToSupabase(d));
         finalCollabs.forEach(c => syncCollaborationToSupabase(c));
         finalBanking.forEach(b => syncBankingEntryToSupabase(b));
+        mergedLocalInvoices.forEach(inv => syncInvoiceToSupabase(inv));
+        mergedLocalOneTime.forEach(ots => syncOneTimeServiceToSupabase(ots));
 
         // Clean up old unscoped keys so they don't migrate again
         const keysToClean = ["clients","services","subServices","requiredDocs",
@@ -637,6 +644,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
       return { invoices: next };
     });
+    syncInvoiceToSupabase(inv);
   },
   updateInvoice: (inv) => {
     set((s) => {
@@ -665,6 +673,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
       return { invoices: next };
     });
+    syncInvoiceToSupabase(inv);
   },
   deleteInvoice: (id) => {
     set((s) => {
@@ -679,6 +688,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
       return { invoices: nextInvoices, bankingEntries: nextBanking };
     });
+    removeInvoiceFromSupabase(id);
   },
 
   // Actions - One Time Services
@@ -688,6 +698,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("oneTimeServices", next);
       return { oneTimeServices: next };
     });
+    syncOneTimeServiceToSupabase(ots);
   },
   updateOneTimeService: (ots) => {
     set((s) => {
@@ -695,6 +706,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("oneTimeServices", next);
       return { oneTimeServices: next };
     });
+    syncOneTimeServiceToSupabase(ots);
   },
   deleteOneTimeService: (id) => {
     set((s) => {
@@ -702,5 +714,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("oneTimeServices", next);
       return { oneTimeServices: next };
     });
+    removeOneTimeServiceFromSupabase(id);
   },
 }));
