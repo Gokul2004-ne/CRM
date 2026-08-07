@@ -188,6 +188,48 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const localInvoices = loadFromLocal<any[]>("invoices", []);
     const localOneTime = loadFromLocal<any[]>("oneTimeServices", []);
 
+    // ── MIGRATION: Read any old unscoped local data (zpluscrm_local_*) ──
+    // This handles data that was saved before the user-scoping fix was applied.
+    const migrateOldKey = <T>(key: string): T[] => {
+      if (typeof window === "undefined") return [];
+      try {
+        const raw = localStorage.getItem(`zpluscrm_local_${key}`);
+        return raw ? JSON.parse(raw) : [];
+      } catch { return []; }
+    };
+    const oldClients = migrateOldKey<Client>("clients");
+    const oldServices = migrateOldKey<Service>("services");
+    const oldSubServices = migrateOldKey<SubService>("subServices");
+    const oldRequiredDocs = migrateOldKey<RequiredDoc>("requiredDocs");
+    const oldAssigned = migrateOldKey<AssignedService>("assignedServices");
+    const oldBanking = migrateOldKey<BankingEntry>("bankingEntries");
+    const oldLeads = migrateOldKey<Lead>("leads");
+    const oldDrafts = migrateOldKey<DocumentDraft>("drafts");
+    const oldCollabs = migrateOldKey<Collaboration>("collaborations");
+    const oldInvoices = migrateOldKey<any>("invoices");
+    const oldOneTime = migrateOldKey<any>("oneTimeServices");
+
+    // Merge old unscoped data into current user's local data
+    const mergeLocal = <T extends { id: string }>(current: T[], old: T[]): T[] => {
+      const merged = [...current];
+      old.forEach(item => {
+        if (!merged.some(m => m.id === item.id)) merged.push(item);
+      });
+      return merged;
+    };
+
+    const mergedLocalClients = mergeLocal(localClients, oldClients);
+    const mergedLocalServices = mergeLocal(localServices, oldServices);
+    const mergedLocalSubServices = mergeLocal(localSubServices, oldSubServices);
+    const mergedLocalRequiredDocs = mergeLocal(localRequiredDocs, oldRequiredDocs);
+    const mergedLocalAssigned = mergeLocal(localAssigned, oldAssigned);
+    const mergedLocalBanking = mergeLocal(localBanking, oldBanking);
+    const mergedLocalLeads = mergeLocal(localLeads, oldLeads);
+    const mergedLocalDrafts = mergeLocal(localDrafts, oldDrafts);
+    const mergedLocalCollabs = mergeLocal(localCollabs, oldCollabs);
+    const mergedLocalInvoices = mergeLocal(localInvoices, oldInvoices);
+    const mergedLocalOneTime = mergeLocal(localOneTime, oldOneTime);
+
     const data = await fetchAllCRMData();
     if (data) {
       // Merge: remote data takes priority; only add local items not present in remote
@@ -201,15 +243,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
         return merged;
       };
 
-      const finalClients = mergeArrays(data.clients, localClients);
-      const finalServices = mergeArrays(data.services, localServices);
-      const finalSubServices = mergeArrays(data.subServices, localSubServices);
-      const finalRequiredDocs = mergeArrays(data.requiredDocs, localRequiredDocs);
-      const finalAssigned = mergeArrays(data.assignedServices, localAssigned);
-      const finalBanking = mergeArrays(data.bankingEntries, localBanking);
-      const finalLeads = mergeArrays(data.leads, localLeads);
-      const finalDrafts = mergeArrays(data.drafts, localDrafts);
-      const finalCollabs = mergeArrays(data.collaborations, localCollabs);
+      const finalClients = mergeArrays(data.clients, mergedLocalClients);
+      const finalServices = mergeArrays(data.services, mergedLocalServices);
+      const finalSubServices = mergeArrays(data.subServices, mergedLocalSubServices);
+      const finalRequiredDocs = mergeArrays(data.requiredDocs, mergedLocalRequiredDocs);
+      const finalAssigned = mergeArrays(data.assignedServices, mergedLocalAssigned);
+      const finalBanking = mergeArrays(data.bankingEntries, mergedLocalBanking);
+      const finalLeads = mergeArrays(data.leads, mergedLocalLeads);
+      const finalDrafts = mergeArrays(data.drafts, mergedLocalDrafts);
+      const finalCollabs = mergeArrays(data.collaborations, mergedLocalCollabs);
 
       set({
         clients: finalClients,
@@ -221,11 +263,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
         leads: finalLeads,
         drafts: finalDrafts,
         collaborations: finalCollabs,
-        invoices: localInvoices,
-        oneTimeServices: localOneTime,
+        invoices: mergedLocalInvoices,
+        oneTimeServices: mergedLocalOneTime,
         isLoadingSupabase: false,
       });
 
+      // Save merged data under scoped key
       saveToLocal("clients", finalClients);
       saveToLocal("services", finalServices);
       saveToLocal("subServices", finalSubServices);
@@ -235,20 +278,44 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("leads", finalLeads);
       saveToLocal("drafts", finalDrafts);
       saveToLocal("collaborations", finalCollabs);
+      saveToLocal("invoices", mergedLocalInvoices);
+      saveToLocal("oneTimeServices", mergedLocalOneTime);
+
+      // Sync any migrated old data up to Supabase
+      if (oldClients.length > 0 || oldServices.length > 0 || oldAssigned.length > 0) {
+        const { syncClientToSupabase, syncServiceToSupabase, syncSubServiceToSupabase,
+                syncAssignedServiceToSupabase, syncLeadToSupabase, syncDraftToSupabase,
+                syncCollaborationToSupabase, syncBankingEntryToSupabase } = await import("./supabaseData");
+        finalClients.forEach(c => syncClientToSupabase(c));
+        finalServices.forEach(s => syncServiceToSupabase(s));
+        finalSubServices.forEach(ss => syncSubServiceToSupabase(ss));
+        finalAssigned.forEach(a => syncAssignedServiceToSupabase(a));
+        finalLeads.forEach(l => syncLeadToSupabase(l));
+        finalDrafts.forEach(d => syncDraftToSupabase(d));
+        finalCollabs.forEach(c => syncCollaborationToSupabase(c));
+        finalBanking.forEach(b => syncBankingEntryToSupabase(b));
+
+        // Clean up old unscoped keys so they don't migrate again
+        const keysToClean = ["clients","services","subServices","requiredDocs",
+          "assignedServices","bankingEntries","leads","drafts","collaborations","invoices","oneTimeServices"];
+        keysToClean.forEach(k => {
+          try { localStorage.removeItem(`zpluscrm_local_${k}`); } catch {}
+        });
+      }
     } else {
       // Supabase unavailable: use user-scoped local data only
       set({
-        clients: localClients,
-        services: localServices,
-        subServices: localSubServices,
-        requiredDocs: localRequiredDocs,
-        assignedServices: localAssigned,
-        bankingEntries: localBanking,
-        leads: localLeads,
-        drafts: localDrafts,
-        collaborations: localCollabs,
-        invoices: localInvoices,
-        oneTimeServices: localOneTime,
+        clients: mergedLocalClients,
+        services: mergedLocalServices,
+        subServices: mergedLocalSubServices,
+        requiredDocs: mergedLocalRequiredDocs,
+        assignedServices: mergedLocalAssigned,
+        bankingEntries: mergedLocalBanking,
+        leads: mergedLocalLeads,
+        drafts: mergedLocalDrafts,
+        collaborations: mergedLocalCollabs,
+        invoices: mergedLocalInvoices,
+        oneTimeServices: mergedLocalOneTime,
         isLoadingSupabase: false
       });
     }
