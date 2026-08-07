@@ -4,7 +4,10 @@ import { useAppStore } from "@/lib/store";
 import { useState, useMemo, useRef } from "react";
 import { formatCurrency, getCurrentFY, getFYOptions } from "@/lib/utils";
 import { Invoice, InvoiceItem, InvoiceType } from "@/lib/types";
-import { Plus, Printer, Eye, X, IndianRupee, FileText, Filter, CheckCircle2, AlertCircle, RefreshCw, Trash2 } from "lucide-react";
+import {
+  Plus, Printer, Eye, X, IndianRupee, FileText, Filter, CheckCircle2,
+  AlertCircle, RefreshCw, Trash2, Pencil, Search, ArrowUpRight, TrendingUp, Clock
+} from "lucide-react";
 import { toast } from "sonner";
 
 const PRESET_DESCRIPTIONS = [
@@ -31,8 +34,10 @@ export default function InvoicePage() {
   const { clients, invoices, selectedFY, addInvoice, updateInvoice, deleteInvoice } = useAppStore();
 
   const [entityFilter, setEntityFilter] = useState<"ALL" | "PROFORMA" | "INVOICE">("ALL");
-  const [modal, setModal] = useState<{ open: boolean; type: InvoiceType } | null>(null);
+  const [search, setSearch] = useState("");
+  const [modal, setModal] = useState<{ open: boolean; type: InvoiceType; isEditing?: boolean } | null>(null);
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
+
   const [form, setForm] = useState<Partial<Invoice>>({
     type: "PROFORMA",
     date: new Date().toISOString().split("T")[0],
@@ -49,6 +54,12 @@ export default function InvoicePage() {
 
   const invoiceCount = useMemo(() => invoices.filter(i => i.type === "INVOICE").length, [invoices]);
   const proformaCount = useMemo(() => invoices.filter(i => i.type === "PROFORMA").length, [invoices]);
+
+  // Summary Metrics
+  const totalInvoiced = useMemo(() => invoices.filter(i => i.type === "INVOICE").reduce((s, i) => s + (i.total || 0), 0), [invoices]);
+  const totalCollected = useMemo(() => invoices.filter(i => i.type === "INVOICE").reduce((s, i) => s + (i.amountReceived || 0), 0), [invoices]);
+  const totalPending = useMemo(() => Math.max(0, totalInvoiced - totalCollected), [totalInvoiced, totalCollected]);
+  const proformaValue = useMemo(() => invoices.filter(i => i.type === "PROFORMA").reduce((s, i) => s + (i.total || 0), 0), [invoices]);
 
   const getInvoiceNumber = (type: InvoiceType) => {
     const prefix = type === "INVOICE" ? "INV" : "PRO";
@@ -70,7 +81,15 @@ export default function InvoicePage() {
       notes: "Payment due within 15 days of invoice date. Thank you for your business!",
       status: "DRAFT",
     });
-    setModal({ open: true, type });
+    setModal({ open: true, type, isEditing: false });
+  };
+
+  const openEdit = (inv: Invoice) => {
+    setForm({
+      ...inv,
+      items: inv.items && inv.items.length > 0 ? [...inv.items] : [defaultItem()]
+    });
+    setModal({ open: true, type: inv.type, isEditing: true });
   };
 
   const updateItem = (idx: number, field: keyof InvoiceItem, value: any) => {
@@ -118,15 +137,15 @@ export default function InvoicePage() {
       createdAt: form.createdAt || new Date().toISOString(),
     };
 
-    if (form.id) {
+    if (modal?.isEditing || form.id) {
       updateInvoice(invoiceRecord);
-      toast.success(`${invoiceRecord.type} #${invoiceRecord.invoiceNumber} updated & saved!`);
+      toast.success(`🎉 ${invoiceRecord.type} #${invoiceRecord.invoiceNumber} updated & saved successfully!`);
     } else {
       addInvoice(invoiceRecord);
       if (invoiceRecord.type === "PROFORMA") {
-        toast.success(`Pro Forma #${invoiceRecord.invoiceNumber} saved to Invoices only (not posted to Banking Ledger)`);
+        toast.success(`🎉 Pro Forma #${invoiceRecord.invoiceNumber} created successfully!`);
       } else {
-        toast.success(`${invoiceRecord.type} #${invoiceRecord.invoiceNumber} created & linked to Banking Ledger!`);
+        toast.success(`🎉 Tax Invoice #${invoiceRecord.invoiceNumber} created & linked to Banking Ledger!`);
       }
     }
 
@@ -135,11 +154,15 @@ export default function InvoicePage() {
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter(inv => {
-      if (entityFilter === "PROFORMA") return inv.type === "PROFORMA";
-      if (entityFilter === "INVOICE") return inv.type === "INVOICE";
-      return true;
+      const matchesType =
+        entityFilter === "ALL" ? true :
+        entityFilter === "PROFORMA" ? inv.type === "PROFORMA" : inv.type === "INVOICE";
+      const matchesSearch =
+        (inv.invoiceNumber || "").toLowerCase().includes(search.toLowerCase()) ||
+        (inv.clientName || "").toLowerCase().includes(search.toLowerCase());
+      return matchesType && matchesSearch;
     });
-  }, [invoices, entityFilter]);
+  }, [invoices, entityFilter, search]);
 
   const handlePrint = () => {
     window.print();
@@ -154,13 +177,78 @@ export default function InvoicePage() {
   };
 
   return (
-    <AppShell title="Invoices & Proformas" subtitle="Generate, filter, and track tax invoices & proformas with banking linkage">
+    <AppShell title="Invoices & Billing Workspace" subtitle="Create, edit, track, and print professional tax invoices and proformas">
+      {/* Header Banner */}
+      <div className="page-header-slds">
+        <div>
+          <div className="breadcrumb">
+            <span>zpluscrm</span>
+            <span>/</span>
+            <span className="current">Invoices & Billing</span>
+          </div>
+          <div className="page-title-slds">Invoices & Proformas Workspace</div>
+          <div className="page-subtitle-slds">
+            Generate GST-compliant Tax Invoices, manage Pro Forma quotes, and auto-sync payments with Banking.
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button className="btn-slds btn-slds-secondary" onClick={() => openCreate("PROFORMA")}>
+            <Plus size={15} /> New Proforma
+          </button>
+          <button className="btn-slds btn-slds-primary" onClick={() => openCreate("INVOICE")}>
+            <Plus size={15} /> New Tax Invoice
+          </button>
+        </div>
+      </div>
+
+      {/* Financial Summary Cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 16, marginBottom: 20 }}>
+        <div className="card-slds" style={{ padding: 18, background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)", color: "white", borderRadius: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#94A3B8" }}>Total Tax Invoiced</span>
+            <div style={{ padding: 8, background: "rgba(59, 130, 246, 0.15)", borderRadius: 10, color: "#60A5FA" }}><IndianRupee size={18} /></div>
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 900, marginTop: 10 }}>{formatCurrency(totalInvoiced)}</div>
+          <div style={{ fontSize: 12, color: "#60A5FA", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+            <TrendingUp size={13} /> <span>{invoiceCount} Total Tax Invoices Issued</span>
+          </div>
+        </div>
+
+        <div className="card-slds" style={{ padding: 18, background: "linear-gradient(135deg, #065F46 0%, #047857 100%)", color: "white", borderRadius: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#A7F3D0" }}>Amount Collected</span>
+            <div style={{ padding: 8, background: "rgba(16, 185, 129, 0.2)", borderRadius: 10, color: "#34D399" }}><CheckCircle2 size={18} /></div>
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 900, marginTop: 10 }}>{formatCurrency(totalCollected)}</div>
+          <div style={{ fontSize: 12, color: "#A7F3D0", marginTop: 4 }}>Linked with Banking Ledger</div>
+        </div>
+
+        <div className="card-slds" style={{ padding: 18, background: "linear-gradient(135deg, #7F1D1D 0%, #991B1B 100%)", color: "white", borderRadius: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#FCA5A5" }}>Pending Balance</span>
+            <div style={{ padding: 8, background: "rgba(239, 68, 68, 0.2)", borderRadius: 10, color: "#F87171" }}><Clock size={18} /></div>
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 900, marginTop: 10 }}>{formatCurrency(totalPending)}</div>
+          <div style={{ fontSize: 12, color: "#FCA5A5", marginTop: 4 }}>Outstanding Client Receivables</div>
+        </div>
+
+        <div className="card-slds" style={{ padding: 18, background: "linear-gradient(135deg, #431407 0%, #7C2D12 100%)", color: "white", borderRadius: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#FFEDD5" }}>Proforma Quotes</span>
+            <div style={{ padding: 8, background: "rgba(249, 115, 22, 0.2)", borderRadius: 10, color: "#FB923C" }}><FileText size={18} /></div>
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 900, marginTop: 10 }}>{formatCurrency(proformaValue)}</div>
+          <div style={{ fontSize: 12, color: "#FFEDD5", marginTop: 4 }}>{proformaCount} Pro Forma Quotes Issued</div>
+        </div>
+      </div>
+
+      {/* Main Table Toolbar */}
       <div className="data-table-wrapper">
-        <div className="data-table-header">
-          {/* Entity Filter Toolbar (All, Proforma, Invoice) */}
-          <div className="toolbar-controls" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#64748B", display: "flex", alignItems: "center", gap: 6 }}>
-              <Filter size={14} /> Entity Filter:
+        <div className="data-table-header" style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12 }}>
+          {/* Entity Filter Buttons */}
+          <div className="toolbar-controls" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", display: "flex", alignItems: "center", gap: 4 }}>
+              <Filter size={14} /> Filter:
             </div>
             <div style={{ display: "flex", gap: 4, background: "#F1F5F9", padding: 3, borderRadius: 8 }}>
               {(["ALL", "PROFORMA", "INVOICE"] as const).map(type => (
@@ -168,7 +256,7 @@ export default function InvoicePage() {
                   key={type}
                   className="btn-slds"
                   style={{
-                    padding: "5px 14px",
+                    padding: "4px 12px",
                     fontSize: 12,
                     fontWeight: 700,
                     borderRadius: 6,
@@ -178,129 +266,144 @@ export default function InvoicePage() {
                   }}
                   onClick={() => setEntityFilter(type)}
                 >
-                  {type === "ALL" ? `All (${invoices.length})` : type === "PROFORMA" ? `Proforma (${proformaCount})` : `Invoice (${invoiceCount})`}
+                  {type === "ALL" ? `All (${invoices.length})` : type === "PROFORMA" ? `Proforma (${proformaCount})` : `Tax Invoice (${invoiceCount})`}
                 </button>
               ))}
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 10 }}>
-            <button className="btn-slds btn-slds-secondary" onClick={() => openCreate("PROFORMA")}>
-              <Plus size={15} /> New Proforma
-            </button>
-            <button className="btn-slds btn-slds-primary" onClick={() => openCreate("INVOICE")}>
-              <Plus size={15} /> New Tax Invoice
-            </button>
+          {/* Search Box */}
+          <div className="search-input-wrapper" style={{ maxWidth: 300 }}>
+            <Search size={15} />
+            <input
+              type="text"
+              placeholder="Search by doc # or client name..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
           </div>
         </div>
 
         {/* Table of Invoices & Proformas */}
         <div className="table-scroll-container">
-          <table>
+          <table className="table-slds">
             <thead>
               <tr>
-                <th className="col-num">#</th>
+                <th style={{ width: 50, textAlign: "center" }}>#</th>
                 <th>Type</th>
                 <th>Doc #</th>
-                <th>Financial Year</th>
+                <th>FY</th>
                 <th>Client Name</th>
                 <th>Date</th>
-                <th>Total Amount</th>
-                <th>Amount Received</th>
+                <th>Total Billed</th>
+                <th>Received</th>
                 <th>Balance Due</th>
                 <th>Status</th>
-                <th className="col-actions">Actions</th>
+                <th style={{ textAlign: "center" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredInvoices.map((inv, i) => {
-                const clientObj = clients.find(c => c.id === inv.clientId);
-                const clientName = inv.clientName || clientObj?.name || "-";
-                const cfg = statusConfig[inv.status || "DRAFT"];
-                const rcv = inv.amountReceived || 0;
-                const bal = inv.balanceDue !== undefined ? inv.balanceDue : Math.max(0, inv.total - rcv);
+              {filteredInvoices.length > 0 ? (
+                filteredInvoices.map((inv, i) => {
+                  const clientObj = clients.find(c => c.id === inv.clientId);
+                  const clientName = inv.clientName || clientObj?.name || "-";
+                  const cfg = statusConfig[inv.status || "DRAFT"];
+                  const rcv = inv.amountReceived || 0;
+                  const bal = inv.balanceDue !== undefined ? inv.balanceDue : Math.max(0, inv.total - rcv);
 
-                return (
-                  <tr key={inv.id}>
-                    <td className="col-num">{i + 1}</td>
-                    <td>
-                      <span
-                        className="badge"
-                        style={{
-                          background: inv.type === "INVOICE" ? "#EFF6FF" : "#FFF7ED",
-                          color: inv.type === "INVOICE" ? "#1D4ED8" : "#C2410C",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {inv.type}
-                      </span>
-                    </td>
-                    <td style={{ fontWeight: 700, color: "#0F172A", fontFamily: "monospace" }}>{inv.invoiceNumber}</td>
-                    <td><span className="chip" style={{ background: "#F1F5F9", color: "#334155" }}>FY {inv.financialYear || getCurrentFY()}</span></td>
-                    <td style={{ fontWeight: 800, color: "#0F172A" }}>{clientName}</td>
-                    <td style={{ fontSize: 13, color: "#475569" }}>{inv.date}</td>
-                    <td style={{ fontWeight: 700, color: "#0F172A" }}>{formatCurrency(inv.total)}</td>
-                    <td style={{ fontWeight: 700, color: "#059669" }}>{formatCurrency(rcv)}</td>
-                    <td style={{ fontWeight: 700, color: bal > 0 ? "#DC2626" : "#059669" }}>{formatCurrency(bal)}</td>
-                    <td>
-                      <span className="badge" style={{ background: cfg.bg, color: cfg.color, fontWeight: 700 }}>
-                        {cfg.label}
-                      </span>
-                    </td>
-                    <td className="col-actions">
-                      <div style={{ display: "flex", gap: 6, justifyContent: "center", alignItems: "center" }}>
-                        {inv.type === "PROFORMA" && (
-                          <button
-                            className="btn-slds btn-slds-primary"
-                            style={{ padding: "4px 10px", fontSize: 11, fontWeight: 700, background: "#2563EB" }}
-                            onClick={() => {
-                              const nextInvNum = getInvoiceNumber("INVOICE");
-                              const converted: Invoice = {
-                                ...inv,
-                                type: "INVOICE",
-                                invoiceNumber: nextInvNum,
-                                status: "SENT"
-                              };
-                              updateInvoice(converted);
-                              toast.success(`Proforma ${inv.invoiceNumber} converted to Tax Invoice ${nextInvNum}!`);
-                            }}
-                            title="Convert this Proforma to Tax Invoice"
-                          >
-                            <RefreshCw size={12} style={{ marginRight: 4 }} />
-                            Convert to Invoice
-                          </button>
-                        )}
-                        <button
-                          className="btn-slds btn-slds-secondary"
-                          style={{ padding: "4px 8px" }}
-                          onClick={() => setViewInvoice(inv)}
-                          title="View / Print Document"
-                        >
-                          <Eye size={13} />
-                        </button>
-                        <button
-                          className="btn-slds btn-slds-secondary"
-                          style={{ padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "#DC2626", borderColor: "#FCA5A5" }}
-                          onClick={() => {
-                            if (confirm(`Delete ${inv.type} #${inv.invoiceNumber}? This will automatically remove its entry from Banking & Ledger as well.`)) {
-                              deleteInvoice(inv.id);
-                              toast.success(`${inv.type} #${inv.invoiceNumber} deleted and removed from Banking & Ledger!`);
-                            }
+                  return (
+                    <tr key={inv.id}>
+                      <td style={{ fontWeight: 700, color: "#64748B", textAlign: "center" }}>{i + 1}</td>
+                      <td>
+                        <span
+                          className="badge-slds"
+                          style={{
+                            background: inv.type === "INVOICE" ? "#EFF6FF" : "#FFF7ED",
+                            color: inv.type === "INVOICE" ? "#1D4ED8" : "#C2410C",
+                            border: `1px solid ${inv.type === "INVOICE" ? "#BFDBFE" : "#FFEDD5"}`,
+                            fontWeight: 800,
+                            padding: "3px 8px",
                           }}
-                          title="Delete document and remove from Banking & Ledger"
                         >
-                          <Trash2 size={13} style={{ marginRight: 4 }} />
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {filteredInvoices.length === 0 && (
+                          {inv.type}
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: 800, color: "#0F172A", fontFamily: "monospace" }}>{inv.invoiceNumber}</td>
+                      <td><span className="chip" style={{ background: "#F1F5F9", color: "#334155", fontWeight: 600 }}>FY {inv.financialYear || getCurrentFY()}</span></td>
+                      <td style={{ fontWeight: 800, color: "#0F172A" }}>{clientName}</td>
+                      <td style={{ fontSize: 13, color: "#475569" }}>{inv.date}</td>
+                      <td style={{ fontWeight: 800, color: "#0F172A" }}>{formatCurrency(inv.total)}</td>
+                      <td style={{ fontWeight: 800, color: "#059669" }}>{formatCurrency(rcv)}</td>
+                      <td style={{ fontWeight: 800, color: bal > 0 ? "#DC2626" : "#059669" }}>{formatCurrency(bal)}</td>
+                      <td>
+                        <span className="badge-slds" style={{ background: cfg.bg, color: cfg.color, fontWeight: 700, padding: "3px 8px" }}>
+                          {cfg.label}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", gap: 6, justifyContent: "center", alignItems: "center" }}>
+                          {/* EDIT INVOICE BUTTON */}
+                          <button
+                            className="btn-slds"
+                            style={{ padding: "4px 8px", fontSize: 11, fontWeight: 700, background: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE" }}
+                            onClick={() => openEdit(inv)}
+                            title="Edit Invoice Details"
+                          >
+                            <Pencil size={12} style={{ marginRight: 3 }} />
+                            Edit
+                          </button>
+
+                          {inv.type === "PROFORMA" && (
+                            <button
+                              className="btn-slds btn-slds-primary"
+                              style={{ padding: "4px 8px", fontSize: 11, fontWeight: 700, background: "#2563EB" }}
+                              onClick={() => {
+                                const nextInvNum = getInvoiceNumber("INVOICE");
+                                const converted: Invoice = {
+                                  ...inv,
+                                  type: "INVOICE",
+                                  invoiceNumber: nextInvNum,
+                                  status: "SENT"
+                                };
+                                updateInvoice(converted);
+                                toast.success(`Proforma ${inv.invoiceNumber} converted to Tax Invoice ${nextInvNum}!`);
+                              }}
+                              title="Convert Proforma to Tax Invoice"
+                            >
+                              <RefreshCw size={11} style={{ marginRight: 3 }} />
+                              Convert
+                            </button>
+                          )}
+                          <button
+                            className="btn-slds btn-slds-secondary"
+                            style={{ padding: "4px 8px" }}
+                            onClick={() => setViewInvoice(inv)}
+                            title="View / Print Document"
+                          >
+                            <Eye size={13} />
+                          </button>
+                          <button
+                            className="btn-slds"
+                            style={{ padding: "4px 8px", fontSize: 11, fontWeight: 700, background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA" }}
+                            onClick={() => {
+                              if (confirm(`Delete ${inv.type} #${inv.invoiceNumber}? This will automatically remove its entry from Banking & Ledger as well.`)) {
+                                deleteInvoice(inv.id);
+                                toast.success(`${inv.type} #${inv.invoiceNumber} deleted!`);
+                              }
+                            }}
+                            title="Delete document"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
                 <tr>
-                  <td colSpan={11} className="empty-table-cell">
-                    No {entityFilter === "ALL" ? "invoices or proformas" : entityFilter.toLowerCase() + "s"} found. Click above to create one.
+                  <td colSpan={11} style={{ textAlign: "center", padding: 36, color: "#64748B" }}>
+                    No {entityFilter === "ALL" ? "invoices or proformas" : entityFilter.toLowerCase() + "s"} found. Click button above to create one.
                   </td>
                 </tr>
               )}
@@ -311,38 +414,38 @@ export default function InvoicePage() {
 
       {/* Create / Edit Invoice & Proforma Modal */}
       {modal && (
-        <div className="modal-overlay" onClick={() => setModal(null)}>
-          <div className="modal" style={{ maxWidth: 780, width: "95%" }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title">
-                {modal.type === "INVOICE" ? "Create Tax Invoice" : "Create Proforma Invoice"}
+        <div className="command-palette-backdrop" onClick={() => setModal(null)}>
+          <div className="command-palette-card" style={{ maxWidth: 780, width: "95%" }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: "18px 24px", borderBottom: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: "#0F172A" }}>
+                {modal.isEditing ? `Edit ${modal.type} #${form.invoiceNumber}` : modal.type === "INVOICE" ? "Create Tax Invoice" : "Create Proforma Invoice"}
               </div>
               <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px" }} onClick={() => setModal(null)}>✕</button>
             </div>
 
-            <div className="modal-body" style={{ display: "grid", gap: 16, maxHeight: "78vh", overflowY: "auto" }}>
+            <div style={{ padding: 24, display: "grid", gap: 16, maxHeight: "78vh", overflowY: "auto" }}>
               {/* Row 1: Document #, Date, Financial Year */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>Document Number</label>
-                  <input className="form-input" value={form.invoiceNumber || ""} readOnly style={{ background: "#F1F5F9" }} />
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Document Number</label>
+                  <input className="command-palette-input" value={form.invoiceNumber || ""} readOnly style={{ background: "#F1F5F9", borderRadius: 8, padding: 8, fontSize: 13 }} />
                 </div>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>Document Date *</label>
-                  <input className="form-input" type="date" value={form.date || ""} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Document Date *</label>
+                  <input className="command-palette-input" type="date" style={{ borderRadius: 8, padding: 8, fontSize: 13, border: "1px solid #CBD5E1" }} value={form.date || ""} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
                 </div>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>Financial Year *</label>
-                  <select className="form-select" value={form.financialYear || selectedFY} onChange={e => setForm(f => ({ ...f, financialYear: e.target.value }))}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Financial Year *</label>
+                  <select className="command-palette-input" style={{ borderRadius: 8, padding: 8, fontSize: 13, border: "1px solid #CBD5E1" }} value={form.financialYear || selectedFY} onChange={e => setForm(f => ({ ...f, financialYear: e.target.value }))}>
                     {fyOptions.map(fy => <option key={fy} value={fy}>FY {fy}</option>)}
                   </select>
                 </div>
               </div>
 
               {/* Row 2: Client Name */}
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 700 }}>Client Name *</label>
-                <select className="form-select" value={form.clientId || ""} onChange={e => setForm(f => ({ ...f, clientId: e.target.value }))}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Client Name *</label>
+                <select className="command-palette-input" style={{ borderRadius: 8, padding: 8, fontSize: 13, border: "1px solid #CBD5E1" }} value={form.clientId || ""} onChange={e => setForm(f => ({ ...f, clientId: e.target.value }))}>
                   <option value="">Select a client...</option>
                   {clients.map(c => (
                     <option key={c.id} value={c.id}>{c.name} {c.pan ? `(PAN: ${c.pan})` : ""}</option>
@@ -350,10 +453,10 @@ export default function InvoicePage() {
                 </select>
               </div>
 
-              {/* Items Table with Pre-built Description Dropdown Options */}
+              {/* Items Table */}
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <label className="form-label" style={{ fontWeight: 700, margin: 0 }}>Service Items / Particulars</label>
+                  <label style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>Service Items / Particulars</label>
                   <button type="button" className="btn-slds btn-slds-secondary" style={{ padding: "3px 8px", fontSize: 11 }} onClick={addItem}>
                     <Plus size={12} /> Add Item Row
                   </button>
@@ -375,11 +478,10 @@ export default function InvoicePage() {
                       {(form.items || []).map((item, idx) => (
                         <tr key={item.id || idx} style={{ borderTop: "1px solid #F1F5F9" }}>
                           <td style={{ padding: "6px 10px" }}>
-                            {/* Pre-built Description Options Dropdown + Input */}
                             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                               <select
-                                className="form-select"
-                                style={{ fontSize: 12, padding: "4px 8px", marginBottom: 2 }}
+                                className="command-palette-input"
+                                style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "1px solid #CBD5E1" }}
                                 value={PRESET_DESCRIPTIONS.includes(item.description) ? item.description : "CUSTOM"}
                                 onChange={e => {
                                   if (e.target.value !== "CUSTOM") {
@@ -393,8 +495,8 @@ export default function InvoicePage() {
                                 <option value="CUSTOM">Type custom description below...</option>
                               </select>
                               <input
-                                className="form-input"
-                                style={{ fontSize: 12, padding: "4px 8px" }}
+                                className="command-palette-input"
+                                style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "1px solid #CBD5E1" }}
                                 value={item.description}
                                 onChange={e => updateItem(idx, "description", e.target.value)}
                                 placeholder="Service description..."
@@ -402,13 +504,13 @@ export default function InvoicePage() {
                             </div>
                           </td>
                           <td style={{ padding: "6px 10px" }}>
-                            <input className="form-input" style={{ fontSize: 12, padding: "4px 8px" }} value={item.hsn} onChange={e => updateItem(idx, "hsn", e.target.value)} placeholder="998311" />
+                            <input className="command-palette-input" style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "1px solid #CBD5E1" }} value={item.hsn} onChange={e => updateItem(idx, "hsn", e.target.value)} placeholder="998311" />
                           </td>
                           <td style={{ padding: "6px 10px" }}>
-                            <input className="form-input" type="number" style={{ fontSize: 12, padding: "4px 8px", textAlign: "center" }} value={item.quantity} onChange={e => updateItem(idx, "quantity", e.target.value)} />
+                            <input className="command-palette-input" type="number" style={{ fontSize: 12, padding: "4px 8px", textAlign: "center", borderRadius: 6, border: "1px solid #CBD5E1" }} value={item.quantity} onChange={e => updateItem(idx, "quantity", e.target.value)} />
                           </td>
                           <td style={{ padding: "6px 10px" }}>
-                            <input className="form-input" type="number" style={{ fontSize: 12, padding: "4px 8px", textAlign: "right" }} value={item.rate} onChange={e => updateItem(idx, "rate", e.target.value)} />
+                            <input className="command-palette-input" type="number" style={{ fontSize: 12, padding: "4px 8px", textAlign: "right", borderRadius: 6, border: "1px solid #CBD5E1" }} value={item.rate} onChange={e => updateItem(idx, "rate", e.target.value)} />
                           </td>
                           <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 700, color: "#0F172A" }}>
                             {formatCurrency(item.amount)}
@@ -430,8 +532,8 @@ export default function InvoicePage() {
               {/* Totals & Amount Received Input */}
               <div style={{ display: "flex", justifyContent: "space-between", gap: 20, paddingTop: 10, borderTop: "1px dashed #CBD5E1" }}>
                 <div style={{ flex: 1 }}>
-                  <label className="form-label" style={{ fontWeight: 700 }}>Notes / Payment Terms</label>
-                  <textarea className="form-input" rows={3} style={{ fontSize: 12 }} value={form.notes || ""} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Notes / Payment Terms</label>
+                  <textarea className="command-palette-input" rows={3} style={{ fontSize: 12, borderRadius: 8, padding: 8, border: "1px solid #CBD5E1" }} value={form.notes || ""} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
                 </div>
 
                 <div style={{ width: 280, display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
@@ -441,7 +543,7 @@ export default function InvoicePage() {
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ color: "#64748B" }}>GST Rate:</span>
-                    <select className="form-select" style={{ width: 80, padding: "2px 6px", fontSize: 12 }} value={form.gstRate} onChange={e => setForm(f => ({ ...f, gstRate: Number(e.target.value) }))}>
+                    <select className="command-palette-input" style={{ width: 80, padding: "2px 6px", fontSize: 12, borderRadius: 6 }} value={form.gstRate} onChange={e => setForm(f => ({ ...f, gstRate: Number(e.target.value) }))}>
                       <option value={0}>0%</option>
                       <option value={5}>5%</option>
                       <option value={12}>12%</option>
@@ -459,16 +561,16 @@ export default function InvoicePage() {
                     <span style={{ color: "#1D4ED8" }}>{formatCurrency(total)}</span>
                   </div>
 
-                  {/* Amount Received Input — Hidden for Proforma */}
+                  {/* Amount Received Input */}
                   {modal.type === "INVOICE" && (
                     <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px dashed #CBD5E1" }}>
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: 12, color: "#059669" }}>
+                      <label style={{ fontSize: 12, fontWeight: 700, color: "#059669", display: "block", marginBottom: 4 }}>
                         Amount Received (₹)
                       </label>
                       <input
-                        className="form-input"
+                        className="command-palette-input"
                         type="number"
-                        style={{ fontSize: 13, fontWeight: 700, color: "#059669" }}
+                        style={{ fontSize: 13, fontWeight: 700, color: "#059669", borderRadius: 8, padding: 8, border: "1px solid #10B981" }}
                         value={form.amountReceived || ""}
                         onChange={e => setForm(f => ({ ...f, amountReceived: Number(e.target.value || 0) }))}
                         placeholder="e.g. 5000"
@@ -482,24 +584,24 @@ export default function InvoicePage() {
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="modal-footer" style={{ display: "flex", justifyContent: "space-between" }}>
-              <button className="btn-slds btn-slds-secondary" onClick={() => setModal(null)}>Cancel</button>
-              <div style={{ display: "flex", gap: 10 }}>
-                <button className="btn-slds btn-slds-secondary" onClick={() => handleSave("DRAFT")}>Save as Draft</button>
-                {modal.type === "PROFORMA" ? (
-                  <button className="btn-slds btn-slds-primary" onClick={() => handleSave("SENT")}>
-                    Save Proforma
-                  </button>
-                ) : (
-                  <>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
+                <button className="btn-slds btn-slds-secondary" onClick={() => setModal(null)}>Cancel</button>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button className="btn-slds btn-slds-secondary" onClick={() => handleSave("DRAFT")}>Save as Draft</button>
+                  {modal.type === "PROFORMA" ? (
                     <button className="btn-slds btn-slds-primary" onClick={() => handleSave("SENT")}>
-                      Save &amp; Link to Banking
+                      Save Proforma
                     </button>
-                    <button className="btn-slds btn-slds-success" onClick={() => handleSave("PAID")}>Mark Paid &amp; Save</button>
-                  </>
-                )}
+                  ) : (
+                    <>
+                      <button className="btn-slds btn-slds-primary" onClick={() => handleSave("SENT")}>
+                        Save &amp; Link to Banking
+                      </button>
+                      <button className="btn-slds btn-slds-success" onClick={() => handleSave("PAID")}>Mark Paid &amp; Save</button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -508,10 +610,10 @@ export default function InvoicePage() {
 
       {/* Invoice Detail / Print Preview Modal */}
       {viewInvoice && (
-        <div className="modal-overlay" onClick={() => setViewInvoice(null)}>
-          <div className="modal" style={{ maxWidth: 740, width: "95%" }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header" style={{ background: "#0F172A", color: "white" }}>
-              <div className="modal-title">{viewInvoice.type} #{viewInvoice.invoiceNumber}</div>
+        <div className="command-palette-backdrop" onClick={() => setViewInvoice(null)}>
+          <div className="command-palette-card" style={{ maxWidth: 740, width: "95%" }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: "16px 24px", background: "#0F172A", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 16, fontWeight: 800 }}>{viewInvoice.type} #{viewInvoice.invoiceNumber}</div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button className="btn-slds btn-slds-primary" style={{ padding: "4px 10px", fontSize: 12 }} onClick={handlePrint}>
                   <Printer size={13} /> Print / Save PDF
@@ -520,11 +622,11 @@ export default function InvoicePage() {
               </div>
             </div>
 
-            <div className="modal-body" ref={printRef} style={{ padding: 32, background: "white", color: "#0F172A", fontFamily: "sans-serif" }}>
+            <div ref={printRef} style={{ padding: 32, background: "white", color: "#0F172A", fontFamily: "sans-serif" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
                 <div>
                   <h1 style={{ fontSize: 24, fontWeight: 900, color: "#1E293B", margin: 0 }}>zpluscrm Practice</h1>
-                  <p style={{ fontSize: 12, color: "#64748B", margin: "4px 0 0" }}>Chartered Accountants & Practice Management</p>
+                  <p style={{ fontSize: 12, color: "#64748B", margin: "4px 0 0" }}>Chartered Accountants &amp; Practice Management</p>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontSize: 20, fontWeight: 900, color: viewInvoice.type === "INVOICE" ? "#1D4ED8" : "#C2410C" }}>

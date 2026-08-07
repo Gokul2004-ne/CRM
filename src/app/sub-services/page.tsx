@@ -19,6 +19,7 @@ const SUGGESTED_SERVICES = [
   "GSTR-1",
   "GSTR-3B",
   "GSTR-9",
+  "CMP-08",
   "ITR-1 Sahaj",
   "ITR-4 Sugam",
   "ITR-6 Corporate",
@@ -29,6 +30,22 @@ const SUGGESTED_SERVICES = [
   "AOC-4 Financial",
   "MGT-7 Annual"
 ];
+
+const GST_SERVICE_PRESETS: Record<string, { recurrence: Recurrence; dueDateDay: number; applicableMonths: string[] }> = {
+  "GSTR-1": { recurrence: "MONTHLY", dueDateDay: 11, applicableMonths: [...ALL_MONTHS] },
+  "GSTR-3B": { recurrence: "MONTHLY", dueDateDay: 20, applicableMonths: [...ALL_MONTHS] },
+  "GSTR-9": { recurrence: "ANNUALLY", dueDateDay: 31, applicableMonths: ["DECEMBER"] },
+  "CMP-08": { recurrence: "QUARTERLY", dueDateDay: 18, applicableMonths: ["APRIL", "JULY", "OCTOBER", "JANUARY"] },
+  "ITR-1 Sahaj": { recurrence: "ANNUALLY", dueDateDay: 31, applicableMonths: ["JULY"] },
+  "ITR-4 Sugam": { recurrence: "ANNUALLY", dueDateDay: 31, applicableMonths: ["JULY"] },
+  "ITR-6 Corporate": { recurrence: "ANNUALLY", dueDateDay: 31, applicableMonths: ["OCTOBER"] },
+  "Tax Audit 3CA/3CB": { recurrence: "ANNUALLY", dueDateDay: 30, applicableMonths: ["SEPTEMBER"] },
+  "Form 24Q Salary TDS": { recurrence: "QUARTERLY", dueDateDay: 31, applicableMonths: ["MAY", "JULY", "OCTOBER", "JANUARY"] },
+  "Form 26Q Non-Salary TDS": { recurrence: "QUARTERLY", dueDateDay: 31, applicableMonths: ["MAY", "JULY", "OCTOBER", "JANUARY"] },
+  "DIR-3 KYC": { recurrence: "ANNUALLY", dueDateDay: 30, applicableMonths: ["SEPTEMBER"] },
+  "AOC-4 Financial": { recurrence: "ANNUALLY", dueDateDay: 30, applicableMonths: ["OCTOBER"] },
+  "MGT-7 Annual": { recurrence: "ANNUALLY", dueDateDay: 29, applicableMonths: ["NOVEMBER"] }
+};
 
 export interface SelectedServiceRow {
   id: string;
@@ -132,12 +149,29 @@ export default function ServicesPage() {
   };
 
   const handleSuggestedClick = (suggestedName: string) => {
-    // If the first row is empty, populate it; otherwise append a new row
+    const preset = GST_SERVICE_PRESETS[suggestedName] || {
+      recurrence: "MONTHLY",
+      dueDateDay: 15,
+      applicableMonths: [...ALL_MONTHS]
+    };
+
     setSelectedRows(prev => {
       if (prev.length === 1 && !prev[0].name.trim()) {
-        return [{ ...prev[0], name: suggestedName }];
+        return [{
+          ...prev[0],
+          name: suggestedName,
+          recurrence: preset.recurrence,
+          dueDateDay: preset.dueDateDay,
+          applicableMonths: preset.applicableMonths
+        }];
       }
-      return [...prev, emptyRow(suggestedName)];
+      return [...prev, {
+        id: `row_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        name: suggestedName,
+        recurrence: preset.recurrence,
+        dueDateDay: preset.dueDateDay,
+        applicableMonths: preset.applicableMonths
+      }];
     });
   };
 

@@ -10,15 +10,11 @@ import {
 
 async function safeTableFetch(tableName: string, userId?: string) {
   try {
-    let q = supabase.from(tableName).select("*");
-    if (userId) {
-      q = q.eq("user_id", userId);
-    }
-    const { data, error } = await q;
+    if (!userId) return [];
+    const { data, error } = await supabase.from(tableName).select("*").eq("user_id", userId);
     if (error) {
-      // Retry without user_id filter if column missing
-      const { data: fallbackData } = await supabase.from(tableName).select("*");
-      return fallbackData || [];
+      console.warn(`Supabase fetch for table ${tableName} returned error or missing column:`, error);
+      return [];
     }
     return data || [];
   } catch {

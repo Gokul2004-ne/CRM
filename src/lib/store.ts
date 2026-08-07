@@ -30,6 +30,13 @@ import {
 function getScopedUserKey(key: string): string {
   if (typeof window === "undefined") return `zpluscrm_${key}`;
   try {
+    const rawSession = localStorage.getItem("zpluscrm_active_session");
+    if (rawSession) {
+      const parsed = JSON.parse(rawSession);
+      const uid = parsed?.user?.id || parsed?.user?.email;
+      if (uid) return `zpluscrm_user_${String(uid).replace(/[^a-zA-Z0-9_]/g, "_")}_${key}`;
+    }
+
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (k && (k.startsWith("sb-") || k.includes("auth-token"))) {
@@ -37,7 +44,7 @@ function getScopedUserKey(key: string): string {
         if (raw) {
           const parsed = JSON.parse(raw);
           const uid = parsed?.user?.id || parsed?.user?.email || parsed?.currentSession?.user?.id;
-          if (uid) return `zpluscrm_user_${uid}_${key}`;
+          if (uid) return `zpluscrm_user_${String(uid).replace(/[^a-zA-Z0-9_]/g, "_")}_${key}`;
         }
       }
     }
@@ -122,6 +129,7 @@ interface AppState {
   // Actions - Leads
   addLead: (l: Lead) => void;
   updateLead: (l: Lead) => void;
+  deleteLead: (id: string) => void;
   convertLead: (leadId: string, clientId: string) => void;
 
   // Actions - Drafts
@@ -430,6 +438,14 @@ export const useAppStore = create<AppState>()((set, get) => ({
       return { leads: next };
     });
     syncLeadToSupabase(l);
+  },
+  deleteLead: (id) => {
+    set((s) => {
+      const next = s.leads.filter(x => x.id !== id);
+      saveToLocal("leads", next);
+      return { leads: next };
+    });
+    removeLeadFromSupabase(id);
   },
   convertLead: (leadId, clientId) => {
     set((s) => {

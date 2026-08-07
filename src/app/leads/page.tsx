@@ -3,7 +3,7 @@ import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState } from "react";
 import { Lead, Client } from "@/lib/types";
-import { Plus, MessageCircle, UserCheck, Search, Phone, ExternalLink, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Plus, MessageCircle, UserCheck, Search, Phone, ExternalLink, RefreshCw, CheckCircle2, Trash2 } from "lucide-react";
 import { getWhatsAppLink, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -19,7 +19,7 @@ const empty = (): Lead => ({
 });
 
 export default function LeadsPage() {
-  const { leads, clients, addLead, convertLead, addClient, updateClient } = useAppStore();
+  const { leads, clients, addLead, updateLead, deleteLead, convertLead, addClient, updateClient } = useAppStore();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"all" | "LEAD" | "CONVERTED">("all");
   const [modal, setModal] = useState<{ open: boolean; adding: boolean }>({ open: false, adding: false });
@@ -256,6 +256,21 @@ export default function LeadsPage() {
                               <span>Convert to Client</span>
                             </button>
                           )}
+
+                          <button
+                            className="btn-slds"
+                            style={{ padding: "4px 10px", fontSize: 11, background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", fontWeight: 600 }}
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to delete lead "${lead.name}"?`)) {
+                                deleteLead(lead.id);
+                                toast.success(`Lead "${lead.name}" deleted.`);
+                              }
+                            }}
+                            title="Delete Lead"
+                          >
+                            <Trash2 size={13} />
+                            <span>Delete</span>
+                          </button>
                         </div>
                       </td>
                     </tr>
