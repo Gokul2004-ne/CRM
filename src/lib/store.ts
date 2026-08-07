@@ -154,19 +154,20 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>()((set, get) => ({
-  // Initialize with empty arrays to prevent cross-user data leakage.
-  // Data is loaded after authentication via loadSupabaseData().
-  clients: [],
-  services: [],
-  subServices: [],
-  requiredDocs: [],
-  assignedServices: [],
-  bankingEntries: [],
-  leads: [],
-  drafts: [],
-  collaborations: [],
-  invoices: [],
-  oneTimeServices: [],
+  // Initialize from user-scoped localStorage so data persists across page refreshes.
+  // getScopedUserKey() reads the saved session token, so the correct scoped key is
+  // used even at module init time. New users get empty arrays (no mock data).
+  clients: loadFromLocal("clients", []),
+  services: loadFromLocal("services", []),
+  subServices: loadFromLocal("subServices", []),
+  requiredDocs: loadFromLocal("requiredDocs", []),
+  assignedServices: loadFromLocal("assignedServices", []),
+  bankingEntries: loadFromLocal("bankingEntries", []),
+  leads: loadFromLocal("leads", []),
+  drafts: loadFromLocal("drafts", []),
+  collaborations: loadFromLocal("collaborations", []),
+  invoices: loadFromLocal("invoices", []),
+  oneTimeServices: loadFromLocal("oneTimeServices", []),
   selectedFY: getCurrentFY(),
   sidebarCollapsed: false,
   isLoadingSupabase: false,
