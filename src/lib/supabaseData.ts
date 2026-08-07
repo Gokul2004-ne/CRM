@@ -33,25 +33,43 @@ async function safeTableFetch(tableName: string, userId?: string) {
   }
 }
 
+function checkIsSaivarala(user: any, mockUserId?: string): boolean {
+  if (user?.email?.toLowerCase().includes("saivarala33@gmail.com")) return true;
+  if (mockUserId?.toLowerCase().includes("saivarala33_gmail_com")) return true;
+  if (typeof window !== "undefined") {
+    try {
+      const rawSession = localStorage.getItem("zpluscrm_active_session");
+      if (rawSession && rawSession.toLowerCase().includes("saivarala33@gmail.com")) return true;
+    } catch {}
+  }
+  return false;
+}
+
 // Fetch all CRM data from Supabase (Scoped to current authenticated user_id)
 export async function fetchAllCRMData() {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    // Use real Supabase user ID if available, otherwise fall back to mock session user ID
-    const userId = user?.id || getMockSessionUserId();
+    let userId = user?.id || getMockSessionUserId();
 
+    const isSaivarala = checkIsSaivarala(user, userId);
     const targetSaivaralaId = "usr_saivarala33_gmail_com";
 
-    // ── MIGRATION HACK: Re-assign legacy null user_id records to saivarala33@gmail.com ──
-    if (userId === targetSaivaralaId) {
+    // ── MIGRATION: Re-assign legacy/unassigned records in Supabase to saivarala33@gmail.com ──
+    if (isSaivarala) {
+      userId = targetSaivaralaId;
       const tablesToClaim = [
         "clients", "services", "sub_services", "required_docs",
         "assigned_services", "banking_entries", "leads", "drafts",
         "collaborations", "invoices", "one_time_services"
       ];
-      await Promise.all(tablesToClaim.map(table =>
-        supabase.from(table).update({ user_id: targetSaivaralaId }).is("user_id", null)
-      )).catch(() => {});
+      await Promise.all(tablesToClaim.map(async (table) => {
+        try {
+          await supabase.from(table).update({ user_id: targetSaivaralaId }).is("user_id", null);
+          await supabase.from(table).update({ user_id: targetSaivaralaId }).eq("user_id", "zpluscrm_local");
+          await supabase.from(table).update({ user_id: targetSaivaralaId }).eq("user_id", "usr_gokul_gmail_com");
+          await supabase.from(table).update({ user_id: targetSaivaralaId }).eq("user_id", "usr_practice_management");
+        } catch {}
+      }));
     }
 
     const [
@@ -243,10 +261,17 @@ export async function fetchAllCRMData() {
 async function getUserId(): Promise<string | undefined> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    // Use real Supabase user ID if available, otherwise fall back to mock session user ID
-    return user?.id || getMockSessionUserId();
+    const mockId = getMockSessionUserId();
+    if (checkIsSaivarala(user, mockId)) {
+      return "usr_saivarala33_gmail_com";
+    }
+    return user?.id || mockId;
   } catch {
-    return getMockSessionUserId();
+    const mockId = getMockSessionUserId();
+    if (checkIsSaivarala(null, mockId)) {
+      return "usr_saivarala33_gmail_com";
+    }
+    return mockId;
   }
 }
 

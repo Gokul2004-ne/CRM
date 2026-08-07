@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { useAppStore } from "@/lib/store";
 
 interface AuthContextType {
   user: User | null;
@@ -96,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signInWithEmail = async (email: string, pass: string) => {
+    useAppStore.getState().resetStore();
     const cleanEmail = email.toLowerCase().trim();
 
     // 1. Try native Supabase Auth first
@@ -138,6 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUpWithEmail = async (email: string, pass: string) => {
+    useAppStore.getState().resetStore();
     const cleanEmail = email.toLowerCase().trim();
     saveStoredAccount(cleanEmail, pass);
 
@@ -179,6 +182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    useAppStore.getState().resetStore();
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);

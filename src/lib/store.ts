@@ -152,6 +152,8 @@ interface AppState {
   sidebarCollapsed: boolean;
   isLoadingSupabase: boolean;
 
+  resetStore: () => void;
+
   // Supabase sync
   loadSupabaseData: () => Promise<void>;
 
@@ -234,6 +236,21 @@ export const useAppStore = create<AppState>()((set, get) => ({
   sidebarCollapsed: false,
   isLoadingSupabase: false,
 
+  resetStore: () => set({
+    clients: [],
+    services: [],
+    subServices: [],
+    requiredDocs: [],
+    assignedServices: [],
+    bankingEntries: [],
+    leads: [],
+    drafts: [],
+    collaborations: [],
+    invoices: [],
+    oneTimeServices: [],
+    isLoadingSupabase: false,
+  }),
+
   loadSupabaseData: async () => {
     set({ isLoadingSupabase: true });
 
@@ -250,61 +267,19 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const localInvoices = loadFromLocal<any[]>("invoices", []);
     const localOneTime = loadFromLocal<any[]>("oneTimeServices", []);
 
-    // ── MIGRATION: Read any old unscoped local data (zpluscrm_local_*) ──
-    // This handles data that was saved before the user-scoping fix was applied.
-    const migrateOldKey = <T>(key: string): T[] => {
-      if (typeof window === "undefined") return [];
-      try {
-        const raw = localStorage.getItem(`zpluscrm_local_${key}`);
-        return raw ? JSON.parse(raw) : [];
-      } catch { return []; }
-    };
-    const oldClients = migrateOldKey<Client>("clients");
-    const oldServices = migrateOldKey<Service>("services");
-    const oldSubServices = migrateOldKey<SubService>("subServices");
-    const oldRequiredDocs = migrateOldKey<RequiredDoc>("requiredDocs");
-    const oldAssigned = migrateOldKey<AssignedService>("assignedServices");
-    const oldBanking = migrateOldKey<BankingEntry>("bankingEntries");
-    const oldLeads = migrateOldKey<Lead>("leads");
-    const oldDrafts = migrateOldKey<DocumentDraft>("drafts");
-    const oldCollabs = migrateOldKey<Collaboration>("collaborations");
-    const oldInvoices = migrateOldKey<any>("invoices");
-    const oldOneTime = migrateOldKey<any>("oneTimeServices");
-
-    // Merge old unscoped data into current user's local data
-    const mergeLocal = <T extends { id: string }>(current: T[], old: T[]): T[] => {
-      const merged = [...current];
-      old.forEach(item => {
-        if (!merged.some(m => m.id === item.id)) merged.push(item);
-      });
-      return merged;
-    };
-
-    const mergedLocalClients = mergeLocal(localClients, oldClients);
-    const mergedLocalServices = mergeLocal(localServices, oldServices);
-    const mergedLocalSubServices = mergeLocal(localSubServices, oldSubServices);
-    const mergedLocalRequiredDocs = mergeLocal(localRequiredDocs, oldRequiredDocs);
-    const mergedLocalAssigned = mergeLocal(localAssigned, oldAssigned);
-    const mergedLocalBanking = mergeLocal(localBanking, oldBanking);
-    const mergedLocalLeads = mergeLocal(localLeads, oldLeads);
-    const mergedLocalDrafts = mergeLocal(localDrafts, oldDrafts);
-    const mergedLocalCollabs = mergeLocal(localCollabs, oldCollabs);
-    const mergedLocalInvoices = mergeLocal(localInvoices, oldInvoices);
-    const mergedLocalOneTime = mergeLocal(localOneTime, oldOneTime);
-
     const data = await fetchAllCRMData();
 
-    const rawClients = data ? [...data.clients, ...mergedLocalClients] : mergedLocalClients;
-    const rawServices = data ? [...data.services, ...mergedLocalServices] : mergedLocalServices;
-    const rawSubServices = data ? [...data.subServices, ...mergedLocalSubServices] : mergedLocalSubServices;
-    const rawRequiredDocs = data ? [...data.requiredDocs, ...mergedLocalRequiredDocs] : mergedLocalRequiredDocs;
-    const rawAssigned = data ? [...data.assignedServices, ...mergedLocalAssigned] : mergedLocalAssigned;
-    const rawBanking = data ? [...data.bankingEntries, ...mergedLocalBanking] : mergedLocalBanking;
-    const rawLeads = data ? [...data.leads, ...mergedLocalLeads] : mergedLocalLeads;
-    const rawDrafts = data ? [...data.drafts, ...mergedLocalDrafts] : mergedLocalDrafts;
-    const rawCollabs = data ? [...data.collaborations, ...mergedLocalCollabs] : mergedLocalCollabs;
-    const rawInvoices = data ? [...(data.invoices || []), ...mergedLocalInvoices] : mergedLocalInvoices;
-    const rawOneTime = data ? [...(data.oneTimeServices || []), ...mergedLocalOneTime] : mergedLocalOneTime;
+    const rawClients = data ? [...data.clients, ...localClients] : localClients;
+    const rawServices = data ? [...data.services, ...localServices] : localServices;
+    const rawSubServices = data ? [...data.subServices, ...localSubServices] : localSubServices;
+    const rawRequiredDocs = data ? [...data.requiredDocs, ...localRequiredDocs] : localRequiredDocs;
+    const rawAssigned = data ? [...data.assignedServices, ...localAssigned] : localAssigned;
+    const rawBanking = data ? [...data.bankingEntries, ...localBanking] : localBanking;
+    const rawLeads = data ? [...data.leads, ...localLeads] : localLeads;
+    const rawDrafts = data ? [...data.drafts, ...localDrafts] : localDrafts;
+    const rawCollabs = data ? [...data.collaborations, ...localCollabs] : localCollabs;
+    const rawInvoices = data ? [...(data.invoices || []), ...localInvoices] : localInvoices;
+    const rawOneTime = data ? [...(data.oneTimeServices || []), ...localOneTime] : localOneTime;
 
     const clientsRes = deduplicateItems(rawClients, getClientKey);
     const servicesRes = deduplicateItems(rawServices, getServiceKey);
