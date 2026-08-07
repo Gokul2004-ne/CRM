@@ -511,3 +511,15 @@ export async function removeOneTimeServiceFromSupabase(id: string) {
     console.error("Error removing one-time service from Supabase:", err);
   }
 }
+
+// Purge Duplicates from Supabase Table
+export async function purgeDuplicatesFromSupabase(tableName: string, ids: string[]) {
+  if (!ids || ids.length === 0) return;
+  try {
+    const userId = await getUserId();
+    if (!userId) return;
+    await supabase.from(tableName).delete().eq("user_id", userId).in("id", ids);
+  } catch (err) {
+    console.error(`Error purging duplicates from ${tableName}:`, err);
+  }
+}

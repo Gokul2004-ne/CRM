@@ -27,8 +27,66 @@ import {
   syncInvoiceToSupabase,
   removeInvoiceFromSupabase,
   syncOneTimeServiceToSupabase,
-  removeOneTimeServiceFromSupabase
+  removeOneTimeServiceFromSupabase,
+  purgeDuplicatesFromSupabase
 } from "./supabaseData";
+
+function deduplicateItems<T extends { id: string }>(
+  items: T[],
+  getKey?: (item: T) => string
+): { unique: T[]; duplicateIds: string[] } {
+  const seenIds = new Set<string>();
+  const seenKeys = new Set<string>();
+  const unique: T[] = [];
+  const duplicateIds: string[] = [];
+
+  items.forEach((item) => {
+    if (!item || !item.id) return;
+
+    if (seenIds.has(item.id)) {
+      duplicateIds.push(item.id);
+      return;
+    }
+
+    if (getKey) {
+      const key = getKey(item);
+      if (key && seenKeys.has(key)) {
+        duplicateIds.push(item.id);
+        return;
+      }
+      if (key) seenKeys.add(key);
+    }
+
+    seenIds.add(item.id);
+    unique.push(item);
+  });
+
+  return { unique, duplicateIds };
+}
+
+const getClientKey = (c: Client) => {
+  const name = (c.name || '').toLowerCase().trim();
+  const detail = (c.mobile || c.phone || c.email || c.pan || c.panNo || c.gstin || c.gstNo || '').toLowerCase().trim();
+  return name ? `${name}_${detail}` : '';
+};
+const getServiceKey = (s: Service) => (s.name || '').toLowerCase().trim();
+const getSubServiceKey = (ss: SubService) => `${(ss.serviceId || '').trim()}_${(ss.name || '').toLowerCase().trim()}`;
+const getRequiredDocKey = (rd: RequiredDoc) => `${(rd.subServiceId || '').trim()}_${(rd.name || '').toLowerCase().trim()}`;
+const getAssignedServiceKey = (a: AssignedService) => `${(a.clientId || '').trim()}_${(a.serviceId || '').trim()}_${(a.financialYear || '').trim()}_${(a.dueDate || '').trim()}`;
+const getBankingEntryKey = (b: BankingEntry) => `${(b.clientId || '').trim()}_${(b.serviceId || '').trim()}_${(b.financialYear || '').trim()}_${b.amountBilled || 0}_${b.amountReceived || 0}`;
+const getLeadKey = (l: Lead) => {
+  const name = (l.name || '').toLowerCase().trim();
+  const contact = (l.mobile || l.phone || '').toLowerCase().trim();
+  return name ? `${name}_${contact}` : '';
+};
+const getDraftKey = (d: DocumentDraft) => (d.title || '').toLowerCase().trim();
+const getCollabKey = (c: Collaboration) => {
+  const name = (c.name || '').toLowerCase().trim();
+  const detail = (c.number || c.email || '').toLowerCase().trim();
+  return name ? `${name}_${detail}` : '';
+};
+const getInvoiceKey = (inv: Invoice) => `${(inv.invoiceNumber || '').toLowerCase().trim()}_${(inv.type || '').toLowerCase().trim()}`;
+const getOneTimeKey = (ots: OneTimeService) => `${(ots.clientName || '').toLowerCase().trim()}_${(ots.serviceName || '').toLowerCase().trim()}`;
 
 // User-Scoped LocalStorage Persistence Helpers (Strict Multi-Tenant Privacy)
 function getScopedUserKey(key: string): string {
@@ -235,97 +293,77 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const mergedLocalOneTime = mergeLocal(localOneTime, oldOneTime);
 
     const data = await fetchAllCRMData();
-    if (data) {
-      // Merge: remote data takes priority; only add local items not present in remote
-      const mergeArrays = <T extends { id: string }>(remote: T[] = [], local: T[] = []) => {
-        const merged = [...remote];
-        local.forEach(item => {
-          if (!merged.some(m => m.id === item.id)) {
-            merged.push(item);
-          }
-        });
-        return merged;
-      };
 
-      const finalClients = mergeArrays(data.clients, mergedLocalClients);
-      const finalServices = mergeArrays(data.services, mergedLocalServices);
-      const finalSubServices = mergeArrays(data.subServices, mergedLocalSubServices);
-      const finalRequiredDocs = mergeArrays(data.requiredDocs, mergedLocalRequiredDocs);
-      const finalAssigned = mergeArrays(data.assignedServices, mergedLocalAssigned);
-      const finalBanking = mergeArrays(data.bankingEntries, mergedLocalBanking);
-      const finalLeads = mergeArrays(data.leads, mergedLocalLeads);
-      const finalDrafts = mergeArrays(data.drafts, mergedLocalDrafts);
-      const finalCollabs = mergeArrays(data.collaborations, mergedLocalCollabs);
+    const rawClients = data ? [...data.clients, ...mergedLocalClients] : mergedLocalClients;
+    const rawServices = data ? [...data.services, ...mergedLocalServices] : mergedLocalServices;
+    const rawSubServices = data ? [...data.subServices, ...mergedLocalSubServices] : mergedLocalSubServices;
+    const rawRequiredDocs = data ? [...data.requiredDocs, ...mergedLocalRequiredDocs] : mergedLocalRequiredDocs;
+    const rawAssigned = data ? [...data.assignedServices, ...mergedLocalAssigned] : mergedLocalAssigned;
+    const rawBanking = data ? [...data.bankingEntries, ...mergedLocalBanking] : mergedLocalBanking;
+    const rawLeads = data ? [...data.leads, ...mergedLocalLeads] : mergedLocalLeads;
+    const rawDrafts = data ? [...data.drafts, ...mergedLocalDrafts] : mergedLocalDrafts;
+    const rawCollabs = data ? [...data.collaborations, ...mergedLocalCollabs] : mergedLocalCollabs;
+    const rawInvoices = data ? [...(data.invoices || []), ...mergedLocalInvoices] : mergedLocalInvoices;
+    const rawOneTime = data ? [...(data.oneTimeServices || []), ...mergedLocalOneTime] : mergedLocalOneTime;
 
-      set({
-        clients: finalClients,
-        services: finalServices,
-        subServices: finalSubServices,
-        requiredDocs: finalRequiredDocs,
-        assignedServices: finalAssigned,
-        bankingEntries: finalBanking,
-        leads: finalLeads,
-        drafts: finalDrafts,
-        collaborations: finalCollabs,
-        invoices: mergedLocalInvoices,
-        oneTimeServices: mergedLocalOneTime,
-        isLoadingSupabase: false,
-      });
+    const clientsRes = deduplicateItems(rawClients, getClientKey);
+    const servicesRes = deduplicateItems(rawServices, getServiceKey);
+    const subServicesRes = deduplicateItems(rawSubServices, getSubServiceKey);
+    const requiredDocsRes = deduplicateItems(rawRequiredDocs, getRequiredDocKey);
+    const assignedRes = deduplicateItems(rawAssigned, getAssignedServiceKey);
+    const bankingRes = deduplicateItems(rawBanking, getBankingEntryKey);
+    const leadsRes = deduplicateItems(rawLeads, getLeadKey);
+    const draftsRes = deduplicateItems(rawDrafts, getDraftKey);
+    const collabsRes = deduplicateItems(rawCollabs, getCollabKey);
+    const invoicesRes = deduplicateItems(rawInvoices, getInvoiceKey);
+    const oneTimeRes = deduplicateItems(rawOneTime, getOneTimeKey);
 
-      // Save merged data under scoped key
-      saveToLocal("clients", finalClients);
-      saveToLocal("services", finalServices);
-      saveToLocal("subServices", finalSubServices);
-      saveToLocal("requiredDocs", finalRequiredDocs);
-      saveToLocal("assignedServices", finalAssigned);
-      saveToLocal("bankingEntries", finalBanking);
-      saveToLocal("leads", finalLeads);
-      saveToLocal("drafts", finalDrafts);
-      saveToLocal("collaborations", finalCollabs);
-      saveToLocal("invoices", mergedLocalInvoices);
-      saveToLocal("oneTimeServices", mergedLocalOneTime);
+    set({
+      clients: clientsRes.unique,
+      services: servicesRes.unique,
+      subServices: subServicesRes.unique,
+      requiredDocs: requiredDocsRes.unique,
+      assignedServices: assignedRes.unique,
+      bankingEntries: bankingRes.unique,
+      leads: leadsRes.unique,
+      drafts: draftsRes.unique,
+      collaborations: collabsRes.unique,
+      invoices: invoicesRes.unique,
+      oneTimeServices: oneTimeRes.unique,
+      isLoadingSupabase: false,
+    });
 
-      // Sync any migrated old data up to Supabase
-      if (oldClients.length > 0 || oldServices.length > 0 || oldAssigned.length > 0 || oldInvoices.length > 0) {
-        const { syncClientToSupabase, syncServiceToSupabase, syncSubServiceToSupabase,
-                syncAssignedServiceToSupabase, syncLeadToSupabase, syncDraftToSupabase,
-                syncCollaborationToSupabase, syncBankingEntryToSupabase,
-                syncInvoiceToSupabase, syncOneTimeServiceToSupabase } = await import("./supabaseData");
-        finalClients.forEach(c => syncClientToSupabase(c));
-        finalServices.forEach(s => syncServiceToSupabase(s));
-        finalSubServices.forEach(ss => syncSubServiceToSupabase(ss));
-        finalAssigned.forEach(a => syncAssignedServiceToSupabase(a));
-        finalLeads.forEach(l => syncLeadToSupabase(l));
-        finalDrafts.forEach(d => syncDraftToSupabase(d));
-        finalCollabs.forEach(c => syncCollaborationToSupabase(c));
-        finalBanking.forEach(b => syncBankingEntryToSupabase(b));
-        mergedLocalInvoices.forEach(inv => syncInvoiceToSupabase(inv));
-        mergedLocalOneTime.forEach(ots => syncOneTimeServiceToSupabase(ots));
+    saveToLocal("clients", clientsRes.unique);
+    saveToLocal("services", servicesRes.unique);
+    saveToLocal("subServices", subServicesRes.unique);
+    saveToLocal("requiredDocs", requiredDocsRes.unique);
+    saveToLocal("assignedServices", assignedRes.unique);
+    saveToLocal("bankingEntries", bankingRes.unique);
+    saveToLocal("leads", leadsRes.unique);
+    saveToLocal("drafts", draftsRes.unique);
+    saveToLocal("collaborations", collabsRes.unique);
+    saveToLocal("invoices", invoicesRes.unique);
+    saveToLocal("oneTimeServices", oneTimeRes.unique);
 
-        // Clean up old unscoped keys so they don't migrate again
-        const keysToClean = ["clients","services","subServices","requiredDocs",
-          "assignedServices","bankingEntries","leads","drafts","collaborations","invoices","oneTimeServices"];
-        keysToClean.forEach(k => {
-          try { localStorage.removeItem(`zpluscrm_local_${k}`); } catch {}
-        });
-      }
-    } else {
-      // Supabase unavailable: use user-scoped local data only
-      set({
-        clients: mergedLocalClients,
-        services: mergedLocalServices,
-        subServices: mergedLocalSubServices,
-        requiredDocs: mergedLocalRequiredDocs,
-        assignedServices: mergedLocalAssigned,
-        bankingEntries: mergedLocalBanking,
-        leads: mergedLocalLeads,
-        drafts: mergedLocalDrafts,
-        collaborations: mergedLocalCollabs,
-        invoices: mergedLocalInvoices,
-        oneTimeServices: mergedLocalOneTime,
-        isLoadingSupabase: false
-      });
-    }
+    // Sync clean data & purge duplicate IDs from Supabase
+    if (clientsRes.duplicateIds.length) purgeDuplicatesFromSupabase("clients", clientsRes.duplicateIds);
+    if (servicesRes.duplicateIds.length) purgeDuplicatesFromSupabase("services", servicesRes.duplicateIds);
+    if (subServicesRes.duplicateIds.length) purgeDuplicatesFromSupabase("sub_services", subServicesRes.duplicateIds);
+    if (requiredDocsRes.duplicateIds.length) purgeDuplicatesFromSupabase("required_docs", requiredDocsRes.duplicateIds);
+    if (assignedRes.duplicateIds.length) purgeDuplicatesFromSupabase("assigned_services", assignedRes.duplicateIds);
+    if (bankingRes.duplicateIds.length) purgeDuplicatesFromSupabase("banking_entries", bankingRes.duplicateIds);
+    if (leadsRes.duplicateIds.length) purgeDuplicatesFromSupabase("leads", leadsRes.duplicateIds);
+    if (draftsRes.duplicateIds.length) purgeDuplicatesFromSupabase("drafts", draftsRes.duplicateIds);
+    if (collabsRes.duplicateIds.length) purgeDuplicatesFromSupabase("collaborations", collabsRes.duplicateIds);
+    if (invoicesRes.duplicateIds.length) purgeDuplicatesFromSupabase("invoices", invoicesRes.duplicateIds);
+    if (oneTimeRes.duplicateIds.length) purgeDuplicatesFromSupabase("one_time_services", oneTimeRes.duplicateIds);
+
+    // Clean up old unscoped keys
+    const keysToClean = ["clients","services","subServices","requiredDocs",
+      "assignedServices","bankingEntries","leads","drafts","collaborations","invoices","oneTimeServices"];
+    keysToClean.forEach(k => {
+      try { localStorage.removeItem(`zpluscrm_local_${k}`); } catch {}
+    });
   },
 
   setSelectedFY: (fy) => set({ selectedFY: fy }),
@@ -334,6 +372,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
   // Clients Sync
   addClient: (c) => {
     set((s) => {
+      const key = getClientKey(c);
+      if (s.clients.some(x => x.id === c.id || (key && getClientKey(x) === key))) return s;
       const next = [...s.clients, c];
       saveToLocal("clients", next);
       return { clients: next };
@@ -360,6 +400,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
   // Services Sync (Packages)
   addService: (sv) => {
     set((s) => {
+      const key = getServiceKey(sv);
+      if (s.services.some(x => x.id === sv.id || (key && getServiceKey(x) === key))) return s;
       const next = [...s.services, sv];
       saveToLocal("services", next);
       return { services: next };
@@ -386,6 +428,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
   // SubServices Sync (Services)
   addSubService: (ss) => {
     set((s) => {
+      const key = getSubServiceKey(ss);
+      if (s.subServices.some(x => x.id === ss.id || (key && getSubServiceKey(x) === key))) return s;
       const next = [...s.subServices, ss];
       saveToLocal("subServices", next);
       return { subServices: next };
@@ -394,7 +438,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
   addSubServicesBatch: (ssList) => {
     set((s) => {
-      const next = [...s.subServices, ...ssList];
+      const uniqueBatch = ssList.filter(ss => {
+        const key = getSubServiceKey(ss);
+        return !s.subServices.some(x => x.id === ss.id || (key && getSubServiceKey(x) === key));
+      });
+      if (uniqueBatch.length === 0) return s;
+      const next = [...s.subServices, ...uniqueBatch];
       saveToLocal("subServices", next);
       return { subServices: next };
     });
