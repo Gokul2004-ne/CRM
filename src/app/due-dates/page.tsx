@@ -2,8 +2,8 @@
 import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
-import { getDaysUntilDue, formatDate, getWhatsAppLink, formatCurrency, getFYMonths, getCurrentFY, ALL_MONTHS, getValidDateForMonthDay } from "@/lib/utils";
-import { MessageCircle, Mail, Calendar, CheckCircle2, Clock, AlertCircle, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { getDaysUntilDue, formatDate, getWhatsAppLink, formatCurrency } from "@/lib/utils";
+import { MessageCircle, Mail, Calendar, CheckCircle2, Clock, AlertCircle, Search } from "lucide-react";
 import { toast } from "sonner";
 
 const MONTHS = [
@@ -35,7 +35,7 @@ export default function DueDatesPage() {
   };
 
   const dueItems = useMemo(() => {
-    // 1. Assigned Client Services
+    // Only Assigned Package Services (with a due date set) appear in the compliance calendar
     const assignedItems = assignedServices
       .filter(a => a.financialYear === selectedFY && a.dueDate)
       .map(a => {
@@ -50,44 +50,7 @@ export default function DueDatesPage() {
         return { ...a, client, service, subs, daysLeft, dueDate, monthName, isConfiguredService: false };
       });
 
-    // 2. Direct Services configured under Services Directory (subServices) with Multi-Month Perpetual Recurrence
-    const configuredServiceItems: typeof assignedItems = [];
-    subServices.forEach(ss => {
-      const parentSvc = services.find(s => s.id === ss.serviceId);
-      const monthsList = (ss.applicableMonths && ss.applicableMonths.length > 0) ? ss.applicableMonths : ALL_MONTHS;
-      const targetDay = ss.dueDateDay || 15;
-
-      monthsList.forEach(monthName => {
-        const my = monthYearMap[monthName];
-        if (my) {
-          const validDateObj = getValidDateForMonthDay(my.year, my.month, targetDay);
-          const daysLeft = getDaysUntilDue(validDateObj.toISOString());
-
-          configuredServiceItems.push({
-            id: `cfg_${ss.id}_${monthName}`,
-            clientId: ss.clientId || "",
-            serviceId: ss.serviceId,
-            subServiceIds: [ss.id],
-            financialYear: selectedFY || getCurrentFY(),
-            amountBilled: 0,
-            amountReceived: 0,
-            amountPending: 0,
-            status: "PENDING",
-            client: clients.find(c => c.id === ss.clientId) || { name: ss.clientName || "All Clients" } as any,
-            service: parentSvc || { name: ss.name } as any,
-            subs: [ss],
-            daysLeft,
-            dueDate: validDateObj,
-            monthName,
-            isConfiguredService: true
-          });
-        }
-      });
-    });
-
-    const combined = [...assignedItems, ...configuredServiceItems];
-
-    return combined.filter(item =>
+    return assignedItems.filter(item =>
       !search ||
       (item.client?.name || "").toLowerCase().includes(search.toLowerCase()) ||
       (item.service?.name || "").toLowerCase().includes(search.toLowerCase()) ||

@@ -3,10 +3,6 @@ import {
   Client, Service, SubService, RequiredDoc,
   AssignedService, BankingEntry, Lead, DocumentDraft, Collaboration
 } from "./types";
-import {
-  mockClients, mockServices, mockSubServices, mockRequiredDocs,
-  mockAssignedServices, mockBankingEntries, mockLeads, mockDrafts, mockCollaborations
-} from "./mockData";
 
 async function safeTableFetch(tableName: string, userId?: string) {
   try {
@@ -159,22 +155,8 @@ export async function fetchAllCRMData() {
       createdAt: c.created_at,
     }));
 
-    // If tables are empty in Supabase, seed initial data
-    if (formattedClients.length === 0) {
-      await seedInitialDataToSupabase();
-      return {
-        clients: mockClients,
-        services: mockServices,
-        subServices: mockSubServices,
-        requiredDocs: mockRequiredDocs,
-        assignedServices: mockAssignedServices,
-        bankingEntries: mockBankingEntries,
-        leads: mockLeads,
-        drafts: mockDrafts,
-        collaborations: mockCollaborations,
-      };
-    }
-
+    // If tables are empty in Supabase, new user starts with a clean workspace
+    // (no mock data seeding — each user's data is their own)
     return {
       clients: formattedClients,
       services: formattedServices,
@@ -192,116 +174,7 @@ export async function fetchAllCRMData() {
   }
 }
 
-export async function seedInitialDataToSupabase() {
-  try {
-    const clientsToInsert = mockClients.map((c) => ({
-      id: c.id,
-      name: c.name,
-      owner_name: c.ownerName,
-      type: c.type,
-      referred_by: c.referredBy,
-      phone: c.phone,
-      mobile: c.mobile,
-      email: c.email,
-      pan: c.pan,
-      pan_no: c.panNo,
-      gstin: c.gstin,
-      gst_no: c.gstNo,
-      contact_person: c.contactPerson,
-      city: c.city,
-      status: c.status,
-      registration_no: c.registrationNo,
-      incorporation_date: c.incorporationDate,
-      acquired_date: c.acquiredDate,
-      address: c.address,
-      notes: c.notes,
-      created_at: c.createdAt || new Date().toISOString(),
-    }));
-    await supabase.from("clients").upsert(clientsToInsert);
 
-    const servicesToInsert = mockServices.map((s) => ({
-      id: s.id,
-      name: s.name,
-      due_date: s.dueDate,
-      price: s.price,
-      recurrence: s.recurrence,
-      applicable_months: s.applicableMonths,
-    }));
-    await supabase.from("services").upsert(servicesToInsert);
-
-    const subServicesToInsert = mockSubServices.map((ss) => ({
-      id: ss.id,
-      service_id: ss.serviceId,
-      name: ss.name,
-      due_date: ss.dueDate || null,
-      due_date_day: ss.dueDateDay || null,
-      applicable_months: ss.applicableMonths || [],
-      recurrence: ss.recurrence || "MONTHLY",
-    }));
-    await supabase.from("sub_services").upsert(subServicesToInsert);
-
-    const requiredDocsToInsert = mockRequiredDocs.map((rd) => ({
-      id: rd.id,
-      sub_service_id: rd.subServiceId,
-      name: rd.name,
-      is_mandatory: rd.isMandatory,
-    }));
-    await supabase.from("required_docs").upsert(requiredDocsToInsert);
-
-    const assignedServicesToInsert = mockAssignedServices.map((a) => ({
-      id: a.id,
-      client_id: a.clientId,
-      service_id: a.serviceId,
-      sub_service_ids: a.subServiceIds,
-      financial_year: a.financialYear,
-      amount_billed: a.amountBilled,
-      amount_received: a.amountReceived,
-      amount_pending: a.amountPending,
-      total_fee: (a as any).totalFee || a.amountBilled,
-      paid_amount: (a as any).paidAmount || a.amountReceived,
-      pending_amount: (a as any).pendingAmount || a.amountPending,
-      status: a.status || "PENDING",
-      due_date: a.dueDate,
-    }));
-    await supabase.from("assigned_services").upsert(assignedServicesToInsert);
-
-    const bankingToInsert = mockBankingEntries.map((b) => ({
-      id: b.id,
-      financial_year: b.financialYear,
-      client_id: b.clientId,
-      service_id: b.serviceId,
-      sub_service_id: b.subServiceId,
-      amount_billed: b.amountBilled,
-      amount_received: b.amountReceived,
-      amount_pending: b.amountPending,
-      remark: b.remark,
-    }));
-    await supabase.from("banking_entries").upsert(bankingToInsert);
-
-    const leadsToInsert = mockLeads.map((l) => ({
-      id: l.id,
-      name: l.name,
-      mobile: l.mobile,
-      phone: l.phone,
-      source: l.source,
-      status: l.status,
-      converted_client_id: l.convertedClientId,
-      notes: l.notes,
-      created_at: l.createdAt || new Date().toISOString(),
-    }));
-    await supabase.from("leads").upsert(leadsToInsert);
-
-    const draftsToInsert = mockDrafts.map((d) => ({
-      id: d.id,
-      title: d.title,
-      content: d.content,
-      updated_at: d.updatedAt || new Date().toISOString(),
-    }));
-    await supabase.from("drafts").upsert(draftsToInsert);
-  } catch (err) {
-    console.error("Error seeding initial data to Supabase:", err);
-  }
-}
 
 async function getUserId(): Promise<string | undefined> {
   try {

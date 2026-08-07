@@ -154,6 +154,8 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>()((set, get) => ({
+  // Initialize with empty arrays to prevent cross-user data leakage.
+  // Data is loaded after authentication via loadSupabaseData().
   clients: [],
   services: [],
   subServices: [],
@@ -161,68 +163,91 @@ export const useAppStore = create<AppState>()((set, get) => ({
   assignedServices: [],
   bankingEntries: [],
   leads: [],
-  drafts: loadFromLocal("drafts", []),
-  collaborations: loadFromLocal("collaborations", []),
-  invoices: loadFromLocal("invoices", []),
-  oneTimeServices: loadFromLocal("oneTimeServices", []),
+  drafts: [],
+  collaborations: [],
+  invoices: [],
+  oneTimeServices: [],
   selectedFY: getCurrentFY(),
   sidebarCollapsed: false,
   isLoadingSupabase: false,
 
   loadSupabaseData: async () => {
     set({ isLoadingSupabase: true });
-    const localCollabs = loadFromLocal<Collaboration[]>("collaborations", []);
+
+    // Load user-scoped local data AFTER auth is established (key is now correct)
+    const localClients = loadFromLocal<Client[]>("clients", []);
+    const localServices = loadFromLocal<Service[]>("services", []);
     const localSubServices = loadFromLocal<SubService[]>("subServices", []);
+    const localRequiredDocs = loadFromLocal<RequiredDoc[]>("requiredDocs", []);
+    const localAssigned = loadFromLocal<AssignedService[]>("assignedServices", []);
+    const localBanking = loadFromLocal<BankingEntry[]>("bankingEntries", []);
+    const localLeads = loadFromLocal<Lead[]>("leads", []);
+    const localCollabs = loadFromLocal<Collaboration[]>("collaborations", []);
     const localDrafts = loadFromLocal<DocumentDraft[]>("drafts", []);
+    const localInvoices = loadFromLocal<any[]>("invoices", []);
+    const localOneTime = loadFromLocal<any[]>("oneTimeServices", []);
 
     const data = await fetchAllCRMData();
     if (data) {
-      // Merge remote collaborations with local collaborations so local creations are never lost
-      const combinedCollabs = [...(data.collaborations || [])];
-      localCollabs.forEach(lc => {
-        if (!combinedCollabs.some(c => c.id === lc.id)) {
-          combinedCollabs.push(lc);
-        }
-      });
+      // Merge: remote data takes priority; only add local items not present in remote
+      const mergeArrays = <T extends { id: string }>(remote: T[] = [], local: T[] = []) => {
+        const merged = [...remote];
+        local.forEach(item => {
+          if (!merged.some(m => m.id === item.id)) {
+            merged.push(item);
+          }
+        });
+        return merged;
+      };
 
-      const combinedSubServices = [...(data.subServices || [])];
-      localSubServices.forEach(lss => {
-        const idx = combinedSubServices.findIndex(ss => ss.id === lss.id);
-        if (idx >= 0) {
-          combinedSubServices[idx] = { ...combinedSubServices[idx], ...lss };
-        } else {
-          combinedSubServices.push(lss);
-        }
-      });
-
-      const combinedDrafts = [...(data.drafts || [])];
-      localDrafts.forEach(ld => {
-        if (!combinedDrafts.some(d => d.id === ld.id)) {
-          combinedDrafts.push(ld);
-        }
-      });
+      const finalClients = mergeArrays(data.clients, localClients);
+      const finalServices = mergeArrays(data.services, localServices);
+      const finalSubServices = mergeArrays(data.subServices, localSubServices);
+      const finalRequiredDocs = mergeArrays(data.requiredDocs, localRequiredDocs);
+      const finalAssigned = mergeArrays(data.assignedServices, localAssigned);
+      const finalBanking = mergeArrays(data.bankingEntries, localBanking);
+      const finalLeads = mergeArrays(data.leads, localLeads);
+      const finalDrafts = mergeArrays(data.drafts, localDrafts);
+      const finalCollabs = mergeArrays(data.collaborations, localCollabs);
 
       set({
-        clients: data.clients,
-        services: data.services,
-        subServices: combinedSubServices,
-        requiredDocs: data.requiredDocs,
-        assignedServices: data.assignedServices,
-        bankingEntries: data.bankingEntries,
-        leads: data.leads,
-        drafts: combinedDrafts,
-        collaborations: combinedCollabs,
+        clients: finalClients,
+        services: finalServices,
+        subServices: finalSubServices,
+        requiredDocs: finalRequiredDocs,
+        assignedServices: finalAssigned,
+        bankingEntries: finalBanking,
+        leads: finalLeads,
+        drafts: finalDrafts,
+        collaborations: finalCollabs,
+        invoices: localInvoices,
+        oneTimeServices: localOneTime,
         isLoadingSupabase: false,
       });
 
-      saveToLocal("collaborations", combinedCollabs);
-      saveToLocal("subServices", combinedSubServices);
-      saveToLocal("drafts", combinedDrafts);
+      saveToLocal("clients", finalClients);
+      saveToLocal("services", finalServices);
+      saveToLocal("subServices", finalSubServices);
+      saveToLocal("requiredDocs", finalRequiredDocs);
+      saveToLocal("assignedServices", finalAssigned);
+      saveToLocal("bankingEntries", finalBanking);
+      saveToLocal("leads", finalLeads);
+      saveToLocal("drafts", finalDrafts);
+      saveToLocal("collaborations", finalCollabs);
     } else {
+      // Supabase unavailable: use user-scoped local data only
       set({
-        collaborations: localCollabs,
+        clients: localClients,
+        services: localServices,
         subServices: localSubServices,
+        requiredDocs: localRequiredDocs,
+        assignedServices: localAssigned,
+        bankingEntries: localBanking,
+        leads: localLeads,
         drafts: localDrafts,
+        collaborations: localCollabs,
+        invoices: localInvoices,
+        oneTimeServices: localOneTime,
         isLoadingSupabase: false
       });
     }
@@ -319,48 +344,52 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   // Required Docs Sync
   addRequiredDoc: (d) => {
-    set((s) => ({ requiredDocs: [...s.requiredDocs, d] }));
+    set((s) => {
+      const next = [...s.requiredDocs, d];
+      saveToLocal("requiredDocs", next);
+      return { requiredDocs: next };
+    });
     syncRequiredDocToSupabase(d);
   },
   updateRequiredDoc: (d) => {
-    set((s) => ({ requiredDocs: s.requiredDocs.map(x => x.id === d.id ? d : x) }));
+    set((s) => {
+      const next = s.requiredDocs.map(x => x.id === d.id ? d : x);
+      saveToLocal("requiredDocs", next);
+      return { requiredDocs: next };
+    });
     syncRequiredDocToSupabase(d);
   },
   deleteRequiredDoc: (id) => {
-    set((s) => ({ requiredDocs: s.requiredDocs.filter(x => x.id !== id) }));
+    set((s) => {
+      const next = s.requiredDocs.filter(x => x.id !== id);
+      saveToLocal("requiredDocs", next);
+      return { requiredDocs: next };
+    });
     removeRequiredDocFromSupabase(id);
   },
 
-  // Assigned Services Sync (Reflects ONLY in Compliance Calendar and Assigned Packages — NOT Banking or Ledger)
+  // Assigned Services Sync
   addAssignedService: (a) => {
     set((s) => {
       const nextAssigned = [...s.assignedServices, a];
       saveToLocal("assignedServices", nextAssigned);
-      return {
-        assignedServices: nextAssigned
-      };
+      return { assignedServices: nextAssigned };
     });
     syncAssignedServiceToSupabase(a);
   },
-
   updateAssignedService: (a) => {
     set((s) => {
       const nextAssigned = s.assignedServices.map(x => x.id === a.id ? a : x);
       saveToLocal("assignedServices", nextAssigned);
-      return {
-        assignedServices: nextAssigned
-      };
+      return { assignedServices: nextAssigned };
     });
     syncAssignedServiceToSupabase(a);
   },
-
   deleteAssignedService: (id) => {
     set((s) => {
       const nextAssigned = s.assignedServices.filter(x => x.id !== id);
       saveToLocal("assignedServices", nextAssigned);
-      return {
-        assignedServices: nextAssigned
-      };
+      return { assignedServices: nextAssigned };
     });
     removeAssignedServiceFromSupabase(id);
   },
@@ -387,7 +416,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
         return a;
       });
 
-      // Bi-directional Sync from Banking to Invoices
       const invoiceId = b.id.startsWith("b_inv_") ? b.id.replace("b_inv_", "") : null;
       const updatedInvoices = invoiceId ? s.invoices.map(inv => {
         if (inv.id === invoiceId) {
@@ -485,7 +513,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     removeDraftFromSupabase(id);
   },
 
-  // Collaborations Sync (Permanently Persisted)
+  // Collaborations Sync
   addCollaboration: (c) => {
     set((s) => {
       const next = [...s.collaborations, c];
@@ -511,13 +539,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
     removeCollaborationFromSupabase(id);
   },
 
-  // Invoices Sync (Permanently Persisted & Linked with Banking Ledger)
+  // Invoices Sync
   addInvoice: (inv) => {
     set((s) => {
       const next = [inv, ...s.invoices];
       saveToLocal("invoices", next);
 
-      // Only link with Banking Ledger for INVOICE type (NOT PROFORMA)
       if (inv.type !== "PROFORMA" && inv.clientId) {
         const rcv = inv.amountReceived || (inv.status === "PAID" ? inv.total : 0);
         const billed = inv.total || 0;
@@ -534,7 +561,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
             remark: `${inv.type} #${inv.invoiceNumber} payment record`
           };
           const nextBanking = [...s.bankingEntries.filter(b => b.id !== bEntry.id), bEntry];
-          saveToLocal("banking", nextBanking);
+          saveToLocal("bankingEntries", nextBanking);
           syncBankingEntryToSupabase(bEntry);
           return { invoices: next, bankingEntries: nextBanking };
         }
@@ -548,7 +575,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const next = s.invoices.map(x => x.id === inv.id ? inv : x);
       saveToLocal("invoices", next);
 
-      // Only sync with Banking Ledger for INVOICE type (NOT PROFORMA)
       if (inv.type !== "PROFORMA" && inv.clientId) {
         const rcv = inv.amountReceived || (inv.status === "PAID" ? inv.total : 0);
         const billed = inv.total || 0;
@@ -564,7 +590,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
           remark: `${inv.type} #${inv.invoiceNumber} payment record`
         };
         const nextBanking = [...s.bankingEntries.filter(b => b.id !== bEntry.id), bEntry];
-        saveToLocal("banking", nextBanking);
+        saveToLocal("bankingEntries", nextBanking);
         syncBankingEntryToSupabase(bEntry);
         return { invoices: next, bankingEntries: nextBanking };
       }
@@ -580,7 +606,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const targetBankingId = `b_inv_${id}`;
       const nextBanking = s.bankingEntries.filter(b => b.id !== targetBankingId && b.id !== id);
       saveToLocal("bankingEntries", nextBanking);
-      saveToLocal("banking", nextBanking);
 
       removeBankingEntryFromSupabase(targetBankingId);
 
