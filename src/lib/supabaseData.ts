@@ -4,6 +4,20 @@ import {
   AssignedService, BankingEntry, Lead, DocumentDraft, Collaboration
 } from "./types";
 
+// Get user ID from mock localStorage session (fallback for non-Supabase auth)
+function getMockSessionUserId(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const rawSession = localStorage.getItem("zpluscrm_active_session");
+    if (rawSession) {
+      const parsed = JSON.parse(rawSession);
+      const uid = parsed?.user?.id || parsed?.user?.email;
+      if (uid) return String(uid).replace(/[^a-zA-Z0-9_]/g, "_");
+    }
+  } catch {}
+  return undefined;
+}
+
 async function safeTableFetch(tableName: string, userId?: string) {
   try {
     if (!userId) return [];
@@ -22,7 +36,8 @@ async function safeTableFetch(tableName: string, userId?: string) {
 export async function fetchAllCRMData() {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id;
+    // Use real Supabase user ID if available, otherwise fall back to mock session user ID
+    const userId = user?.id || getMockSessionUserId();
 
     const [
       clients,
@@ -179,9 +194,10 @@ export async function fetchAllCRMData() {
 async function getUserId(): Promise<string | undefined> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    return user?.id;
+    // Use real Supabase user ID if available, otherwise fall back to mock session user ID
+    return user?.id || getMockSessionUserId();
   } catch {
-    return undefined;
+    return getMockSessionUserId();
   }
 }
 
