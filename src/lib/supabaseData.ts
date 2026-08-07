@@ -20,13 +20,34 @@ function getMockSessionUserId(): string | undefined {
 
 async function safeTableFetch(tableName: string, userId?: string) {
   try {
-    if (!userId) return [];
-    const { data, error } = await supabase.from(tableName).select("*").eq("user_id", userId);
-    if (error) {
-      console.warn(`Supabase fetch for table ${tableName} returned error or missing column:`, error);
-      return [];
+    // Fetch rows belonging to this user
+    const userRows: any[] = [];
+    if (userId) {
+      const { data, error } = await supabase.from(tableName).select("*").eq("user_id", userId);
+      if (!error && data) userRows.push(...data);
     }
-    return data || [];
+
+    // Also fetch rows with null user_id (data saved before user-scoping fix)
+    const { data: nullRows, error: nullError } = await supabase.from(tableName).select("*").is("user_id", null);
+    const unclaimedRows = (!nullError && nullRows) ? nullRows : [];
+
+    // Merge: avoid duplicates by id
+    const allRows = [...userRows];
+    unclaimedRows.forEach((row: any) => {
+      if (!allRows.some((r: any) => r.id === row.id)) {
+        allRows.push(row);
+      }
+    });
+
+    // Claim unclaimed rows by updating their user_id to this user
+    if (userId && unclaimedRows.length > 0) {
+      const ids = unclaimedRows.map((r: any) => r.id);
+      supabase.from(tableName).update({ user_id: userId }).in("id", ids).then(() => {
+        // Silent background update
+      });
+    }
+
+    return allRows;
   } catch {
     return [];
   }
