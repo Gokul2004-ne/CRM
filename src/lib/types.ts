@@ -99,6 +99,21 @@ export interface OneTimeService {
   createdAt?: string;
 }
 
+export interface RenewalItem {
+  id: string;
+  clientName: string;
+  serviceName: string;
+  registrationDate?: string;
+  dueDate?: string;
+  fromDate?: string;
+  toDate?: string;
+  financialYear?: string;
+  recurrencePeriod?: string;
+  progress: ProgressStatus;
+  notes?: string;
+  createdAt?: string;
+}
+
 export interface AssignedService {
   id: string;
   clientId: string;

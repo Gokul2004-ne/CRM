@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, MessageSquare, Package, Layers,
   FileText, ClipboardList, Building2, Calendar, PenTool,
-  CreditCard, Settings, Handshake, Receipt, Sparkles
+  CreditCard, Settings, Handshake, Receipt, Sparkles, RefreshCw
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -35,6 +35,7 @@ export default function Sidebar() {
         { href: "/assign", label: "Assign Packages", icon: ClipboardList, badge: assignedServices.length },
         { href: "/service-clients", label: "Clients by Service", icon: Users },
         { href: "/one-time-services", label: "One Time Service", icon: Sparkles },
+        { href: "/renewals", label: "Renewals", icon: RefreshCw },
       ]
     },
     {

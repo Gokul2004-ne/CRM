@@ -537,6 +537,38 @@ export async function removeOneTimeServiceFromSupabase(id: string) {
   }
 }
 
+// Renewals Sync
+export async function syncRenewalToSupabase(rn: any) {
+  try {
+    const userId = await getUserId();
+    await supabase.from("renewals").upsert({
+      id: rn.id,
+      user_id: userId,
+      client_name: rn.clientName,
+      service_name: rn.serviceName,
+      registration_date: rn.registrationDate || null,
+      due_date: rn.dueDate || null,
+      from_date: rn.fromDate || null,
+      to_date: rn.toDate || null,
+      financial_year: rn.financialYear || null,
+      recurrence_period: rn.recurrencePeriod || null,
+      progress: rn.progress,
+      notes: rn.notes,
+      created_at: rn.createdAt || new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("Error syncing renewal to Supabase:", err);
+  }
+}
+
+export async function removeRenewalFromSupabase(id: string) {
+  try {
+    await supabase.from("renewals").delete().eq("id", id);
+  } catch (err) {
+    console.error("Error removing renewal from Supabase:", err);
+  }
+}
+
 // Purge Duplicates from Supabase Table
 export async function purgeDuplicatesFromSupabase(tableName: string, ids: string[]) {
   if (!ids || ids.length === 0) return;

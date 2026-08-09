@@ -206,24 +206,7 @@ export default function ServiceClientsPage() {
 
   return (
     <AppShell title="Clients by Service" subtitle="View and track client lists mapped dynamically according to assigned services & packages">
-      {/* ─── PAGE HEADER & BANNER ─── */}
-      <div className="page-header-slds" style={{ background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)", color: "white", padding: 24, borderRadius: 16, marginBottom: 20 }}>
-        <div>
-          <div className="breadcrumb" style={{ color: "#94A3B8", fontSize: 12, marginBottom: 6 }}>
-            <span>zpluscrm</span>
-            <span>/</span>
-            <span>Operations &amp; Packages</span>
-            <span>/</span>
-            <span className="current" style={{ color: "#38BDF8", fontWeight: 700 }}>Clients by Service</span>
-          </div>
-          <div className="page-title-slds" style={{ fontSize: 24, fontWeight: 900, color: "white" }}>
-            Client-Service Directory Matrix
-          </div>
-          <div className="page-subtitle-slds" style={{ color: "#94A3B8", fontSize: 13, marginTop: 4 }}>
-            Auto-linked with Packages, Services, and Assign Packages. Group client accounts by service name for real-time practice management.
-          </div>
-        </div>
-      </div>
+
 
       {/* ─── KPI SUMMARY CARDS ─── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 20 }}>

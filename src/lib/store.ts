@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import {
   Client, Service, SubService, RequiredDoc,
-  AssignedService, BankingEntry, Lead, DocumentDraft, Collaboration, Invoice, OneTimeService
+  AssignedService, BankingEntry, Lead, DocumentDraft, Collaboration, Invoice, OneTimeService, RenewalItem
 } from "./types";
 import { getCurrentFY } from "./utils";
 import {
@@ -28,6 +28,8 @@ import {
   removeInvoiceFromSupabase,
   syncOneTimeServiceToSupabase,
   removeOneTimeServiceFromSupabase,
+  syncRenewalToSupabase,
+  removeRenewalFromSupabase,
   purgeDuplicatesFromSupabase
 } from "./supabaseData";
 
@@ -148,6 +150,7 @@ interface AppState {
   collaborations: Collaboration[];
   invoices: Invoice[];
   oneTimeServices: OneTimeService[];
+  renewals: RenewalItem[];
   selectedFY: string;
   sidebarCollapsed: boolean;
   isLoadingSupabase: boolean;
@@ -215,6 +218,12 @@ interface AppState {
   addOneTimeService: (ots: OneTimeService) => void;
   updateOneTimeService: (ots: OneTimeService) => void;
   deleteOneTimeService: (id: string) => void;
+
+  // Actions - Renewals
+  addRenewal: (rn: RenewalItem) => void;
+  updateRenewal: (rn: RenewalItem) => void;
+  deleteRenewal: (id: string) => void;
+  renewService: (id: string) => void;
 }
 
 export const useAppStore = create<AppState>()((set, get) => ({
@@ -232,6 +241,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   collaborations: loadFromLocal("collaborations", []),
   invoices: loadFromLocal("invoices", []),
   oneTimeServices: loadFromLocal("oneTimeServices", []),
+  renewals: loadFromLocal("renewals", []),
   selectedFY: getCurrentFY(),
   sidebarCollapsed: false,
   isLoadingSupabase: false,
@@ -739,5 +749,93 @@ export const useAppStore = create<AppState>()((set, get) => ({
       return { oneTimeServices: next };
     });
     removeOneTimeServiceFromSupabase(id);
+  },
+
+  // Actions - Renewals
+  addRenewal: (rn) => {
+    set((s) => {
+      const next = [rn, ...(s.renewals || [])];
+      saveToLocal("renewals", next);
+      return { renewals: next };
+    });
+    syncRenewalToSupabase(rn);
+  },
+  updateRenewal: (rn) => {
+    set((s) => {
+      const next = (s.renewals || []).map(x => x.id === rn.id ? rn : x);
+      saveToLocal("renewals", next);
+      return { renewals: next };
+    });
+    syncRenewalToSupabase(rn);
+  },
+  deleteRenewal: (id) => {
+    set((s) => {
+      const next = (s.renewals || []).filter(x => x.id !== id);
+      saveToLocal("renewals", next);
+      return { renewals: next };
+    });
+    removeRenewalFromSupabase(id);
+  },
+  renewService: (id) => {
+    set((s) => {
+      const target = (s.renewals || []).find(x => x.id === id);
+      if (!target) return s;
+
+      // Auto-advance dates & financial year
+      let yearsToAdd = 1;
+      const rec = (target.recurrencePeriod || "").toLowerCase();
+      if (rec.includes("2 year")) yearsToAdd = 2;
+      else if (rec.includes("3 year")) yearsToAdd = 3;
+      else if (rec.includes("5 year")) yearsToAdd = 5;
+
+      let nextFromDate = target.fromDate;
+      let nextToDate = target.toDate;
+      let nextDueDate = target.dueDate;
+      let nextFY = target.financialYear;
+
+      if (target.fromDate) {
+        const d = new Date(target.fromDate);
+        d.setFullYear(d.getFullYear() + yearsToAdd);
+        nextFromDate = d.toISOString().split("T")[0];
+      }
+      if (target.toDate) {
+        const d = new Date(target.toDate);
+        d.setFullYear(d.getFullYear() + yearsToAdd);
+        nextToDate = d.toISOString().split("T")[0];
+      }
+      if (target.dueDate) {
+        const d = new Date(target.dueDate);
+        d.setFullYear(d.getFullYear() + yearsToAdd);
+        nextDueDate = d.toISOString().split("T")[0];
+      }
+
+      // Compute FY string
+      if (nextFromDate && nextToDate) {
+        const y1 = new Date(nextFromDate).getFullYear();
+        const y2 = new Date(nextToDate).getFullYear();
+        nextFY = y1 === y2 ? `FY ${y1}` : `${y1} - ${y2}`;
+      } else if (nextFY && nextFY.includes("FY")) {
+        const match = nextFY.match(/\d{4}/);
+        if (match) {
+          const startY = parseInt(match[0]) + yearsToAdd;
+          const endYStr = String(startY + 1).slice(-2);
+          nextFY = `FY ${startY}-${endYStr}`;
+        }
+      }
+
+      const renewedItem: RenewalItem = {
+        ...target,
+        fromDate: nextFromDate,
+        toDate: nextToDate,
+        dueDate: nextDueDate,
+        financialYear: nextFY,
+        progress: "To-do", // Reset progress to To-do for the new cycle
+      };
+
+      const next = (s.renewals || []).map(x => x.id === id ? renewedItem : x);
+      saveToLocal("renewals", next);
+      syncRenewalToSupabase(renewedItem);
+      return { renewals: next };
+    });
   },
 }));
