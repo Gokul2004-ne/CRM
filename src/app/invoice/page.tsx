@@ -668,6 +668,17 @@ export default function InvoicePage() {
                   >
                     <Printer size={14} /> Print / Save PDF
                   </button>
+                  <button
+                    className="btn-slds"
+                    style={{ background: "#4F46E5", color: "white", padding: "6px 16px", fontSize: 12, fontWeight: 800, borderRadius: 8, display: "flex", alignItems: "center", gap: 6, border: "none", cursor: "pointer" }}
+                    onClick={() => {
+                      const target = viewInvoice;
+                      setViewInvoice(null);
+                      openEdit(target);
+                    }}
+                  >
+                    <Pencil size={14} /> Edit
+                  </button>
                   <button className="btn-slds btn-slds-secondary" style={{ padding: "6px 12px", background: "rgba(255,255,255,0.15)", color: "white", border: "none" }} onClick={() => setViewInvoice(null)}>✕</button>
                 </div>
               </div>
