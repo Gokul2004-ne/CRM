@@ -9,6 +9,7 @@ import {
   AlertCircle, RefreshCw, Trash2, Pencil, Search, ArrowUpRight, TrendingUp, Clock, Crown
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 
 const PRESET_DESCRIPTIONS = [
   "GST Filing & Compliance Services",
@@ -31,6 +32,7 @@ const defaultItem = (): InvoiceItem => ({
 });
 
 export default function InvoicePage() {
+  const { user } = useAuth();
   const { clients, invoices, selectedFY, addInvoice, updateInvoice, deleteInvoice } = useAppStore();
 
   const [entityFilter, setEntityFilter] = useState<"ALL" | "PROFORMA" | "INVOICE">("ALL");
@@ -617,16 +619,32 @@ export default function InvoicePage() {
         const clientObj = clients.find(c => c.id === viewInvoice.clientId || c.name.toLowerCase() === (viewInvoice.clientName || "").toLowerCase());
         const isTaxInvoice = viewInvoice.type === "INVOICE";
         
-        // Firm Practice Details
+        // Registered User Company / Firm Details
         let firmSettings: any = {};
         if (typeof window !== "undefined") {
           try { firmSettings = JSON.parse(localStorage.getItem("zpluscrm_settings") || "{}"); } catch {}
         }
 
-        const practiceName = firmSettings.firmName || firmSettings.ownerName || "SAI KUMAR VARALA & CO(cost accountants)";
-        const practiceAddress = firmSettings.address || "4-24, KARIMNAGAR, Delhi, TELANGANA, 505451";
-        const practiceMobile = firmSettings.mobile || "+91 7337500748";
-        const practiceEmail = firmSettings.email || "saivarala33@gmail.com";
+        const userMeta = user?.user_metadata || {};
+        let practiceName =
+          firmSettings.firmName ||
+          firmSettings.ownerName ||
+          userMeta.company_name ||
+          userMeta.firm_name ||
+          userMeta.full_name;
+
+        if (!practiceName || practiceName === "Practice Management") {
+          if (user?.email) {
+            const emailName = user.email.split("@")[0];
+            practiceName = emailName.charAt(0).toUpperCase() + emailName.slice(1) + " Company";
+          } else {
+            practiceName = "Registered Practice Company";
+          }
+        }
+
+        const practiceAddress = firmSettings.address || userMeta.address || "";
+        const practiceMobile = firmSettings.mobile || userMeta.phone || userMeta.mobile || "";
+        const practiceEmail = firmSettings.email || user?.email || "";
 
         const itemsList = viewInvoice.items || [];
         const totalItemsCount = itemsList.length;
@@ -669,8 +687,8 @@ export default function InvoicePage() {
               >
                 {/* 1. Header Title Row */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                  <div style={{ fontSize: 18, fontWeight: 900, color: "#1D4ED8", letterSpacing: "1.5px", textTransform: "uppercase" }}>
-                    {isTaxInvoice ? "TA X   I N V O I C E" : "P R O F O R M A   I N V O I C E"}
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#1D4ED8", letterSpacing: "1px", textTransform: "uppercase" }}>
+                    {isTaxInvoice ? "TAX INVOICE" : "PROFORMA INVOICE"}
                   </div>
                   <div style={{ fontSize: 10, fontWeight: 800, color: "#475569", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                     ORIGINAL FOR RECIPIENT
@@ -683,10 +701,13 @@ export default function InvoicePage() {
                     <div style={{ fontSize: 17, fontWeight: 900, color: "#0F172A", textTransform: "uppercase" }}>
                       {practiceName}
                     </div>
-                    <div style={{ fontSize: 11.5, color: "#334155", marginTop: 2 }}>{practiceAddress}</div>
-                    <div style={{ fontSize: 11.5, color: "#334155", marginTop: 2 }}>
-                      <strong>Mobile</strong> {practiceMobile} &nbsp; <strong>Email</strong> {practiceEmail}
-                    </div>
+                    {practiceAddress && <div style={{ fontSize: 11.5, color: "#334155", marginTop: 2 }}>{practiceAddress}</div>}
+                    {(practiceMobile || practiceEmail) && (
+                      <div style={{ fontSize: 11.5, color: "#334155", marginTop: 2 }}>
+                        {practiceMobile && <><strong>Mobile</strong> {practiceMobile} &nbsp;</>}
+                        {practiceEmail && <><strong>Email</strong> {practiceEmail}</>}
+                      </div>
+                    )}
                   </div>
 
                   {/* Firm Emblem Logo */}
