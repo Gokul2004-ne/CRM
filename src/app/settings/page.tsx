@@ -1,7 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { useEffect, useState } from "react";
-import { Save, Building2, User, Bell, Shield, Palette, CreditCard, Database, Download, Trash2, KeyRound, LogOut, CheckCircle, Eye, EyeOff, RefreshCw } from "lucide-react";
+import { Save, Building2, User, Bell, Shield, Palette, CreditCard, Database, Download, Trash2, KeyRound, LogOut, CheckCircle, Eye, EyeOff, RefreshCw, PenTool, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 
@@ -43,6 +43,7 @@ export default function SettingsPage() {
   const [website, setWebsite] = useState("");
   const [fyStart, setFyStart] = useState("4");
   const [currency, setCurrency] = useState("INR");
+  const [signatureUrl, setSignatureUrl] = useState("");
 
   // ─── Profile ──────────────────────────────────────────────────────────────
   const [fullName, setFullName] = useState("CA Gokulnath");
@@ -81,6 +82,7 @@ export default function SettingsPage() {
     if (s.website) setWebsite(s.website);
     if (s.fyStart) setFyStart(s.fyStart);
     if (s.currency) setCurrency(s.currency);
+    if (s.signatureUrl) setSignatureUrl(s.signatureUrl);
     if (s.fullName) setFullName(s.fullName);
     if (s.designation) setDesignation(s.designation);
     if (s.bio) setBio(s.bio);
@@ -90,9 +92,25 @@ export default function SettingsPage() {
     if (s.notifs) setNotifs(prev => ({ ...prev, ...s.notifs }));
   }, []);
 
+  const handleSignatureUpload = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file (PNG, JPG, SVG)");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      if (result) {
+        setSignatureUrl(result);
+        toast.success("Signature uploaded! Click 'Save Firm Details' to persist.");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSaveFirm = () => {
-    saveSettings({ ...loadSettings(), firmName, ownerName, email, mobile, address, gstin, pan, regNo, website, fyStart, currency });
-    toast.success("Firm details saved!");
+    saveSettings({ ...loadSettings(), firmName, ownerName, email, mobile, address, gstin, pan, regNo, website, fyStart, currency, signatureUrl });
+    toast.success("Firm details & signature saved!");
   };
   const handleSaveProfile = () => {
     saveSettings({ ...loadSettings(), fullName, designation, bio });
@@ -219,6 +237,72 @@ export default function SettingsPage() {
                   </select>
                 </div>
               </div>
+
+              {/* Authorized Signature & Stamp Upload Block */}
+              <div style={{ marginTop: 16, marginBottom: 20, padding: 18, border: "2px dashed #CBD5E1", borderRadius: 12, background: "#F8FAFC" }}>
+                <label className="form-label" style={{ fontWeight: 800, color: "#0F172A", display: "flex", alignItems: "center", gap: 6, fontSize: 13.5 }}>
+                  <PenTool size={16} color="#0176D3" />
+                  Authorized Signature & Stamp (For Invoices &amp; Receipts)
+                </label>
+                <p style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>
+                  Upload your digital signature or firm stamp image. It will automatically populate in the Authorized Signatory box on all generated Tax Invoices, Proforma Invoices, and Payment Receipts.
+                </p>
+
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) handleSignatureUpload(file);
+                  }}
+                  style={{
+                    padding: 20,
+                    textAlign: "center",
+                    background: "#FFFFFF",
+                    border: "1.5px dashed #0176D3",
+                    borderRadius: 10,
+                    cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 10
+                  }}
+                >
+                  {signatureUrl ? (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                      <img src={signatureUrl} alt="Authorized Signature" style={{ maxHeight: 75, maxWidth: 220, objectFit: "contain", border: "1px solid #CBD5E1", padding: 6, borderRadius: 8, background: "white" }} />
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <label className="btn-slds btn-slds-secondary" style={{ padding: "5px 14px", fontSize: 12, cursor: "pointer" }}>
+                          Change Signature / Stamp
+                          <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleSignatureUpload(file);
+                          }} />
+                        </label>
+                        <button type="button" className="btn-slds" style={{ background: "#FEE2E2", color: "#DC2626", border: "none", padding: "5px 14px", fontSize: 12, borderRadius: 8, fontWeight: 700 }} onClick={() => setSignatureUrl("")}>
+                          Remove Signature
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <UploadCloud size={34} color="#0176D3" />
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>
+                        Drag &amp; drop your signature or stamp image here, or <span style={{ color: "#0176D3", textDecoration: "underline" }}>browse files</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: "#94A3B8" }}>Supports PNG, JPG, JPEG, SVG (Max 5MB)</div>
+                      <input type="file" accept="image/*" style={{ display: "none" }} id="signature-input" onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleSignatureUpload(file);
+                      }} />
+                      <label htmlFor="signature-input" className="btn-slds btn-slds-primary" style={{ padding: "6px 18px", fontSize: 12, marginTop: 4, cursor: "pointer" }}>
+                        Upload Signature File
+                      </label>
+                    </>
+                  )}
+                </div>
+              </div>
+
               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
                 <button className="btn btn-primary" onClick={handleSaveFirm}><Save size={14} /> Save Firm Details</button>
               </div>

@@ -155,23 +155,38 @@ export default function Topbar({ title, subtitle, onOpenSearch }: TopbarProps) {
               </Link>
             )}
 
-            {isUserMenuOpen && user && (
-              <div style={{
-                position: "absolute",
-                top: 45,
-                right: 0,
-                width: 220,
-                background: "white",
-                borderRadius: 12,
-                boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
-                border: "1px solid #E2E8F0",
-                zIndex: 50,
-                padding: 12
-              }}>
-                <div style={{ paddingBottom: 8, marginBottom: 8, borderBottom: "1px solid #F1F5F9" }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Signed in as</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", wordBreak: "break-all" }}>{user.email}</div>
-                </div>
+            {isUserMenuOpen && user && (() => {
+              let firmSettings: any = {};
+              if (typeof window !== "undefined") {
+                try { firmSettings = JSON.parse(localStorage.getItem("zpluscrm_settings") || "{}"); } catch {}
+              }
+              const userMeta = user?.user_metadata || {};
+              const companyOrUserName =
+                firmSettings.firmName ||
+                firmSettings.ownerName ||
+                userMeta.company_name ||
+                userMeta.firm_name ||
+                userMeta.full_name ||
+                (user?.email ? user.email.split("@")[0].toUpperCase() + " Practice" : "Registered User");
+
+              return (
+                <div style={{
+                  position: "absolute",
+                  top: 45,
+                  right: 0,
+                  width: 230,
+                  background: "white",
+                  borderRadius: 12,
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
+                  border: "1px solid #E2E8F0",
+                  zIndex: 50,
+                  padding: 12
+                }}>
+                  <div style={{ paddingBottom: 8, marginBottom: 8, borderBottom: "1px solid #F1F5F9" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Signed in as</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: "#0F172A", marginTop: 2 }}>{companyOrUserName}</div>
+                    <div style={{ fontSize: 11.5, color: "#64748B", marginTop: 1, wordBreak: "break-all" }}>{user.email}</div>
+                  </div>
 
                 <Link
                   href="/login"
@@ -193,7 +208,8 @@ export default function Topbar({ title, subtitle, onOpenSearch }: TopbarProps) {
                   <span>Sign Out</span>
                 </button>
               </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       </header>

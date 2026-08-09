@@ -869,10 +869,15 @@ export default function InvoicePage() {
                       For {practiceName}
                     </div>
 
-                    {/* Authorized Stamp Badge */}
-                    <div style={{ margin: "10px 0 6px auto", width: 85, height: 42, border: "2px dashed #1D4ED8", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#1D4ED8", fontSize: 9.5, fontWeight: 900, textTransform: "uppercase", background: "#EFF6FF" }}>
-                      Authorized Signatory
-                    </div>
+                    {firmSettings.signatureUrl ? (
+                      <div style={{ margin: "6px 0 4px auto", textAlign: "right" }}>
+                        <img src={firmSettings.signatureUrl} alt="Authorized Signature" style={{ maxHeight: 55, maxWidth: 160, objectFit: "contain", display: "inline-block" }} />
+                      </div>
+                    ) : (
+                      <div style={{ margin: "10px 0 6px auto", width: 85, height: 42, border: "2px dashed #1D4ED8", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#1D4ED8", fontSize: 9.5, fontWeight: 900, textTransform: "uppercase", background: "#EFF6FF" }}>
+                        Authorized Signatory
+                      </div>
+                    )}
 
                     <div style={{ fontSize: 11, color: "#64748B", fontWeight: 600 }}>Authorized Signatory</div>
                   </div>
