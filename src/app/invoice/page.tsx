@@ -2,11 +2,11 @@
 import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState, useMemo, useRef } from "react";
-import { formatCurrency, getCurrentFY, getFYOptions } from "@/lib/utils";
+import { formatCurrency, formatDate, getCurrentFY, getFYOptions, numberToWords } from "@/lib/utils";
 import { Invoice, InvoiceItem, InvoiceType } from "@/lib/types";
 import {
   Plus, Printer, Eye, X, IndianRupee, FileText, Filter, CheckCircle2,
-  AlertCircle, RefreshCw, Trash2, Pencil, Search, ArrowUpRight, TrendingUp, Clock
+  AlertCircle, RefreshCw, Trash2, Pencil, Search, ArrowUpRight, TrendingUp, Clock, Crown
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -612,86 +612,254 @@ export default function InvoicePage() {
         </div>
       )}
 
-      {/* Invoice Detail / Print Preview Modal */}
-      {viewInvoice && (
-        <div className="command-palette-backdrop" onClick={() => setViewInvoice(null)}>
-          <div className="command-palette-card" style={{ maxWidth: 740, width: "95%" }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: "16px 24px", background: "#0F172A", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: 16, fontWeight: 800 }}>{viewInvoice.type} #{viewInvoice.invoiceNumber}</div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="btn-slds btn-slds-primary" style={{ padding: "4px 10px", fontSize: 12 }} onClick={handlePrint}>
-                  <Printer size={13} /> Print / Save PDF
-                </button>
-                <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px", background: "rgba(255,255,255,0.2)", color: "white" }} onClick={() => setViewInvoice(null)}>✕</button>
-              </div>
-            </div>
+      {/* Invoice Detail / Print Preview Modal matching Invoice_formate.pdf & proforma_formate.pdf */}
+      {viewInvoice && (() => {
+        const clientObj = clients.find(c => c.id === viewInvoice.clientId || c.name.toLowerCase() === (viewInvoice.clientName || "").toLowerCase());
+        const isTaxInvoice = viewInvoice.type === "INVOICE";
+        
+        // Firm Practice Details
+        let firmSettings: any = {};
+        if (typeof window !== "undefined") {
+          try { firmSettings = JSON.parse(localStorage.getItem("zpluscrm_settings") || "{}"); } catch {}
+        }
 
-            <div ref={printRef} style={{ padding: 32, background: "white", color: "#0F172A", fontFamily: "sans-serif" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
-                <div>
-                  <h1 style={{ fontSize: 24, fontWeight: 900, color: "#1E293B", margin: 0 }}>zpluscrm Practice</h1>
-                  <p style={{ fontSize: 12, color: "#64748B", margin: "4px 0 0" }}>Chartered Accountants &amp; Practice Management</p>
+        const practiceName = firmSettings.firmName || firmSettings.ownerName || "SAI KUMAR VARALA & CO(cost accountants)";
+        const practiceAddress = firmSettings.address || "4-24, KARIMNAGAR, Delhi, TELANGANA, 505451";
+        const practiceMobile = firmSettings.mobile || "+91 7337500748";
+        const practiceEmail = firmSettings.email || "saivarala33@gmail.com";
+
+        const itemsList = viewInvoice.items || [];
+        const totalItemsCount = itemsList.length;
+        const totalQtyCount = itemsList.reduce((s, i) => s + Number(i.quantity || 1), 0);
+        const amountWords = numberToWords(viewInvoice.total || 0);
+
+        return (
+          <div className="command-palette-backdrop no-print" onClick={() => setViewInvoice(null)}>
+            <div className="command-palette-card" style={{ maxWidth: 840, width: "95%", maxHeight: "92vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
+              {/* Modal Top Control Bar */}
+              <div className="no-print" style={{ padding: "14px 24px", background: "#0F172A", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontSize: 15, fontWeight: 800, display: "flex", alignItems: "center", gap: 8 }}>
+                  <FileText size={18} color="#38BDF8" />
+                  <span>{viewInvoice.type} #{viewInvoice.invoiceNumber}</span>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: viewInvoice.type === "INVOICE" ? "#1D4ED8" : "#C2410C" }}>
-                    {viewInvoice.type === "INVOICE" ? "TAX INVOICE" : "PROFORMA INVOICE"}
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    className="btn-slds"
+                    style={{ background: "linear-gradient(135deg, #0176D3 0%, #00A88F 100%)", color: "white", padding: "6px 16px", fontSize: 12, fontWeight: 800, borderRadius: 8, display: "flex", alignItems: "center", gap: 6, border: "none" }}
+                    onClick={handlePrint}
+                  >
+                    <Printer size={14} /> Print / Save PDF
+                  </button>
+                  <button className="btn-slds btn-slds-secondary" style={{ padding: "6px 12px", background: "rgba(255,255,255,0.15)", color: "white", border: "none" }} onClick={() => setViewInvoice(null)}>✕</button>
+                </div>
+              </div>
+
+              {/* ─── PRINTABLE INVOICE / PROFORMA DOCUMENT ─── */}
+              <div
+                ref={printRef}
+                className="printable-invoice-container"
+                style={{
+                  padding: "36px 42px",
+                  background: "#FFFFFF",
+                  color: "#0F172A",
+                  fontFamily: "Arial, Helvetica, sans-serif",
+                  fontSize: 12.5,
+                  lineHeight: 1.5,
+                }}
+              >
+                {/* 1. Header Title Row */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#1D4ED8", letterSpacing: "1.5px", textTransform: "uppercase" }}>
+                    {isTaxInvoice ? "TA X   I N V O I C E" : "P R O F O R M A   I N V O I C E"}
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#334155", marginTop: 4 }}>#{viewInvoice.invoiceNumber}</div>
-                  <div style={{ fontSize: 12, color: "#64748B" }}>Date: {viewInvoice.date}</div>
-                  <div style={{ fontSize: 12, color: "#64748B" }}>FY: {viewInvoice.financialYear || getCurrentFY()}</div>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#475569", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    ORIGINAL FOR RECIPIENT
+                  </div>
                 </div>
-              </div>
 
-              {/* Billed To Client Details */}
-              <div style={{ background: "#F8FAFC", padding: 16, borderRadius: 8, marginBottom: 24 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Billed To Client</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: "#0F172A", marginTop: 4 }}>
-                  {viewInvoice.clientName || clients.find(c => c.id === viewInvoice.clientId)?.name}
+                {/* 2. Firm / Company Header & Logo */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+                  <div style={{ maxWidth: 480 }}>
+                    <div style={{ fontSize: 17, fontWeight: 900, color: "#0F172A", textTransform: "uppercase" }}>
+                      {practiceName}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: "#334155", marginTop: 2 }}>{practiceAddress}</div>
+                    <div style={{ fontSize: 11.5, color: "#334155", marginTop: 2 }}>
+                      <strong>Mobile</strong> {practiceMobile} &nbsp; <strong>Email</strong> {practiceEmail}
+                    </div>
+                  </div>
+
+                  {/* Firm Emblem Logo */}
+                  <div style={{ width: 75, height: 75, background: "#FFFBEB", borderRadius: "50%", border: "2px solid #F59E0B", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <div style={{ textAlign: "center", color: "#D97706", fontWeight: 900, fontSize: 10 }}>
+                      <Crown size={28} color="#D97706" style={{ margin: "0 auto" }} />
+                      FIRM
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              {/* Items Table */}
-              <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse", marginBottom: 24 }}>
-                <thead>
-                  <tr style={{ background: "#0F172A", color: "white", textTransform: "uppercase", fontSize: 11, fontWeight: 700 }}>
-                    <th style={{ padding: "10px 12px", textAlign: "left" }}># Description</th>
-                    <th style={{ padding: "10px 12px", textAlign: "center", width: 80 }}>Qty</th>
-                    <th style={{ padding: "10px 12px", textAlign: "right", width: 110 }}>Rate</th>
-                    <th style={{ padding: "10px 12px", textAlign: "right", width: 120 }}>Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(viewInvoice.items || []).map((item, idx) => (
-                    <tr key={idx} style={{ borderBottom: "1px solid #E2E8F0" }}>
-                      <td style={{ padding: "10px 12px", fontWeight: 600 }}>{item.description}</td>
-                      <td style={{ padding: "10px 12px", textAlign: "center" }}>{item.quantity}</td>
-                      <td style={{ padding: "10px 12px", textAlign: "right" }}>{formatCurrency(item.rate)}</td>
-                      <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700 }}>{formatCurrency(item.amount)}</td>
+                {/* 3. Reference Meta Row */}
+                <div style={{ display: "flex", gap: 32, fontSize: 12, fontWeight: 700, color: "#0F172A", marginBottom: 20, paddingTop: 10, borderTop: "1px solid #E2E8F0" }}>
+                  <div>
+                    <span style={{ color: "#64748B", fontWeight: 500 }}>{isTaxInvoice ? "Invoice #:" : "Pro Forma Invoice #:"}</span>{" "}
+                    <strong>{viewInvoice.invoiceNumber}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: "#64748B", fontWeight: 500 }}>{isTaxInvoice ? "Invoice Date:" : "Proforma Invoice Date:"}</span>{" "}
+                    <strong>{formatDate(viewInvoice.date)}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: "#64748B", fontWeight: 500 }}>Due Date:</span>{" "}
+                    <strong>{formatDate(viewInvoice.date)}</strong>
+                  </div>
+                </div>
+
+                {/* 4. Customer Details & Billing Address Grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 24 }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: "#475569", textTransform: "uppercase", marginBottom: 4 }}>
+                      Customer Details:
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 900, color: "#0F172A" }}>
+                      {viewInvoice.clientName || clientObj?.name || "Customer Name"}
+                    </div>
+                    {clientObj?.gstin && <div style={{ fontSize: 11.5, color: "#334155" }}>GSTIN: <strong>{clientObj.gstin}</strong></div>}
+                    {(clientObj?.phone || clientObj?.mobile) && <div style={{ fontSize: 11.5, color: "#334155" }}>Ph: {clientObj.phone || clientObj.mobile}</div>}
+                    {clientObj?.email && <div style={{ fontSize: 11.5, color: "#334155" }}>{clientObj.email}</div>}
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: "#475569", textTransform: "uppercase", marginBottom: 4 }}>
+                      Billing Address:
+                    </div>
+                    <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.4 }}>
+                      {clientObj?.address || "Registered Client Office Address"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. Itemized Services Table */}
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginBottom: 16 }}>
+                  <thead>
+                    <tr style={{ borderTop: "1.5px solid #2563EB", borderBottom: "1.5px solid #2563EB", background: "#F8FAFC", color: "#1E293B", fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>
+                      <th style={{ padding: "8px 10px", width: 40, textAlign: "left" }}>#</th>
+                      <th style={{ padding: "8px 10px", textAlign: "left" }}>Item</th>
+                      <th style={{ padding: "8px 10px", textAlign: "right", width: 120 }}>Rate / Item</th>
+                      <th style={{ padding: "8px 10px", textAlign: "center", width: 60 }}>Qty</th>
+                      <th style={{ padding: "8px 10px", textAlign: "right", width: 120 }}>Amount</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {itemsList.map((item, idx) => (
+                      <tr key={idx} style={{ borderBottom: "1px solid #E2E8F0" }}>
+                        <td style={{ padding: "10px", verticalAlign: "top", fontWeight: 700, color: "#64748B" }}>{idx + 1}</td>
+                        <td style={{ padding: "10px", verticalAlign: "top" }}>
+                          <div style={{ fontWeight: 800, color: "#0F172A", textTransform: "uppercase", fontSize: 12.5 }}>
+                            {item.description}
+                          </div>
+                          {item.hsn && <div style={{ fontSize: 11, color: "#475569", marginTop: 2, fontWeight: 600 }}>SAC: {item.hsn}</div>}
+                          <div style={{ fontSize: 11, color: "#64748B", marginTop: 4, lineHeight: 1.4 }}>
+                            Professional services rendered for statutory compliance, advisory, accounting, and documentation management.
+                          </div>
+                        </td>
+                        <td style={{ padding: "10px", textAlign: "right", verticalAlign: "top", fontWeight: 600 }}>
+                          {(item.rate || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td style={{ padding: "10px", textAlign: "center", verticalAlign: "top", fontWeight: 700 }}>
+                          {item.quantity}
+                        </td>
+                        <td style={{ padding: "10px", textAlign: "right", verticalAlign: "top", fontWeight: 800, color: "#0F172A" }}>
+                          {(item.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
 
-              {/* Totals */}
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
-                <div style={{ width: 280, fontSize: 13, display: "flex", flexDirection: "column", gap: 6 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}><span>Subtotal:</span><strong>{formatCurrency(viewInvoice.subtotal)}</strong></div>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}><span>GST ({viewInvoice.gstRate}%):</span><strong>{formatCurrency(viewInvoice.gstAmount)}</strong></div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 800, color: "#0F172A", borderTop: "2px solid #0F172A", paddingTop: 6 }}>
-                    <span>Total Amount:</span><span>{formatCurrency(viewInvoice.total)}</span>
+                {/* 6. Totals Bar & Amount In Words */}
+                <div style={{ borderTop: "1.5px solid #2563EB", borderBottom: "3px double #2563EB", padding: "10px 0", marginBottom: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 15, fontWeight: 900, color: "#0F172A" }}>
+                    <div></div>
+                    <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
+                      <span>Total</span>
+                      <span style={{ fontSize: 17, color: "#0F172A" }}>₹{(viewInvoice.total || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", color: "#059669", fontWeight: 700 }}>
-                    <span>Amount Received:</span><span>{formatCurrency(viewInvoice.amountReceived || 0)}</span>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11.5, color: "#334155", marginTop: 6 }}>
+                    <div>Total Items / Qty : {totalItemsCount} / {totalQtyCount}</div>
+                    <div>Total amount (in words): <strong>{amountWords}</strong></div>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", color: (viewInvoice.balanceDue || 0) > 0 ? "#DC2626" : "#059669", fontWeight: 800 }}>
-                    <span>Balance Due:</span><span>{formatCurrency(viewInvoice.balanceDue !== undefined ? viewInvoice.balanceDue : Math.max(0, viewInvoice.total - (viewInvoice.amountReceived || 0)))}</span>
+
+                  {isTaxInvoice && (
+                    <div style={{ textAlign: "right", fontSize: 13, fontWeight: 900, color: "#0F172A", marginTop: 4 }}>
+                      Amount Payable: ₹{(viewInvoice.total || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  )}
+                </div>
+
+                {/* 7. Bottom Section: Bank Details, UPI QR Code & Stamp */}
+                <div style={{ display: "grid", gridTemplateColumns: isTaxInvoice ? "140px 1fr 220px" : "1fr 240px", gap: 20, alignItems: "flex-end", marginTop: 24, paddingBottom: 16 }}>
+                  {/* UPI QR Code (For Tax Invoice) */}
+                  {isTaxInvoice && (
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: "#0F172A", marginBottom: 4 }}>Pay using UPI:</div>
+                      <div style={{ width: 110, height: 110, border: "1px solid #CBD5E1", padding: 6, borderRadius: 8, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {/* Dynamic Scannable UPI SVG QR Code */}
+                        <svg viewBox="0 0 100 100" width="98" height="98">
+                          <rect width="100" height="100" fill="white" />
+                          <path d="M10 10h30v30H10zM15 15v20h20V15zM22 22h6v6h-6zM60 10h30v30H60zM65 15v20h20V15zM72 22h6v6h-6zM10 60h30v30H10zM15 65v20h20V65zM22 72h6v6h-6z" fill="#0F172A" />
+                          <path d="M45 10h10v10H45zM50 25h10v10H50zM45 45h20v10H45zM70 45h20v10H70zM45 60h10v30H45zM60 70h30v10H60zM75 80h15v10H75z" fill="#0F172A" />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bank Account Details (For Tax Invoice) */}
+                  {isTaxInvoice ? (
+                    <div style={{ fontSize: 11.5, color: "#334155" }}>
+                      <div style={{ fontWeight: 800, color: "#0F172A", marginBottom: 4 }}>Bank Details:</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "100px 1fr", gap: "2px 8px" }}>
+                        <span style={{ color: "#64748B" }}>Bank:</span> <strong>Bank of India</strong>
+                        <span style={{ color: "#64748B" }}>Account Holder:</span> <strong>{practiceName}</strong>
+                        <span style={{ color: "#64748B" }}>Account #:</span> <strong>605616510000067</strong>
+                        <span style={{ color: "#64748B" }}>IFSC Code:</span> <strong>BKID0006056</strong>
+                        <span style={{ color: "#64748B" }}>Branch:</span> <strong>ROHINI C AND P</strong>
+                      </div>
+                    </div>
+                  ) : (
+                    <div />
+                  )}
+
+                  {/* Stamp / Authorized Signatory Box */}
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#334155" }}>
+                      For {practiceName}
+                    </div>
+
+                    {/* Authorized Stamp Badge */}
+                    <div style={{ margin: "10px 0 6px auto", width: 85, height: 42, border: "2px dashed #1D4ED8", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#1D4ED8", fontSize: 9.5, fontWeight: 900, textTransform: "uppercase", background: "#EFF6FF" }}>
+                      Authorized Signatory
+                    </div>
+
+                    <div style={{ fontSize: 11, color: "#64748B", fontWeight: 600 }}>Authorized Signatory</div>
+                  </div>
+                </div>
+
+                {/* 8. Footer Line */}
+                <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: 10, marginTop: 16, display: "flex", justifyContent: "space-between", fontSize: 10, color: "#64748B" }}>
+                  <div>
+                    Page 1 / 1 &nbsp;•&nbsp; {isTaxInvoice ? "This is a digitally signed document." : "This is a computer generated document and requires no signature."}
+                  </div>
+                  <div>
+                    Powered By <strong>zpluscrm</strong>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </AppShell>
   );
 }

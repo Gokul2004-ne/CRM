@@ -1096,3 +1096,36 @@ input[type="number"] {
 .btn-sm         { padding: 4px 10px; font-size: 12px; }
 .btn-icon       { padding: 6px; }
 
+/* Print & PDF Page Fit Styles */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .printable-invoice-container, .printable-invoice-container * {
+    visibility: visible;
+  }
+  .printable-invoice-container {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 20px 24px !important;
+    box-shadow: none !important;
+    background: #FFFFFF !important;
+    color: #0F172A !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+  }
+  .no-print, .command-palette-backdrop {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+}
+
