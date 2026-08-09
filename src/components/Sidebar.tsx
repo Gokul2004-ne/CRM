@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, MessageSquare, Package, Layers,
   FileText, ClipboardList, Building2, Calendar, PenTool,
-  CreditCard, Settings, Handshake, Receipt, Sparkles, RefreshCw
+  CreditCard, Settings, Handshake, Receipt, Sparkles, RefreshCw, Zap
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -50,6 +50,7 @@ export default function Sidebar() {
     {
       title: "Enterprise System",
       items: [
+        { href: "/automations", label: "Smart Automations", icon: Zap },
         { href: "/subscription", label: "Subscription", icon: CreditCard },
         { href: "/settings", label: "Settings", icon: Settings },
       ]

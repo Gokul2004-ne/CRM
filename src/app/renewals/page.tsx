@@ -288,64 +288,64 @@ export default function RenewalsPage() {
 
         {/* ─── TABLE CONTENT ─── */}
         <div className="table-scroll-container">
-          <table>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
-              <tr>
-                <th className="col-num">#</th>
-                <th>Client Name</th>
-                <th>Service Name</th>
-                <th>Registration Date (Optional)</th>
-                <th>Date &amp; Financial Year</th>
-                <th>Due Date &amp; Year</th>
-                <th style={{ textAlign: "center" }}>Progress Status</th>
-                <th className="col-actions" style={{ textAlign: "center" }}>Actions</th>
+              <tr style={{ background: "#F8FAFC", color: "#475569", textTransform: "uppercase", fontSize: 11, fontWeight: 800, borderBottom: "2px solid #E2E8F0", letterSpacing: "0.5px" }}>
+                <th className="col-num" style={{ padding: "14px 12px", width: 50, textAlign: "center" }}>#</th>
+                <th style={{ padding: "14px 16px", textAlign: "left", minWidth: 170 }}>Client Name</th>
+                <th style={{ padding: "14px 16px", textAlign: "left", minWidth: 180 }}>Service Name</th>
+                <th style={{ padding: "14px 16px", textAlign: "center", minWidth: 150 }}>Registration Date</th>
+                <th style={{ padding: "14px 16px", textAlign: "left", minWidth: 190 }}>Validity &amp; Financial Year</th>
+                <th style={{ padding: "14px 16px", textAlign: "left", minWidth: 160 }}>Due Date &amp; Year</th>
+                <th style={{ padding: "14px 16px", textAlign: "center", minWidth: 260 }}>Progress Status</th>
+                <th className="col-actions" style={{ padding: "14px 16px", textAlign: "center", minWidth: 180 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredRenewals.map((rn, idx) => {
                 const clientObj = clients.find(c => c.name.toLowerCase() === rn.clientName.toLowerCase());
                 const phone = clientObj?.phone || clientObj?.mobile || "";
-
-                // Year extraction from Due Date
                 const dueYear = rn.dueDate ? new Date(rn.dueDate).getFullYear() : null;
 
                 return (
-                  <tr key={rn.id}>
-                    <td className="col-num">{idx + 1}</td>
+                  <tr key={rn.id} style={{ borderBottom: "1px solid #F1F5F9", background: idx % 2 === 0 ? "#FFFFFF" : "#FAFBFD" }}>
+                    <td className="col-num" style={{ padding: "14px 12px", textAlign: "center", fontWeight: 700, color: "#94A3B8" }}>{idx + 1}</td>
 
                     {/* Client Name */}
-                    <td style={{ fontWeight: 800, color: "#0F172A", fontSize: 13 }}>
-                      {rn.clientName}
-                      {phone && <div style={{ fontSize: 11, color: "#0284C7", marginTop: 2 }}>{phone}</div>}
+                    <td style={{ padding: "14px 16px" }}>
+                      <div style={{ fontWeight: 800, color: "#0F172A", fontSize: 13.5 }}>{rn.clientName}</div>
+                      {phone && <div style={{ fontSize: 11, color: "#0284C7", marginTop: 2, fontWeight: 600 }}>{phone}</div>}
                     </td>
 
                     {/* Service Name */}
-                    <td style={{ fontWeight: 800, color: "#4F46E5", fontSize: 13 }}>
-                      {rn.serviceName}
+                    <td style={{ padding: "14px 16px" }}>
+                      <div style={{ fontWeight: 800, color: "#4F46E5", fontSize: 13.5 }}>{rn.serviceName}</div>
                       {rn.recurrencePeriod && (
-                        <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{rn.recurrencePeriod}</div>
+                        <span style={{ display: "inline-block", fontSize: 10.5, fontWeight: 700, color: "#64748B", background: "#F1F5F9", padding: "2px 8px", borderRadius: 10, marginTop: 4 }}>
+                          {rn.recurrencePeriod}
+                        </span>
                       )}
                     </td>
 
                     {/* Registration Date (Optional) */}
-                    <td>
+                    <td style={{ padding: "14px 16px", textAlign: "center" }}>
                       {rn.registrationDate ? (
-                        <span style={{ fontSize: 12, fontWeight: 700, color: "#334155" }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#334155", background: "#F8FAFC", padding: "4px 10px", borderRadius: 8, border: "1px solid #E2E8F0" }}>
                           {formatDate(rn.registrationDate)}
                         </span>
                       ) : (
-                        <span style={{ color: "#94A3B8", fontSize: 11 }}>-</span>
+                        <span style={{ color: "#94A3B8", fontSize: 12 }}>-</span>
                       )}
                     </td>
 
                     {/* Date & Financial Year (From - To) */}
-                    <td>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                        <span className="badge" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 800, fontSize: 11, width: "fit-content" }}>
+                    <td style={{ padding: "14px 16px" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <span style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 800, fontSize: 11, padding: "3px 10px", borderRadius: 8, border: "1px solid #BFDBFE", width: "fit-content" }}>
                           {rn.financialYear || "FY 2026-27"}
                         </span>
                         {(rn.fromDate || rn.toDate) && (
-                          <div style={{ fontSize: 11, color: "#64748B" }}>
+                          <div style={{ fontSize: 11.5, color: "#475569", fontWeight: 600, whiteSpace: "nowrap" }}>
                             {rn.fromDate ? formatDate(rn.fromDate) : "?"} to {rn.toDate ? formatDate(rn.toDate) : "?"}
                           </div>
                         )}
@@ -353,29 +353,29 @@ export default function RenewalsPage() {
                     </td>
 
                     {/* Due Date & Year */}
-                    <td>
+                    <td style={{ padding: "14px 16px" }}>
                       {rn.dueDate ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <Calendar size={14} color="#0284C7" />
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ padding: 6, background: "#E0F2FE", borderRadius: 8, color: "#0284C7" }}><Calendar size={14} /></div>
                           <div>
-                            <div style={{ fontWeight: 800, color: "#0F172A", fontSize: 12 }}>
+                            <div style={{ fontWeight: 800, color: "#0F172A", fontSize: 12.5 }}>
                               {formatDate(rn.dueDate)}
                             </div>
                             {dueYear && (
-                              <div style={{ fontSize: 10, color: "#0284C7", fontWeight: 700 }}>
+                              <span style={{ fontSize: 10.5, color: "#0284C7", fontWeight: 800, background: "#E0F2FE", padding: "1px 6px", borderRadius: 6, display: "inline-block", marginTop: 2 }}>
                                 Year: {dueYear}
-                              </div>
+                              </span>
                             )}
                           </div>
                         </div>
                       ) : (
-                        <span style={{ color: "#94A3B8", fontSize: 11 }}>No due date set</span>
+                        <span style={{ color: "#94A3B8", fontSize: 12 }}>No due date set</span>
                       )}
                     </td>
 
                     {/* Progress Status Buttons */}
-                    <td style={{ textAlign: "center" }}>
-                      <div style={{ display: "inline-flex", gap: 4 }}>
+                    <td style={{ padding: "14px 16px", textAlign: "center" }}>
+                      <div style={{ display: "inline-flex", gap: 5, background: "#F8FAFC", padding: 4, borderRadius: 18, border: "1px solid #E2E8F0" }}>
                         {(["To-do", "In-progress", "Completed"] as ProgressStatus[]).map(p => {
                           const cfg = progressStatusConfig[p];
                           const isActive = rn.progress === p;
@@ -384,10 +384,12 @@ export default function RenewalsPage() {
                               key={p}
                               onClick={() => handleStatusChange(rn, p)}
                               style={{
-                                padding: "4px 9px", borderRadius: 14, cursor: "pointer", fontSize: 10.5, fontWeight: 800,
-                                background: isActive ? cfg.bg : "#F8FAFC",
-                                color: isActive ? cfg.color : "#94A3B8",
-                                border: isActive ? `2px solid ${cfg.color}` : "1px solid #E2E8F0",
+                                padding: "5px 12px", borderRadius: 14, cursor: "pointer", fontSize: 11, fontWeight: 800,
+                                background: isActive ? cfg.bg : "transparent",
+                                color: isActive ? cfg.color : "#64748B",
+                                border: isActive ? `1.5px solid ${cfg.color}` : "none",
+                                whiteSpace: "nowrap",
+                                boxShadow: isActive ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
                                 transition: "all 0.15s",
                               }}
                             >
@@ -399,46 +401,53 @@ export default function RenewalsPage() {
                     </td>
 
                     {/* Actions: Renewal, View, Edit, Delete */}
-                    <td className="col-actions" style={{ textAlign: "center" }}>
+                    <td className="col-actions" style={{ padding: "14px 16px", textAlign: "center" }}>
                       <div style={{ display: "flex", gap: 6, justifyContent: "center", alignItems: "center" }}>
                         {/* Special 1-Click Renewal Button */}
                         <button
-                          className="btn-slds btn-slds-primary"
+                          className="btn-slds"
                           style={{
                             background: "linear-gradient(135deg, #4F46E5 0%, #059669 100%)",
+                            color: "white",
                             border: "none",
-                            padding: "4px 10px",
-                            fontSize: 11,
+                            padding: "6px 12px",
+                            fontSize: 11.5,
                             fontWeight: 800,
+                            borderRadius: 8,
                             display: "flex",
                             alignItems: "center",
-                            gap: 4
+                            gap: 5,
+                            whiteSpace: "nowrap",
+                            boxShadow: "0 2px 6px rgba(79,70,229,0.3)"
                           }}
                           onClick={() => handleRenewAction(rn)}
                           title="Click to automatically renew for the next cycle & update year"
                         >
-                          <RefreshCw size={12} />
+                          <RefreshCw size={13} />
                           <span>Renewal</span>
                         </button>
 
                         <button
                           className="icon-btn-slds"
-                          title="View Details & WhatsApp"
+                          style={{ padding: 6, borderRadius: 8, background: "#F1F5F9" }}
+                          title="View Details &amp; WhatsApp"
                           onClick={() => setViewModal({ open: true, item: rn })}
                         >
-                          <Eye size={14} color="#0176D3" />
+                          <Eye size={15} color="#0176D3" />
                         </button>
 
                         <button
                           className="icon-btn-slds"
+                          style={{ padding: 6, borderRadius: 8, background: "#F1F5F9" }}
                           title="Edit Renewal"
                           onClick={() => openEdit(rn)}
                         >
-                          <Pencil size={14} color="#64748B" />
+                          <Pencil size={15} color="#64748B" />
                         </button>
 
                         <button
                           className="icon-btn-slds"
+                          style={{ padding: 6, borderRadius: 8, background: "#FEE2E2" }}
                           title="Delete Renewal"
                           onClick={() => {
                             if (confirm(`Delete renewal record for "${rn.clientName}"?`)) {
@@ -447,7 +456,7 @@ export default function RenewalsPage() {
                             }
                           }}
                         >
-                          <Trash2 size={14} color="#DC2626" />
+                          <Trash2 size={15} color="#DC2626" />
                         </button>
                       </div>
                     </td>

@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import GlobalSearchModal from "@/components/GlobalSearchModal";
+import AiCopilotWidget from "@/components/AiCopilotWidget";
 import { toast } from "sonner";
 import { Lock, Mail, ArrowRight, ArrowLeft, CheckCircle, X, Building2, Eye, EyeOff, ShieldCheck, RefreshCw } from "lucide-react";
 
@@ -1143,6 +1144,7 @@ export default function AppShell({ children, title, subtitle }: AppShellProps) {
       </div>
 
       <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <AiCopilotWidget />
     </div>
   );
 }
