@@ -781,45 +781,53 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const target = (s.renewals || []).find(x => x.id === id);
       if (!target) return s;
 
-      // Auto-advance dates & financial year
+      // 1. Calculate duration in years from existing dates or recurrence period
       let yearsToAdd = 1;
-      const rec = (target.recurrencePeriod || "").toLowerCase();
-      if (rec.includes("2 year")) yearsToAdd = 2;
-      else if (rec.includes("3 year")) yearsToAdd = 3;
-      else if (rec.includes("5 year")) yearsToAdd = 5;
+      if (target.fromDate && target.toDate) {
+        const yFrom = new Date(target.fromDate).getFullYear();
+        const yTo = new Date(target.toDate).getFullYear();
+        if (!isNaN(yFrom) && !isNaN(yTo) && yTo > yFrom) {
+          yearsToAdd = yTo - yFrom;
+        }
+      } else {
+        const rec = (target.recurrencePeriod || "").toLowerCase();
+        if (rec.includes("2 year")) yearsToAdd = 2;
+        else if (rec.includes("3 year")) yearsToAdd = 3;
+        else if (rec.includes("5 year")) yearsToAdd = 5;
+      }
 
-      let nextFromDate = target.fromDate;
+      // 2. Next cycle starts from previous cycle's To Date (e.g. 10/08/2029)
+      let nextFromDate = target.toDate || target.fromDate;
       let nextToDate = target.toDate;
       let nextDueDate = target.dueDate;
       let nextFY = target.financialYear;
 
-      if (target.fromDate) {
-        const d = new Date(target.fromDate);
-        d.setFullYear(d.getFullYear() + yearsToAdd);
-        nextFromDate = d.toISOString().split("T")[0];
-      }
-      if (target.toDate) {
-        const d = new Date(target.toDate);
-        d.setFullYear(d.getFullYear() + yearsToAdd);
-        nextToDate = d.toISOString().split("T")[0];
-      }
-      if (target.dueDate) {
-        const d = new Date(target.dueDate);
-        d.setFullYear(d.getFullYear() + yearsToAdd);
-        nextDueDate = d.toISOString().split("T")[0];
+      if (nextFromDate) {
+        // Calculate new To Date starting from nextFromDate + yearsToAdd (e.g. 10/08/2029 -> 10/08/2032)
+        const dTo = new Date(nextFromDate);
+        dTo.setFullYear(dTo.getFullYear() + yearsToAdd);
+        nextToDate = dTo.toISOString().split("T")[0];
+        nextDueDate = nextToDate;
+      } else if (target.fromDate) {
+        const dFrom = new Date(target.fromDate);
+        dFrom.setFullYear(dFrom.getFullYear() + yearsToAdd);
+        nextFromDate = dFrom.toISOString().split("T")[0];
+
+        const dTo = new Date(nextFromDate);
+        dTo.setFullYear(dTo.getFullYear() + yearsToAdd);
+        nextToDate = dTo.toISOString().split("T")[0];
+        nextDueDate = nextToDate;
       }
 
-      // Compute FY string
+      // 3. Compute Financial Year string (e.g. 2029 - 2032 or FY 2029-30)
       if (nextFromDate && nextToDate) {
         const y1 = new Date(nextFromDate).getFullYear();
         const y2 = new Date(nextToDate).getFullYear();
-        nextFY = y1 === y2 ? `FY ${y1}` : `${y1} - ${y2}`;
-      } else if (nextFY && nextFY.includes("FY")) {
-        const match = nextFY.match(/\d{4}/);
-        if (match) {
-          const startY = parseInt(match[0]) + yearsToAdd;
-          const endYStr = String(startY + 1).slice(-2);
-          nextFY = `FY ${startY}-${endYStr}`;
+        if (y2 - y1 === 1) {
+          const endYStr = String(y2).slice(-2);
+          nextFY = `FY ${y1}-${endYStr}`;
+        } else {
+          nextFY = y1 === y2 ? `FY ${y1}` : `${y1} - ${y2}`;
         }
       }
 
