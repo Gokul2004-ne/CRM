@@ -11,13 +11,13 @@ import { getWhatsAppLink, formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 
 export default function ClientsPage() {
-  const { clients, services, subServices, requiredDocs, assignedServices, addClient, updateClient, deleteClient } = useAppStore();
+  const { clients, services, subServices, requiredDocs, assignedServices, invoices, oneTimeServices, addClient, updateClient, deleteClient } = useAppStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<string>("ALL");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [viewingClient, setViewingClient] = useState<Client | null>(null);
-  const [activeTab, setActiveTab] = useState<"details" | "credentials" | "documents" | "services">("details");
+  const [activeTab, setActiveTab] = useState<"details" | "credentials" | "documents" | "services" | "360">("details");
 
   const [formData, setFormData] = useState<Partial<Client>>({
     name: "",
@@ -61,7 +61,7 @@ export default function ClientsPage() {
 
   const handleOpenView = (client: Client) => {
     setViewingClient(client);
-    setActiveTab("details");
+    setActiveTab("360");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -243,6 +243,17 @@ export default function ClientsPage() {
                             <Eye size={13} />
                             <span>View</span>
                           </button>
+                          <a
+                            href={getWhatsAppLink(phoneNum, `Hello ${client.name}, greetings from our office!`)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn-slds btn-slds-success"
+                            style={{ padding: "4px 10px", fontSize: 11 }}
+                            title="Send WhatsApp Message"
+                          >
+                            <MessageCircle size={13} />
+                            <span>WhatsApp</span>
+                          </a>
                           <button
                             className="btn-slds btn-slds-secondary"
                             style={{ padding: "4px 8px", fontSize: 11 }}
@@ -456,9 +467,10 @@ export default function ClientsPage() {
               </div>
 
               {/* Navigation Tabs */}
-              <div style={{ display: "flex", gap: 12, marginTop: 20, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+              <div style={{ display: "flex", gap: 6, marginTop: 20, borderBottom: "1px solid rgba(255,255,255,0.1)", flexWrap: "wrap" }}>
                 {[
-                  { id: "details", label: "Client Profile & Details", icon: Building },
+                  { id: "360", label: "📊 Client 360°", icon: Building },
+                  { id: "details", label: "Profile & Details", icon: Building },
                   { id: "credentials", label: "Login Credentials", icon: Lock },
                   { id: "documents", label: `Documents (${viewingClient.documentCount || viewingClient.documents?.length || 0})`, icon: FileText },
                   { id: "services", label: "Services & Workflow", icon: Layers }
@@ -470,13 +482,13 @@ export default function ClientsPage() {
                       background: activeTab === t.id ? "white" : "transparent",
                       color: activeTab === t.id ? "#0F172A" : "#94A3B8",
                       borderRadius: "8px 8px 0 0",
-                      padding: "8px 16px",
-                      fontSize: 13,
+                      padding: "8px 14px",
+                      fontSize: 12,
                       fontWeight: 700
                     }}
                     onClick={() => setActiveTab(t.id as any)}
                   >
-                    <t.icon size={14} />
+                    <t.icon size={13} />
                     <span>{t.label}</span>
                   </button>
                 ))}
@@ -485,6 +497,127 @@ export default function ClientsPage() {
 
             {/* Modal Body */}
             <div style={{ padding: 24, maxHeight: 520, overflowY: "auto" }}>
+              {/* ───── TAB 0: Client 360° Dashboard ───── */}
+              {activeTab === "360" && (() => {
+                const clientInvoices = (invoices || []).filter(inv => inv.clientId === viewingClient.id && inv.type === "INVOICE");
+                const clientOts = (oneTimeServices || []).filter(ots => ots.clientName === viewingClient.name);
+                const totalBilled360 = clientInvoices.reduce((s, inv) => s + (inv.total || 0), 0);
+                const totalRecv360 = clientInvoices.reduce((s, inv) => s + (inv.amountReceived || 0), 0);
+                const totalPend360 = clientInvoices.reduce((s, inv) => s + (inv.balanceDue || Math.max(0, (inv.total || 0) - (inv.amountReceived || 0))), 0);
+                const recentInvoices = clientInvoices.slice(0, 3);
+                const phone = viewingClient.phone || viewingClient.mobile || "";
+
+                return (
+                  <div style={{ display: "grid", gap: 16 }}>
+                    {/* Quick Actions */}
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {phone && (
+                        <a href={getWhatsAppLink(phone, `Hello ${viewingClient.name}, greetings from our office!`)} target="_blank" rel="noreferrer"
+                          className="btn-slds btn-slds-success" style={{ padding: "7px 14px", fontSize: 12 }}>
+                          <MessageCircle size={14} /> <span>WhatsApp</span>
+                        </a>
+                      )}
+                      {viewingClient.email && (
+                        <a href={`mailto:${viewingClient.email}`} className="btn-slds btn-slds-secondary" style={{ padding: "7px 14px", fontSize: 12, color: "#0284C7" }}>
+                          <Mail size={14} /> <span>Email</span>
+                        </a>
+                      )}
+                      {phone && (
+                        <a href={`tel:${phone}`} className="btn-slds btn-slds-secondary" style={{ padding: "7px 14px", fontSize: 12 }}>
+                          <Phone size={14} /> <span>Call</span>
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Financial KPIs */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                      <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 12, padding: 14, textAlign: "center" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#059669", textTransform: "uppercase" }}>Total Billed</div>
+                        <div style={{ fontSize: 20, fontWeight: 900, color: "#047857", marginTop: 4 }}>{formatCurrency(totalBilled360)}</div>
+                        <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{clientInvoices.length} invoices</div>
+                      </div>
+                      <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 12, padding: 14, textAlign: "center" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#1D4ED8", textTransform: "uppercase" }}>Collected</div>
+                        <div style={{ fontSize: 20, fontWeight: 900, color: "#1D4ED8", marginTop: 4 }}>{formatCurrency(totalRecv360)}</div>
+                        <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>Amount received</div>
+                      </div>
+                      <div style={{ background: totalPend360 > 0 ? "#FEF2F2" : "#F0FDF4", border: `1px solid ${totalPend360 > 0 ? "#FECACA" : "#BBF7D0"}`, borderRadius: 12, padding: 14, textAlign: "center" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: totalPend360 > 0 ? "#DC2626" : "#059669", textTransform: "uppercase" }}>Pending</div>
+                        <div style={{ fontSize: 20, fontWeight: 900, color: totalPend360 > 0 ? "#DC2626" : "#059669", marginTop: 4 }}>{formatCurrency(totalPend360)}</div>
+                        <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>Balance due</div>
+                      </div>
+                    </div>
+
+                    {/* Recent Invoices */}
+                    <div className="section-card" style={{ padding: 16 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: "#0F172A", marginBottom: 10 }}>Recent Invoices</div>
+                      {recentInvoices.length > 0 ? (
+                        <div style={{ display: "grid", gap: 8 }}>
+                          {recentInvoices.map(inv => (
+                            <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#F8FAFC", borderRadius: 8, border: "1px solid #E2E8F0" }}>
+                              <div>
+                                <div style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>#{inv.invoiceNumber}</div>
+                                <div style={{ fontSize: 11, color: "#64748B" }}>{inv.date}</div>
+                              </div>
+                              <div style={{ textAlign: "right" }}>
+                                <div style={{ fontWeight: 700, color: "#059669" }}>{formatCurrency(inv.total || 0)}</div>
+                                <div style={{ fontSize: 11, color: inv.status === "PAID" ? "#059669" : "#D97706" }}>{inv.status}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ color: "#94A3B8", fontSize: 12, textAlign: "center", padding: "12px 0" }}>No invoices yet for this client</div>
+                      )}
+                    </div>
+
+                    {/* One-Time Services */}
+                    <div className="section-card" style={{ padding: 16 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: "#0F172A", marginBottom: 10 }}>One-Time Services ({clientOts.length})</div>
+                      {clientOts.length > 0 ? (
+                        <div style={{ display: "grid", gap: 6 }}>
+                          {clientOts.map(ots => (
+                            <div key={ots.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 12px", background: "#F8FAFC", borderRadius: 8, border: "1px solid #E2E8F0" }}>
+                              <div style={{ fontWeight: 700, fontSize: 12, color: "#4F46E5" }}>{ots.serviceName}</div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                {ots.dueDate && <div style={{ fontSize: 11, color: "#64748B" }}>{formatDate(ots.dueDate)}</div>}
+                                <span style={{ padding: "2px 8px", borderRadius: 10, fontSize: 11, fontWeight: 700,
+                                  background: ots.progress === "Completed" ? "#F0FDF4" : ots.progress === "In-progress" ? "#FFFBEB" : "#F1F5F9",
+                                  color: ots.progress === "Completed" ? "#059669" : ots.progress === "In-progress" ? "#D97706" : "#475569" }}>
+                                  {ots.progress}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ color: "#94A3B8", fontSize: 12, textAlign: "center", padding: "12px 0" }}>No one-time services for this client</div>
+                      )}
+                    </div>
+
+                    {/* Active Packages */}
+                    <div className="section-card" style={{ padding: 16 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: "#0F172A", marginBottom: 10 }}>Active Packages ({assignedServices.filter(a => a.clientId === viewingClient.id).length})</div>
+                      {assignedServices.filter(a => a.clientId === viewingClient.id).length > 0 ? (
+                        <div style={{ display: "grid", gap: 6 }}>
+                          {assignedServices.filter(a => a.clientId === viewingClient.id).slice(0, 4).map(a => {
+                            const svc = services.find(s => s.id === a.serviceId);
+                            return (
+                              <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 12px", background: "#F8FAFC", borderRadius: 8, border: "1px solid #E2E8F0" }}>
+                                <div style={{ fontWeight: 700, fontSize: 12, color: "#0F172A" }}>{svc?.name || "Package"}</div>
+                                <div style={{ fontSize: 11, color: "#64748B" }}>FY {a.financialYear}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{ color: "#94A3B8", fontSize: 12, textAlign: "center", padding: "12px 0" }}>No packages assigned</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* TAB 1: Client Profile Details */}
               {activeTab === "details" && (
                 <div style={{ display: "grid", gap: 16 }}>

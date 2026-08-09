@@ -112,7 +112,11 @@ export default function InvoicePage() {
   };
 
   const subtotal = useMemo(() => (form.items || []).reduce((s, i) => s + (i.amount || 0), 0), [form.items]);
-  const gstAmount = useMemo(() => (subtotal * (form.gstRate || 18)) / 100, [subtotal, form.gstRate]);
+  const gstAmount = useMemo(() => {
+    const rate = form.gstRate ?? 18;
+    if (rate === 0) return 0;
+    return (subtotal * rate) / 100;
+  }, [subtotal, form.gstRate]);
   const total = useMemo(() => subtotal + gstAmount, [subtotal, gstAmount]);
   const balanceDue = useMemo(() => Math.max(0, total - (form.amountReceived || 0)), [total, form.amountReceived]);
 

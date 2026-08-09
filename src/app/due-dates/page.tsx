@@ -12,7 +12,7 @@ const MONTHS = [
 ];
 
 export default function DueDatesPage() {
-  const { assignedServices, clients, services, subServices, selectedFY, updateAssignedService } = useAppStore();
+  const { services, subServices, selectedFY } = useAppStore();
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
@@ -35,28 +35,32 @@ export default function DueDatesPage() {
   };
 
   const dueItems = useMemo(() => {
-    // Only Assigned Package Services (with a due date set) appear in the compliance calendar
-    const assignedItems = assignedServices
-      .filter(a => a.financialYear === selectedFY && a.dueDate)
-      .map(a => {
-        const client = clients.find(c => c.id === a.clientId);
-        const service = services.find(s => s.id === a.serviceId);
-        const subs = subServices.filter(ss => a.subServiceIds?.includes(ss.id));
-        const daysLeft = getDaysUntilDue(a.dueDate!);
-        const dueDate = new Date(a.dueDate!);
+    // Compliance Calendar: show Services (Packages) that have a dueDate configured
+    return services
+      .filter(s => s.dueDate || s.dueDateDay)
+      .map(s => {
+        // Build a concrete due date for current FY: use s.dueDate directly or compute from dueDateDay + April of FY
+        let dueDateStr = s.dueDate || "";
+        if (!dueDateStr && s.dueDateDay) {
+          // Default: April of the FY start year on that day
+          const pad = (n: number) => String(n).padStart(2, "0");
+          dueDateStr = `${fyStartYear}-04-${pad(s.dueDateDay)}`;
+        }
+        const dueDate = new Date(dueDateStr);
         const monthIndex = dueDate.getMonth();
         const monthName = ["January", "February", "March", "April", "May", "June",
           "July", "August", "September", "October", "November", "December"][monthIndex];
-        return { ...a, client, service, subs, daysLeft, dueDate, monthName, isConfiguredService: false };
-      });
-
-    return assignedItems.filter(item =>
-      !search ||
-      (item.client?.name || "").toLowerCase().includes(search.toLowerCase()) ||
-      (item.service?.name || "").toLowerCase().includes(search.toLowerCase()) ||
-      item.subs.some(s => s.name.toLowerCase().includes(search.toLowerCase()))
-    );
-  }, [assignedServices, clients, services, subServices, selectedFY, search]);
+        const daysLeft = getDaysUntilDue(dueDateStr);
+        // Sub-services (services under this package)
+        const subs = subServices.filter(ss => ss.serviceId === s.id);
+        return { ...s, dueDate, monthName, daysLeft, subs, dueDateStr };
+      })
+      .filter(item =>
+        !search ||
+        item.name.toLowerCase().includes(search.toLowerCase()) ||
+        item.subs.some((ss: any) => ss.name.toLowerCase().includes(search.toLowerCase()))
+      );
+  }, [services, subServices, fyStartYear, search]);
 
   // Group items by FY month
   const itemsByMonth = useMemo(() => {
@@ -215,15 +219,15 @@ export default function DueDatesPage() {
                       </div>
 
                       {/* First 3 items preview */}
-                      {items.slice(0, 3).map(item => (
+                      {items.slice(0, 3).map((item: any) => (
                         <div key={item.id} style={{ fontSize: 12, padding: "5px 0", borderBottom: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <div>
-                            <div style={{ fontWeight: 700, color: "#0F172A" }}>{item.client?.name}</div>
-                            <div style={{ color: "#64748B", fontSize: 11 }}>{item.service?.name}</div>
+                            <div style={{ fontWeight: 700, color: "#0F172A" }}>{item.name}</div>
+                            <div style={{ color: "#64748B", fontSize: 11 }}>{item.subs?.length || 0} sub-services</div>
                           </div>
                           <div style={{ textAlign: "right" }}>
                             {getStatusIcon(item.daysLeft)}
-                            <div style={{ fontSize: 10, color: "#64748B", marginTop: 2 }}>{formatDate(item.dueDate.toISOString())}</div>
+                            <div style={{ fontSize: 10, color: "#64748B", marginTop: 2 }}>{formatDate(item.dueDateStr)}</div>
                           </div>
                         </div>
                       ))}
@@ -278,7 +282,7 @@ export default function DueDatesPage() {
               <Calendar size={40} color="#CBD5E1" style={{ margin: "0 auto 12px" }} />
               <div style={{ fontSize: 15, fontWeight: 600 }}>No compliance items found</div>
               <div style={{ fontSize: 13, marginTop: 6 }}>
-                {search ? `No results for "${search}"` : "Assign packages to clients to see compliance due dates here"}
+                {search ? `No results for "${search}"` : "Add Services with a due date in the Services section to see compliance due dates here"}
               </div>
             </div>
           )}
@@ -295,12 +299,10 @@ function MonthListView({ items, getStatusStyle, getWhatsAppLink, formatDate, for
         <thead>
           <tr>
             <th className="col-num">#</th>
-            <th>Client Name</th>
-            <th>Package & Services</th>
+            <th>Service (Package) Name</th>
+            <th>Sub-Services</th>
             <th>Due Date</th>
-            <th>Status Proximity</th>
-            <th>Payment Status</th>
-            <th>Actions</th>
+            <th>Status</th>
           </tr>
         </thead>
         <tbody>
@@ -310,22 +312,22 @@ function MonthListView({ items, getStatusStyle, getWhatsAppLink, formatDate, for
               <tr key={item.id}>
                 <td className="col-num">{i + 1}</td>
                 <td style={{ fontWeight: 800, color: "#0F172A" }}>
-                  {item.client?.name}
-                  {item.client?.phone && (
-                    <div style={{ fontSize: 11, color: "#0176D3", marginTop: 2 }}>{item.client.phone}</div>
+                  {item.name}
+                  {item.recurrence && (
+                    <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{item.recurrence}</div>
                   )}
                 </td>
                 <td>
-                  <div style={{ fontWeight: 700, color: "#0176D3", fontSize: 13 }}>{item.service?.name}</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                     {item.subs?.map((ss: any) => (
                       <span key={ss.id} className="chip" style={{ background: "#F1F5F9", color: "#334155", fontSize: 10 }}>{ss.name}</span>
                     ))}
+                    {(!item.subs || item.subs.length === 0) && <span style={{ color: "#94A3B8", fontSize: 11 }}>No sub-services</span>}
                   </div>
                 </td>
                 <td>
                   <div style={{ fontWeight: 700, color: style.color, fontSize: 13 }}>
-                    {formatDate(item.dueDate.toISOString())}
+                    {formatDate(item.dueDateStr)}
                   </div>
                 </td>
                 <td>
@@ -335,43 +337,6 @@ function MonthListView({ items, getStatusStyle, getWhatsAppLink, formatDate, for
                      item.daysLeft <= 15 ? `🟡 ${item.daysLeft}d Left` :
                      `🟢 ${item.daysLeft}d Left`}
                   </span>
-                </td>
-                <td>
-                  <div style={{ fontSize: 13 }}>
-                    <span style={{ color: "#059669", fontWeight: 600 }}>{formatCurrency(item.amountReceived || 0)}</span>
-                    <span style={{ color: "#94A3B8", fontSize: 11 }}> / {formatCurrency(item.amountBilled || 0)}</span>
-                  </div>
-                  {(item.amountPending || 0) > 0 && (
-                    <div style={{ fontSize: 11, color: "#DC2626", fontWeight: 600 }}>₹{(item.amountPending || 0).toLocaleString("en-IN")} pending</div>
-                  )}
-                </td>
-                <td>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {item.client?.phone && (
-                      <a
-                        href={getWhatsAppLink(item.client.phone, `Reminder: ${item.service?.name} is due on ${formatDate(item.dueDate.toISOString())}.`)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn-slds btn-slds-success"
-                        style={{ padding: "4px 8px", fontSize: 11 }}
-                        title="Send WhatsApp Reminder"
-                      >
-                        <MessageCircle size={12} />
-                        <span>WA</span>
-                      </a>
-                    )}
-                    {item.client?.email && (
-                      <a
-                        href={`mailto:${item.client.email}?subject=${encodeURIComponent(`Compliance Alert: ${item.service?.name}`)}&body=${encodeURIComponent(`Dear ${item.client?.name},\n\nThis is a compliance reminder for ${item.service?.name} due on ${formatDate(item.dueDate.toISOString())}.\n\nThank you!`)}`}
-                        className="btn-slds btn-slds-secondary"
-                        style={{ padding: "4px 8px", fontSize: 11, color: "#0284C7" }}
-                        title="Send Email"
-                      >
-                        <Mail size={12} />
-                        <span>Mail</span>
-                      </a>
-                    )}
-                  </div>
                 </td>
               </tr>
             );

@@ -15,16 +15,18 @@ import {
 import PaymentAndDeliveryCell from "@/components/PaymentAndDeliveryCell";
 
 export default function Dashboard() {
-  const { clients, services, subServices, assignedServices, selectedFY } = useAppStore();
+  const { clients, services, subServices, assignedServices, invoices, selectedFY } = useAppStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   const totalClients = clients.length;
   const totalServices = services.length;
 
-  const totalBilled = assignedServices.reduce((acc, curr) => acc + ((curr as any).totalFee || curr.amountBilled || 0), 0);
-  const totalReceived = assignedServices.reduce((acc, curr) => acc + ((curr as any).paidAmount || curr.amountReceived || 0), 0);
-  const totalPending = assignedServices.reduce((acc, curr) => acc + ((curr as any).pendingAmount || curr.amountPending || 0), 0);
+  // Dashboard KPIs: derived from actual invoices (not assignedServices which may lack data)
+  const taxInvoices = (invoices || []).filter(inv => inv.type === "INVOICE");
+  const totalBilled = taxInvoices.reduce((acc, inv) => acc + (inv.total || 0), 0);
+  const totalReceived = taxInvoices.reduce((acc, inv) => acc + (inv.amountReceived || 0), 0);
+  const totalPending = taxInvoices.reduce((acc, inv) => acc + (inv.balanceDue || Math.max(0, (inv.total || 0) - (inv.amountReceived || 0))), 0);
 
   // Chart data for April - March
   const months = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];

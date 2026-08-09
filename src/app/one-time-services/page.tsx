@@ -3,8 +3,8 @@ import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
 import { OneTimeService, ProgressStatus } from "@/lib/types";
-import { Plus, Pencil, Trash2, Search, Eye, Calendar, Clock, Circle, CheckCircle2, Layers } from "lucide-react";
-import { formatDate } from "@/lib/utils";
+import { Plus, Pencil, Trash2, Search, Eye, Calendar, Clock, Circle, CheckCircle2, Layers, MessageCircle } from "lucide-react";
+import { formatDate, getWhatsAppLink } from "@/lib/utils";
 import { toast } from "sonner";
 
 const progressStatusConfig: Record<ProgressStatus, { label: string; color: string; bg: string; border: string }> = {
@@ -21,6 +21,7 @@ export default function OneTimeServicesPage() {
   const { clients, oneTimeServices, addOneTimeService, updateOneTimeService, deleteOneTimeService } = useAppStore();
 
   const [search, setSearch] = useState("");
+  const [progressTab, setProgressTab] = useState<ProgressStatus | "ALL">("ALL");
   const [modal, setModal] = useState<{ open: boolean; editing: OneTimeService | null }>({ open: false, editing: null });
   const [viewModal, setViewModal] = useState<{ open: boolean; item: OneTimeService | null }>({ open: false, item: null });
   const [form, setForm] = useState<Partial<OneTimeService>>(emptyOts());
@@ -39,8 +40,10 @@ export default function OneTimeServicesPage() {
   const filteredAndSorted = useMemo(() => {
     const list = (oneTimeServices || []).filter(ots => {
       const q = search.toLowerCase();
-      return (ots.clientName || "").toLowerCase().includes(q) ||
+      const matchesSearch = (ots.clientName || "").toLowerCase().includes(q) ||
              (ots.serviceName || "").toLowerCase().includes(q);
+      const matchesTab = progressTab === "ALL" || ots.progress === progressTab;
+      return matchesSearch && matchesTab;
     });
 
     return list.sort((a, b) => {
@@ -51,7 +54,7 @@ export default function OneTimeServicesPage() {
       // Both without due date -> sort by Client Name ascending
       return (a.clientName || "").localeCompare(b.clientName || "");
     });
-  }, [oneTimeServices, search]);
+  }, [oneTimeServices, search, progressTab]);
 
   const openAdd = () => { setForm(emptyOts()); setModal({ open: true, editing: null }); };
   const openEdit = (ots: OneTimeService) => { setForm({ ...ots }); setModal({ open: true, editing: ots }); };
@@ -100,12 +103,22 @@ export default function OneTimeServicesPage() {
     toast.success(`Progress set to "${next}"`);
   };
 
+  const progressCounts = useMemo(() => {
+    const all = oneTimeServices || [];
+    return {
+      ALL: all.length,
+      "To-do": all.filter(o => o.progress === "To-do").length,
+      "In-progress": all.filter(o => o.progress === "In-progress").length,
+      Completed: all.filter(o => o.progress === "Completed").length,
+    };
+  }, [oneTimeServices]);
+
   return (
     <AppShell title="One Time Service" subtitle="Track and manage individual non-recurring services for clients">
       <div className="data-table-wrapper">
         <div className="data-table-header">
           <div className="toolbar-controls">
-            <div className="search-wrapper" style={{ width: 300 }}>
+            <div className="search-wrapper" style={{ width: 260 }}>
               <Search className="search-icon" />
               <input
                 className="search-input"
@@ -113,6 +126,30 @@ export default function OneTimeServicesPage() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
+            </div>
+            {/* Progress Tab Filters */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {(["ALL", "To-do", "In-progress", "Completed"] as const).map(tab => {
+                const cfg = tab === "ALL"
+                  ? { color: "#4F46E5", bg: "#EEF2FF", border: "#6366F1" }
+                  : progressStatusConfig[tab as ProgressStatus];
+                const isActive = progressTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setProgressTab(tab)}
+                    style={{
+                      padding: "5px 14px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 800,
+                      background: isActive ? cfg.bg : "#F8FAFC",
+                      color: isActive ? cfg.color : "#64748B",
+                      border: isActive ? `2px solid ${cfg.color}` : "1px solid #CBD5E1",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {tab} ({progressCounts[tab]})
+                  </button>
+                );
+              })}
             </div>
           </div>
           <button className="btn-slds btn-slds-primary" style={{ background: "#6366F1", border: "none" }} onClick={openAdd}>
@@ -370,7 +407,26 @@ export default function OneTimeServicesPage() {
                 </div>
               </div>
             </div>
-            <div className="modal-footer">
+            <div className="modal-footer" style={{ justifyContent: "space-between" }}>
+              {(() => {
+                const item = viewModal.item!;
+                const client = clients.find(c => c.name === item.clientName);
+                const phone = client?.phone || client?.mobile || "";
+                const msgText = `Hi ${item.clientName}, this is a reminder for *${item.serviceName}*${item.dueDate ? ` due on ${formatDate(item.dueDate)}` : ""}. Please take the necessary action. Thank you!`;
+                return phone ? (
+                  <a
+                    href={getWhatsAppLink(phone, msgText)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-slds btn-slds-success"
+                    style={{ padding: "7px 16px", fontSize: 12 }}
+                    title="Send WhatsApp Reminder"
+                  >
+                    <MessageCircle size={14} />
+                    <span>Send WhatsApp Reminder</span>
+                  </a>
+                ) : <div />;
+              })()}
               <button className="btn-slds btn-slds-secondary" onClick={() => setViewModal({ open: false, item: null })}>Close</button>
             </div>
           </div>
