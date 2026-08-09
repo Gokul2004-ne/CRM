@@ -110,16 +110,18 @@ export default function ClientsPage() {
     setIsModalOpen(false);
   };
 
-  const filteredClients = clients.filter(c => {
-    const phoneVal = c.phone || c.mobile || "";
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (c.pan || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (c.gstin || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (c.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          phoneVal.includes(searchQuery);
-    const matchesFilter = filterType === "ALL" || c.type === filterType;
-    return matchesSearch && matchesFilter;
-  });
+  const filteredClients = clients
+    .filter(c => {
+      const phoneVal = c.phone || c.mobile || "";
+      const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            (c.pan || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            (c.gstin || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            (c.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            phoneVal.includes(searchQuery);
+      const matchesFilter = filterType === "ALL" || c.type === filterType;
+      return matchesSearch && matchesFilter;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <AppShell title="Client Directory" subtitle="Manage client accounts, statutory details, documents, and sub-services">

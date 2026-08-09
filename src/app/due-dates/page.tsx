@@ -35,31 +35,65 @@ export default function DueDatesPage() {
   };
 
   const dueItems = useMemo(() => {
-    // Compliance Calendar: show Services (Packages) that have a dueDate configured
-    return services
-      .filter(s => s.dueDate || s.dueDateDay)
-      .map(s => {
-        // Build a concrete due date for current FY: use s.dueDate directly or compute from dueDateDay + April of FY
-        let dueDateStr = s.dueDate || "";
-        if (!dueDateStr && s.dueDateDay) {
-          // Default: April of the FY start year on that day
-          const pad = (n: number) => String(n).padStart(2, "0");
-          dueDateStr = `${fyStartYear}-04-${pad(s.dueDateDay)}`;
-        }
-        const dueDate = new Date(dueDateStr);
+    const items: any[] = [];
+    const pad = (n: number) => String(n).padStart(2, "0");
+
+    // Month name => 0-based JS month index (for FY months)
+    const MONTH_IDX: Record<string, number> = {
+      "January": 0, "February": 1, "March": 2, "April": 3, "May": 4, "June": 5,
+      "July": 6, "August": 7, "September": 8, "October": 9, "November": 10, "December": 11,
+    };
+
+    services.forEach(s => {
+      const subs = subServices.filter(ss => ss.serviceId === s.id);
+
+      // 1. If service itself has a dueDate — show it
+      if (s.dueDate) {
+        const dueDate = new Date(s.dueDate);
         const monthIndex = dueDate.getMonth();
-        const monthName = ["January", "February", "March", "April", "May", "June",
-          "July", "August", "September", "October", "November", "December"][monthIndex];
+        const monthName = Object.keys(MONTH_IDX).find(k => MONTH_IDX[k] === monthIndex) || "";
+        const daysLeft = getDaysUntilDue(s.dueDate);
+        if (!search || s.name.toLowerCase().includes(search.toLowerCase())) {
+          items.push({ id: `${s.id}_direct`, name: s.name, recurrence: s.recurrence, dueDate, monthName, daysLeft, subs, dueDateStr: s.dueDate });
+        }
+      } else if (s.dueDateDay) {
+        // 2. Service has a dueDateDay — compute date in current FY (April start)
+        const dueDateStr = `${fyStartYear}-04-${pad(s.dueDateDay)}`;
+        const dueDate = new Date(dueDateStr);
+        const monthName = "April";
         const daysLeft = getDaysUntilDue(dueDateStr);
-        // Sub-services (services under this package)
-        const subs = subServices.filter(ss => ss.serviceId === s.id);
-        return { ...s, dueDate, monthName, daysLeft, subs, dueDateStr };
-      })
-      .filter(item =>
-        !search ||
-        item.name.toLowerCase().includes(search.toLowerCase()) ||
-        item.subs.some((ss: any) => ss.name.toLowerCase().includes(search.toLowerCase()))
-      );
+        if (!search || s.name.toLowerCase().includes(search.toLowerCase())) {
+          items.push({ id: `${s.id}_day`, name: s.name, recurrence: s.recurrence, dueDate, monthName, daysLeft, subs, dueDateStr });
+        }
+      } else if (subs.length > 0) {
+        // 3. Service has no dueDate/dueDateDay — use sub-services that DO have one
+        subs.forEach(ss => {
+          if (!ss.dueDateDay && !ss.dueDate) return;
+          const appMonths = (ss.applicableMonths && ss.applicableMonths.length > 0) ? ss.applicableMonths : ["April"];
+          appMonths.forEach(monthName => {
+            const calMonthIdx = MONTH_IDX[monthName] ?? 3;
+            const calYear = calMonthIdx >= 3 ? fyStartYear : fyStartYear + 1;
+            const day = ss.dueDateDay || 15;
+            const dueDateStr = ss.dueDate || `${calYear}-${pad(calMonthIdx + 1)}-${pad(day)}`;
+            const dueDate = new Date(dueDateStr);
+            const daysLeft = getDaysUntilDue(dueDateStr);
+            const matchSearch = !search ||
+              s.name.toLowerCase().includes(search.toLowerCase()) ||
+              ss.name.toLowerCase().includes(search.toLowerCase());
+            if (matchSearch) {
+              items.push({
+                id: `${s.id}_${ss.id}_${monthName}`,
+                name: `${s.name} — ${ss.name}`,
+                recurrence: ss.recurrence,
+                dueDate, monthName, daysLeft, subs: [ss], dueDateStr
+              });
+            }
+          });
+        });
+      }
+    });
+
+    return items;
   }, [services, subServices, fyStartYear, search]);
 
   // Group items by FY month

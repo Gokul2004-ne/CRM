@@ -33,6 +33,7 @@ export default function Sidebar() {
         { href: "/sub-services", label: "Services", icon: Layers },
         { href: "/required-docs", label: "Required Docs", icon: FileText },
         { href: "/assign", label: "Assign Packages", icon: ClipboardList, badge: assignedServices.length },
+        { href: "/service-clients", label: "Clients by Service", icon: Users },
         { href: "/one-time-services", label: "One Time Service", icon: Sparkles },
       ]
     },

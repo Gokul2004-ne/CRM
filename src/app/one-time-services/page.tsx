@@ -410,22 +410,25 @@ export default function OneTimeServicesPage() {
             <div className="modal-footer" style={{ justifyContent: "space-between" }}>
               {(() => {
                 const item = viewModal.item!;
-                const client = clients.find(c => c.name === item.clientName);
+                const client = clients.find(c => c.name === item.clientName || c.id === (item as any).clientId);
                 const phone = client?.phone || client?.mobile || "";
                 const msgText = `Hi ${item.clientName}, this is a reminder for *${item.serviceName}*${item.dueDate ? ` due on ${formatDate(item.dueDate)}` : ""}. Please take the necessary action. Thank you!`;
-                return phone ? (
+                const waLink = phone
+                  ? getWhatsAppLink(phone, msgText)
+                  : `https://wa.me/?text=${encodeURIComponent(msgText)}`;
+                return (
                   <a
-                    href={getWhatsAppLink(phone, msgText)}
+                    href={waLink}
                     target="_blank"
                     rel="noreferrer"
                     className="btn-slds btn-slds-success"
                     style={{ padding: "7px 16px", fontSize: 12 }}
-                    title="Send WhatsApp Reminder"
+                    title={phone ? `Send WhatsApp to ${phone}` : "Open WhatsApp (enter number manually)"}
                   >
                     <MessageCircle size={14} />
                     <span>Send WhatsApp Reminder</span>
                   </a>
-                ) : <div />;
+                );
               })()}
               <button className="btn-slds btn-slds-secondary" onClick={() => setViewModal({ open: false, item: null })}>Close</button>
             </div>

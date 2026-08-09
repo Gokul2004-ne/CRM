@@ -54,6 +54,7 @@ const empty = () => ({
 export default function AssignPage() {
   const { clients, services, subServices, assignedServices, selectedFY, addAssignedService, updateAssignedService, deleteAssignedService } = useAppStore();
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<DeliveryStatus | "ALL">("ALL");
   const [modal, setModal] = useState<{ open: boolean; editing: AssignedService | null }>({ open: false, editing: null });
   const [viewDetailModal, setViewDetailModal] = useState<{ open: boolean; assignment: AssignedService | null }>({ open: false, assignment: null });
   const [form, setForm] = useState<any>(empty());
@@ -84,12 +85,14 @@ export default function AssignPage() {
                subName.toLowerCase().includes(search.toLowerCase());
       });
 
-    return list.sort((a, b) => {
-      const daysA = getDueStatus(a.dueDate).days;
-      const daysB = getDueStatus(b.dueDate).days;
-      return daysA - daysB;
-    });
-  }, [assignedServices, clients, services, subServices, search, selectedFY]);
+    return list
+      .filter(a => statusFilter === "ALL" || (a.status || "PENDING") === statusFilter)
+      .sort((a, b) => {
+        const daysA = getDueStatus(a.dueDate).days;
+        const daysB = getDueStatus(b.dueDate).days;
+        return daysA - daysB;
+      });
+  }, [assignedServices, clients, services, subServices, search, selectedFY, statusFilter]);
 
   const openAdd = () => { setForm(empty()); setModal({ open: true, editing: null }); };
   const openEdit = (a: AssignedService) => { setForm({ ...a }); setModal({ open: true, editing: a }); };
@@ -168,6 +171,16 @@ export default function AssignPage() {
     toast.success(`Status updated to ${statusConfig[next].label}`);
   };
 
+  const statusCounts = useMemo(() => {
+    const base = assignedServices.filter(a => a.financialYear === selectedFY);
+    return {
+      ALL: base.length,
+      PENDING: base.filter(a => (a.status || "PENDING") === "PENDING").length,
+      IN_PROGRESS: base.filter(a => a.status === "IN_PROGRESS").length,
+      COMPLETED: base.filter(a => a.status === "COMPLETED").length,
+    };
+  }, [assignedServices, selectedFY]);
+
   return (
     <AppShell title="Assign Packages" subtitle="Assign packages to clients with due date tracking">
       <div className="data-table-wrapper">
@@ -176,6 +189,31 @@ export default function AssignPage() {
             <div className="search-wrapper">
               <Search className="search-icon" />
               <input className="search-input" placeholder="Search client, package or service..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            {/* Progress Status Filter Tabs */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {(["ALL", "PENDING", "IN_PROGRESS", "COMPLETED"] as const).map(tab => {
+                const cfg = tab === "ALL"
+                  ? { color: "#4F46E5", bg: "#EEF2FF" }
+                  : statusConfig[tab];
+                const label = tab === "ALL" ? "All" : statusConfig[tab].label;
+                const isActive = statusFilter === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setStatusFilter(tab)}
+                    style={{
+                      padding: "5px 14px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 800,
+                      background: isActive ? cfg.bg : "#F8FAFC",
+                      color: isActive ? cfg.color : "#64748B",
+                      border: isActive ? `2px solid ${cfg.color}` : "1px solid #CBD5E1",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {label} ({statusCounts[tab]})
+                  </button>
+                );
+              })}
             </div>
           </div>
           <button className="btn-slds btn-slds-primary" onClick={openAdd}><Plus size={15} /> Assign Package</button>
@@ -266,13 +304,28 @@ export default function AssignPage() {
                       </span>
                     </td>
                     <td>
-                      <button
-                        onClick={() => handleStatusCycle(a)}
-                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 20, cursor: "pointer", transition: "all 0.15s" }}
-                      >
-                        <StatusIcon size={14} color={cfg.color} />
-                        <span style={{ fontSize: 12, fontWeight: 700, color: cfg.color }}>{cfg.label}</span>
-                      </button>
+                      {/* 3 inline status buttons — same as One Time Services */}
+                      <div style={{ display: "flex", gap: 5 }}>
+                        {(["PENDING", "IN_PROGRESS", "COMPLETED"] as DeliveryStatus[]).map(s => {
+                          const scfg = statusConfig[s];
+                          const isActive = deliveryStatus === s;
+                          return (
+                            <button
+                              key={s}
+                              onClick={() => { updateAssignedService({ ...a, status: s }); toast.success(`Status set to ${scfg.label}`); }}
+                              style={{
+                                padding: "4px 10px", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: 800,
+                                background: isActive ? scfg.bg : "#F8FAFC",
+                                color: isActive ? scfg.color : "#94A3B8",
+                                border: isActive ? `2px solid ${scfg.color}` : "1px solid #E2E8F0",
+                                transition: "all 0.15s",
+                              }}
+                            >
+                              {scfg.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </td>
                     <td className="col-actions">
                       <div style={{ display: "flex", gap: 4 }}>

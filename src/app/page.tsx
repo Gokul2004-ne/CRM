@@ -28,15 +28,24 @@ export default function Dashboard() {
   const totalReceived = taxInvoices.reduce((acc, inv) => acc + (inv.amountReceived || 0), 0);
   const totalPending = taxInvoices.reduce((acc, inv) => acc + (inv.balanceDue || Math.max(0, (inv.total || 0) - (inv.amountReceived || 0))), 0);
 
-  // Chart data for April - March
-  const months = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
-  const chartData = months.map((month) => {
-    return {
-      month,
-      Billed: Math.round(totalBilled > 0 ? (totalBilled / 12) : 0),
-      Received: Math.round(totalReceived > 0 ? (totalReceived / 12) : 0),
-      Pending: Math.round(totalPending > 0 ? (totalPending / 12) : 0),
-    };
+  // Chart data: group invoices by the actual month they were created in
+  const fyStart = parseInt(selectedFY?.split("-")[0] || "2024");
+  const monthShortNames = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
+  // Month order in FY: Apr(3), May(4), ..., Dec(11), Jan(0), Feb(1), Mar(2)
+  const fyMonthOrder = [3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2];
+
+  const chartData = monthShortNames.map((month, idx) => {
+    const calMonth = fyMonthOrder[idx]; // 0-based JS month
+    const calYear = calMonth >= 3 ? fyStart : fyStart + 1;
+    const monthInvoices = taxInvoices.filter(inv => {
+      if (!inv.date && !inv.createdAt) return false;
+      const d = new Date(inv.date || inv.createdAt || "");
+      return d.getMonth() === calMonth && d.getFullYear() === calYear;
+    });
+    const Billed = monthInvoices.reduce((s, inv) => s + (inv.total || 0), 0);
+    const Received = monthInvoices.reduce((s, inv) => s + (inv.amountReceived || 0), 0);
+    const Pending = monthInvoices.reduce((s, inv) => s + (inv.balanceDue || Math.max(0, (inv.total || 0) - (inv.amountReceived || 0))), 0);
+    return { month, Billed, Received, Pending };
   });
 
   // Section 8: Dynamic sorting & Proximity color coding
