@@ -6,7 +6,7 @@ import { useState, useMemo } from "react";
 import { RenewalItem, ProgressStatus } from "@/lib/types";
 import {
   Plus, Pencil, Trash2, Search, Eye, Calendar, RefreshCw, MessageCircle,
-  Clock, Circle, CheckCircle2, Layers, AlertCircle, Sparkles
+  Clock, CheckCircle2, Sparkles
 } from "lucide-react";
 import { formatDate, getWhatsAppLink } from "@/lib/utils";
 import { toast } from "sonner";
@@ -18,7 +18,7 @@ const progressStatusConfig: Record<ProgressStatus, { label: string; color: strin
 };
 
 const RECURRENCE_PRESETS = [
-  "1 Year (Annual)",
+  "1 Year",
   "2 Years",
   "3 Years",
   "5 Years",
@@ -40,6 +40,23 @@ const SUGGESTED_RENEWALS = [
   "Accounting & Bookkeeping Retainer"
 ];
 
+// Helper to calculate Financial Year string from dates
+const computeFY = (fromStr?: string, toStr?: string): string => {
+  if (!fromStr && !toStr) return "";
+  const d1 = fromStr ? new Date(fromStr) : null;
+  const d2 = toStr ? new Date(toStr) : null;
+
+  const y1 = d1 && !isNaN(d1.getFullYear()) ? d1.getFullYear() : null;
+  const y2 = d2 && !isNaN(d2.getFullYear()) ? d2.getFullYear() : null;
+
+  if (y1 && y2) {
+    return y1 === y2 ? `${y1}` : `${y1} - ${y2}`;
+  }
+  if (y1) return `${y1}`;
+  if (y2) return `${y2}`;
+  return "";
+};
+
 const emptyRenewal = (): Partial<RenewalItem> => {
   const today = new Date().toISOString().split("T")[0];
   const nextYearDate = new Date();
@@ -55,8 +72,8 @@ const emptyRenewal = (): Partial<RenewalItem> => {
     fromDate: today,
     toDate: nextYearStr,
     dueDate: nextYearStr,
-    financialYear: `FY ${currentYear}-${String(currentYear + 1).slice(-2)}`,
-    recurrencePeriod: "1 Year (Annual)",
+    financialYear: `${currentYear} - ${currentYear + 1}`,
+    recurrencePeriod: "1 Year",
     progress: "To-do",
     notes: ""
   };
@@ -71,20 +88,19 @@ export default function RenewalsPage() {
   const [viewModal, setViewModal] = useState<{ open: boolean; item: RenewalItem | null }>({ open: false, item: null });
   const [form, setForm] = useState<Partial<RenewalItem>>(emptyRenewal());
 
-  // Auto-calculate Financial Year & Due Date when From/To dates change
-  const handleDateChange = (field: "fromDate" | "toDate" | "registrationDate" | "dueDate", value: string) => {
+  // Auto-calculate Financial Year when From/To dates change
+  const handleDateChange = (field: "fromDate" | "toDate" | "registrationDate", value: string) => {
     setForm(prev => {
       const updated = { ...prev, [field]: value };
 
       if (field === "toDate" && value) {
-        updated.dueDate = value; // Default Due Date to To Date
+        updated.dueDate = value; // Keep internal dueDate in sync with toDate
       }
 
-      if (updated.fromDate && updated.toDate) {
-        const y1 = new Date(updated.fromDate).getFullYear();
-        const y2 = new Date(updated.toDate).getFullYear();
-        if (!isNaN(y1) && !isNaN(y2)) {
-          updated.financialYear = y1 === y2 ? `FY ${y1}` : `${y1} - ${y2}`;
+      if (field === "fromDate" || field === "toDate") {
+        const calculatedFY = computeFY(updated.fromDate, updated.toDate);
+        if (calculatedFY) {
+          updated.financialYear = calculatedFY;
         }
       }
 
@@ -92,7 +108,7 @@ export default function RenewalsPage() {
     });
   };
 
-  // Handle Recurrence change to auto-set To Date & FY
+  // Handle Recurrence change to auto-set To Date & Financial Year
   const handleRecurrenceChange = (period: string) => {
     setForm(prev => {
       let years = 1;
@@ -105,16 +121,15 @@ export default function RenewalsPage() {
       toD.setFullYear(toD.getFullYear() + years);
       const toDateStr = toD.toISOString().split("T")[0];
 
-      const y1 = fromD.getFullYear();
-      const y2 = toD.getFullYear();
-      const fyStr = y1 === y2 ? `FY ${y1}` : `${y1} - ${y2}`;
+      const fromDateStr = prev.fromDate || fromD.toISOString().split("T")[0];
+      const calculatedFY = computeFY(fromDateStr, toDateStr);
 
       return {
         ...prev,
         recurrencePeriod: period,
         toDate: toDateStr,
         dueDate: toDateStr,
-        financialYear: fyStr
+        financialYear: calculatedFY || prev.financialYear
       };
     });
   };
@@ -131,9 +146,11 @@ export default function RenewalsPage() {
     });
 
     return list.sort((a, b) => {
-      if (a.dueDate && !b.dueDate) return -1;
-      if (!a.dueDate && b.dueDate) return 1;
-      if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+      const dateA = a.toDate || a.dueDate || "";
+      const dateB = b.toDate || b.dueDate || "";
+      if (dateA && !dateB) return -1;
+      if (!dateA && dateB) return 1;
+      if (dateA && dateB) return dateA.localeCompare(dateB);
       return (a.clientName || "").localeCompare(b.clientName || "");
     });
   }, [renewals, search, progressTab]);
@@ -165,6 +182,7 @@ export default function RenewalsPage() {
       const newRecord: RenewalItem = {
         ...(form as RenewalItem),
         id: `rn_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        dueDate: form.toDate || form.dueDate || "",
         progress: form.progress || "To-do",
         createdAt: new Date().toISOString()
       };
@@ -182,7 +200,7 @@ export default function RenewalsPage() {
   const handleRenewAction = (rn: RenewalItem) => {
     if (confirm(`Renew service "${rn.serviceName}" for client "${rn.clientName}" for the next cycle?`)) {
       renewService(rn.id);
-      toast.success(`🎉 Service "${rn.serviceName}" renewed for next cycle!`);
+      toast.success(`Service "${rn.serviceName}" renewed for next cycle!`);
     }
   };
 
@@ -197,7 +215,7 @@ export default function RenewalsPage() {
   }, [renewals]);
 
   return (
-    <AppShell title="Renewals Management" subtitle="Track client service renewals, validity periods, and multi-year expiry dates">
+    <AppShell title="Renewals Management" subtitle="Track client service renewals, validity periods, and financial years">
       {/* ─── SUMMARY KPI CARDS ─── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 20 }}>
         <div className="card-slds" style={{ padding: 18, background: "#FFFFFF", borderRadius: 14, border: "1px solid #E2E8F0" }}>
@@ -211,7 +229,7 @@ export default function RenewalsPage() {
 
         <div className="card-slds" style={{ padding: 18, background: "#FFFFFF", borderRadius: 14, border: "1px solid #E2E8F0" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#64748B" }}>To-do / Due</span>
+            <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#64748B" }}>To-do</span>
             <div style={{ padding: 8, background: "#F1F5F9", borderRadius: 10, color: "#475569" }}><Clock size={18} /></div>
           </div>
           <div style={{ fontSize: 26, fontWeight: 900, color: "#0F172A", marginTop: 8 }}>{progressCounts["To-do"]}</div>
@@ -295,8 +313,7 @@ export default function RenewalsPage() {
                 <th style={{ padding: "14px 16px", textAlign: "left", minWidth: 170 }}>Client Name</th>
                 <th style={{ padding: "14px 16px", textAlign: "left", minWidth: 180 }}>Service Name</th>
                 <th style={{ padding: "14px 16px", textAlign: "center", minWidth: 150 }}>Registration Date</th>
-                <th style={{ padding: "14px 16px", textAlign: "left", minWidth: 190 }}>Validity &amp; Financial Year</th>
-                <th style={{ padding: "14px 16px", textAlign: "left", minWidth: 160 }}>Due Date &amp; Year</th>
+                <th style={{ padding: "14px 16px", textAlign: "left", minWidth: 220 }}>Validity &amp; Financial Year</th>
                 <th style={{ padding: "14px 16px", textAlign: "center", minWidth: 260 }}>Progress Status</th>
                 <th className="col-actions" style={{ padding: "14px 16px", textAlign: "center", minWidth: 180 }}>Actions</th>
               </tr>
@@ -305,7 +322,6 @@ export default function RenewalsPage() {
               {filteredRenewals.map((rn, idx) => {
                 const clientObj = clients.find(c => c.name.toLowerCase() === rn.clientName.toLowerCase());
                 const phone = clientObj?.phone || clientObj?.mobile || "";
-                const dueYear = rn.dueDate ? new Date(rn.dueDate).getFullYear() : null;
 
                 return (
                   <tr key={rn.id} style={{ borderBottom: "1px solid #F1F5F9", background: idx % 2 === 0 ? "#FFFFFF" : "#FAFBFD" }}>
@@ -338,11 +354,11 @@ export default function RenewalsPage() {
                       )}
                     </td>
 
-                    {/* Date & Financial Year (From - To) */}
+                    {/* Validity & Financial Year (From - To) */}
                     <td style={{ padding: "14px 16px" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        <span style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 800, fontSize: 11, padding: "3px 10px", borderRadius: 8, border: "1px solid #BFDBFE", width: "fit-content" }}>
-                          {rn.financialYear || "FY 2026-27"}
+                        <span style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 800, fontSize: 11.5, padding: "3px 10px", borderRadius: 8, border: "1px solid #BFDBFE", width: "fit-content" }}>
+                          {rn.financialYear || "FY Renewal"}
                         </span>
                         {(rn.fromDate || rn.toDate) && (
                           <div style={{ fontSize: 11.5, color: "#475569", fontWeight: 600, whiteSpace: "nowrap" }}>
@@ -350,27 +366,6 @@ export default function RenewalsPage() {
                           </div>
                         )}
                       </div>
-                    </td>
-
-                    {/* Due Date & Year */}
-                    <td style={{ padding: "14px 16px" }}>
-                      {rn.dueDate ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ padding: 6, background: "#E0F2FE", borderRadius: 8, color: "#0284C7" }}><Calendar size={14} /></div>
-                          <div>
-                            <div style={{ fontWeight: 800, color: "#0F172A", fontSize: 12.5 }}>
-                              {formatDate(rn.dueDate)}
-                            </div>
-                            {dueYear && (
-                              <span style={{ fontSize: 10.5, color: "#0284C7", fontWeight: 800, background: "#E0F2FE", padding: "1px 6px", borderRadius: 6, display: "inline-block", marginTop: 2 }}>
-                                Year: {dueYear}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <span style={{ color: "#94A3B8", fontSize: 12 }}>No due date set</span>
-                      )}
                     </td>
 
                     {/* Progress Status Buttons */}
@@ -466,7 +461,7 @@ export default function RenewalsPage() {
 
               {filteredRenewals.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: 40, color: "#64748B" }}>
+                  <td colSpan={7} style={{ textAlign: "center", padding: 40, color: "#64748B" }}>
                     No renewal records found. Click "+ Add Renewal Service" to get started!
                   </td>
                 </tr>
@@ -479,128 +474,127 @@ export default function RenewalsPage() {
       {/* ─── MODAL: Add / Edit Renewal ────────────────────────────────── */}
       {modal.open && (
         <div className="modal-overlay" onClick={() => setModal({ open: false, editing: null })}>
-          <div className="modal" style={{ maxWidth: 540 }} onClick={e => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header" style={{ background: "#4F46E5", color: "white" }}>
               <div className="modal-title">{modal.editing ? "Edit Renewal Service" : "Add New Renewal Service"}</div>
               <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px", background: "rgba(255,255,255,0.2)", color: "white" }} onClick={() => setModal({ open: false, editing: null })}>✕</button>
             </div>
-            <div className="modal-body" style={{ display: "grid", gap: 14, padding: 20 }}>
-              
-              {/* 1. Client Name (Manual Entry) */}
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 700 }}>1. Client Name * (Manually Entered)</label>
-                <input
-                  className="command-palette-input"
-                  style={{ width: "100%", padding: 8, fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1" }}
-                  list="client-suggestions"
-                  placeholder="Type client name e.g. Krishna, Gokul..."
-                  value={form.clientName || ""}
-                  onChange={e => setForm(f => ({ ...f, clientName: e.target.value }))}
-                />
-                <datalist id="client-suggestions">
-                  {clients.map(c => <option key={c.id} value={c.name} />)}
-                </datalist>
-              </div>
+            
+            <div className="modal-body" style={{ display: "grid", gap: 16, padding: 20 }}>
 
-              {/* 2. Service Name (Manual Entry) */}
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 700 }}>2. Service Name * (Manually Entered)</label>
-                <input
-                  className="command-palette-input"
-                  style={{ width: "100%", padding: 8, fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1" }}
-                  list="service-suggestions"
-                  placeholder="Type service name e.g. GST License Renewal..."
-                  value={form.serviceName || ""}
-                  onChange={e => setForm(f => ({ ...f, serviceName: e.target.value }))}
-                />
-                <datalist id="service-suggestions">
-                  {SUGGESTED_RENEWALS.map(s => <option key={s} value={s} />)}
-                </datalist>
-              </div>
-
-              {/* 3. Registration Date (Optional) */}
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 700 }}>3. Registration Date (Optional)</label>
-                <input
-                  type="date"
-                  className="command-palette-input"
-                  style={{ width: "100%", padding: 8, fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1" }}
-                  value={form.registrationDate || ""}
-                  onChange={e => handleDateChange("registrationDate", e.target.value)}
-                />
-              </div>
-
-              {/* 4. Recurrence Duration Dropdown */}
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 700 }}>4. Recurrence / Duration Period</label>
-                <select
-                  className="command-palette-input"
-                  style={{ width: "100%", padding: 8, fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1" }}
-                  value={form.recurrencePeriod || "1 Year (Annual)"}
-                  onChange={e => handleRecurrenceChange(e.target.value)}
-                >
-                  {RECURRENCE_PRESETS.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-
-              {/* 5. Date & Financial Year (From to To) */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>From Date</label>
-                  <input
-                    type="date"
-                    className="command-palette-input"
-                    style={{ width: "100%", padding: 8, fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1" }}
-                    value={form.fromDate || ""}
-                    onChange={e => handleDateChange("fromDate", e.target.value)}
-                  />
+              {/* SECTION 1: Client & Service Information */}
+              <div style={{ background: "#F8FAFC", padding: 14, borderRadius: 10, border: "1px solid #E2E8F0" }}>
+                <div style={{ fontSize: 11.5, fontWeight: 800, color: "#475569", textTransform: "uppercase", marginBottom: 10, letterSpacing: "0.5px" }}>
+                  Client &amp; Service Information
                 </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: 12.5 }}>Client Name *</label>
+                    <input
+                      className="command-palette-input"
+                      style={{ width: "100%", padding: "8px 12px", fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1" }}
+                      list="client-suggestions"
+                      placeholder="e.g. Krishna, Gokul..."
+                      value={form.clientName || ""}
+                      onChange={e => setForm(f => ({ ...f, clientName: e.target.value }))}
+                    />
+                    <datalist id="client-suggestions">
+                      {clients.map(c => <option key={c.id} value={c.name} />)}
+                    </datalist>
+                  </div>
 
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>To Date</label>
-                  <input
-                    type="date"
-                    className="command-palette-input"
-                    style={{ width: "100%", padding: 8, fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1" }}
-                    value={form.toDate || ""}
-                    onChange={e => handleDateChange("toDate", e.target.value)}
-                  />
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: 12.5 }}>Service Name *</label>
+                    <input
+                      className="command-palette-input"
+                      style={{ width: "100%", padding: "8px 12px", fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1" }}
+                      list="service-suggestions"
+                      placeholder="e.g. GST Registration Renewal..."
+                      value={form.serviceName || ""}
+                      onChange={e => setForm(f => ({ ...f, serviceName: e.target.value }))}
+                    />
+                    <datalist id="service-suggestions">
+                      {SUGGESTED_RENEWALS.map(s => <option key={s} value={s} />)}
+                    </datalist>
+                  </div>
                 </div>
               </div>
 
-              {/* Editable Financial Year & Due Date */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {/* SECTION 2: Validity & Financial Year */}
+              <div style={{ background: "#F8FAFC", padding: 14, borderRadius: 10, border: "1px solid #E2E8F0" }}>
+                <div style={{ fontSize: 11.5, fontWeight: 800, color: "#475569", textTransform: "uppercase", marginBottom: 10, letterSpacing: "0.5px" }}>
+                  Validity &amp; Financial Year
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: 12.5 }}>Registration Date <span style={{ fontWeight: 400, color: "#64748B" }}>(Optional)</span></label>
+                    <input
+                      type="date"
+                      className="command-palette-input"
+                      style={{ width: "100%", padding: "8px 12px", fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1" }}
+                      value={form.registrationDate || ""}
+                      onChange={e => handleDateChange("registrationDate", e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: 12.5 }}>Recurrence / Duration</label>
+                    <select
+                      className="command-palette-input"
+                      style={{ width: "100%", padding: "8px 12px", fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1" }}
+                      value={form.recurrencePeriod || "1 Year"}
+                      onChange={e => handleRecurrenceChange(e.target.value)}
+                    >
+                      {RECURRENCE_PRESETS.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: 12.5 }}>From Date</label>
+                    <input
+                      type="date"
+                      className="command-palette-input"
+                      style={{ width: "100%", padding: "8px 12px", fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1" }}
+                      value={form.fromDate || ""}
+                      onChange={e => handleDateChange("fromDate", e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: 12.5 }}>To Date (Expiry Date)</label>
+                    <input
+                      type="date"
+                      className="command-palette-input"
+                      style={{ width: "100%", padding: "8px 12px", fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1" }}
+                      value={form.toDate || ""}
+                      onChange={e => handleDateChange("toDate", e.target.value)}
+                    />
+                  </div>
+                </div>
+
                 <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>Financial Year (Editable)</label>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: 12.5 }}>Financial Year</label>
                   <input
                     className="command-palette-input"
-                    style={{ width: "100%", padding: 8, fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1", fontWeight: 700, color: "#1D4ED8" }}
-                    placeholder="e.g. FY 2026-27 or 2026 - 2029"
+                    style={{ width: "100%", padding: "8px 12px", fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1", fontWeight: 700, color: "#1D4ED8", background: "#FFFFFF" }}
+                    placeholder="e.g. 2026 - 2027"
                     value={form.financialYear || ""}
                     onChange={e => setForm(f => ({ ...f, financialYear: e.target.value }))}
                   />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>Due Date &amp; Year</label>
-                  <input
-                    type="date"
-                    className="command-palette-input"
-                    style={{ width: "100%", padding: 8, fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1" }}
-                    value={form.dueDate || ""}
-                    onChange={e => handleDateChange("dueDate", e.target.value)}
-                  />
-                  {form.dueDate && (
-                    <div style={{ fontSize: 11, color: "#0284C7", fontWeight: 700, marginTop: 2 }}>
-                      Due Year: {new Date(form.dueDate).getFullYear()}
-                    </div>
-                  )}
+                  <div style={{ fontSize: 11, color: "#64748B", marginTop: 4, fontWeight: 500 }}>
+                    ⚡ Auto-calculated when dates change. You can also edit it manually.
+                  </div>
                 </div>
               </div>
 
-              {/* 6. Progress Status */}
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 700 }}>6. Progress Status</label>
+              {/* SECTION 3: Progress Status */}
+              <div style={{ background: "#F8FAFC", padding: 14, borderRadius: 10, border: "1px solid #E2E8F0" }}>
+                <div style={{ fontSize: 11.5, fontWeight: 800, color: "#475569", textTransform: "uppercase", marginBottom: 10, letterSpacing: "0.5px" }}>
+                  Progress Status
+                </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   {(["To-do", "In-progress", "Completed"] as ProgressStatus[]).map(p => {
                     const cfg = progressStatusConfig[p];
@@ -613,9 +607,10 @@ export default function RenewalsPage() {
                         style={{
                           flex: 1, padding: "8px 0", borderRadius: 8, cursor: "pointer",
                           fontSize: 12.5, fontWeight: 800,
-                          background: isSelected ? cfg.bg : "#F8FAFC",
+                          background: isSelected ? cfg.bg : "#FFFFFF",
                           color: isSelected ? cfg.color : "#64748B",
                           border: isSelected ? `2px solid ${cfg.color}` : "1px solid #CBD5E1",
+                          boxShadow: isSelected ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
                           transition: "all 0.15s",
                         }}
                       >
@@ -671,24 +666,15 @@ export default function RenewalsPage() {
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>Financial Year</div>
                   <div style={{ fontSize: 13, fontWeight: 800, color: "#1D4ED8", marginTop: 2 }}>
-                    {viewModal.item.financialYear || "FY 2026-27"}
+                    {viewModal.item.financialYear || "FY Renewal"}
                   </div>
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>Validity (From - To)</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A", marginTop: 2 }}>
-                    {viewModal.item.fromDate ? formatDate(viewModal.item.fromDate) : "-"} to {viewModal.item.toDate ? formatDate(viewModal.item.toDate) : "-"}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>Due Date &amp; Year</div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#0F172A", marginTop: 2 }}>
-                    {viewModal.item.dueDate ? `${formatDate(viewModal.item.dueDate)} (${new Date(viewModal.item.dueDate).getFullYear()})` : "No due date set"}
-                  </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>Validity Period</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginTop: 2 }}>
+                  {viewModal.item.fromDate ? formatDate(viewModal.item.fromDate) : "-"} to {viewModal.item.toDate ? formatDate(viewModal.item.toDate) : "-"}
                 </div>
               </div>
 
@@ -712,7 +698,8 @@ export default function RenewalsPage() {
                 const item = viewModal.item!;
                 const client = clients.find(c => c.name.toLowerCase() === item.clientName.toLowerCase());
                 const phone = client?.phone || client?.mobile || "";
-                const msgText = `Hi ${item.clientName}, this is a renewal reminder for *${item.serviceName}* (${item.financialYear || "FY Renewal"}). Due Date: ${item.dueDate ? formatDate(item.dueDate) : "Upcoming"}. Please renew at the earliest. Thank you!`;
+                const expiryStr = item.toDate ? formatDate(item.toDate) : "Upcoming";
+                const msgText = `Hi ${item.clientName}, this is a renewal reminder for *${item.serviceName}* (${item.financialYear || "FY Renewal"}). Expiry Date: ${expiryStr}. Please renew at the earliest. Thank you!`;
                 const waLink = phone ? getWhatsAppLink(phone, msgText) : `https://wa.me/?text=${encodeURIComponent(msgText)}`;
 
                 return (

@@ -53,11 +53,17 @@ export function formatDate(date: string | Date): string {
   return format(new Date(date), "dd MMM yyyy");
 }
 
-export function getWhatsAppLink(mobile: string, message?: string): string {
-  const cleaned = mobile.replace(/\D/g, "");
-  const number = cleaned.startsWith("91") ? cleaned : `91${cleaned}`;
+export function getWhatsAppLink(mobile?: string, message?: string): string {
   const msg = message ? encodeURIComponent(message) : "";
-  return `https://wa.me/${number}${msg ? `?text=${msg}` : ""}`;
+  if (!mobile || !mobile.trim()) {
+    return `https://wa.me/${msg ? `?text=${msg}` : ""}`;
+  }
+  const cleaned = mobile.replace(/\D/g, "");
+  if (!cleaned) {
+    return `https://wa.me/${msg ? `?text=${msg}` : ""}`;
+  }
+  const number = cleaned.length === 10 ? `91${cleaned}` : cleaned;
+  return `https://api.whatsapp.com/send?phone=${number}${msg ? `&text=${msg}` : ""}`;
 }
 
 export function getDueBadgeColor(days: number): string {

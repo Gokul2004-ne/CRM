@@ -69,7 +69,7 @@ export default function AiCopilotWidget() {
       totalClients: clients.length,
       highRiskClients,
       highRiskCount,
-      overdueRenewalsCount: (renewals || []).filter(r => r.dueDate && new Date(r.dueDate) < new Date() && r.progress !== "Completed").length,
+      overdueRenewalsCount: (renewals || []).filter(r => (r.toDate || r.dueDate) && new Date(r.toDate || r.dueDate!) < new Date() && r.progress !== "Completed").length,
     };
   }, [clients, invoices, assignedServices, renewals]);
 

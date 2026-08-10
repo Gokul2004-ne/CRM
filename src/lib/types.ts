@@ -46,6 +46,10 @@ export interface Client {
   incorporationDate?: string;
   acquiredDate?: string;
   address?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  state?: string;
+  pincode?: string;
   notes?: string;
   documentCount?: number;
   documents?: ClientDocument[];

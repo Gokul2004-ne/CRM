@@ -24,7 +24,10 @@ async function safeTableFetch(tableName: string, userId?: string) {
     // Strict isolation: ONLY fetch records matching the current user's userId
     const { data, error } = await supabase.from(tableName).select("*").eq("user_id", userId);
     if (error) {
-      console.warn(`Supabase fetch for table ${tableName} returned error:`, error);
+      // Suppress noisy warnings for expected mock-auth UUID mismatch (22P02) or missing table schemas (PGRST205)
+      if (error.code !== "22P02" && error.code !== "PGRST205") {
+        console.warn(`Supabase fetch for table ${tableName} returned error:`, error);
+      }
       return [];
     }
     return data || [];

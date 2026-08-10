@@ -10,6 +10,15 @@ import {
 import { getWhatsAppLink, formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+  "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand",
+  "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
+  "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab",
+  "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
+  "Uttar Pradesh", "Uttarakhand", "West Bengal", "Delhi", "Chandigarh"
+];
+
 export default function ClientsPage() {
   const { clients, services, subServices, requiredDocs, assignedServices, invoices, oneTimeServices, addClient, updateClient, deleteClient } = useAppStore();
   const [searchQuery, setSearchQuery] = useState("");
@@ -29,6 +38,10 @@ export default function ClientsPage() {
     email: "",
     city: "",
     address: "",
+    addressLine1: "",
+    addressLine2: "",
+    state: "Maharashtra",
+    pincode: "",
     status: "ACTIVE"
   });
 
@@ -44,6 +57,10 @@ export default function ClientsPage() {
       email: "",
       city: "",
       address: "",
+      addressLine1: "",
+      addressLine2: "",
+      state: "Maharashtra",
+      pincode: "",
       status: "ACTIVE"
     });
     setIsModalOpen(true);
@@ -51,9 +68,38 @@ export default function ClientsPage() {
 
   const handleOpenEdit = (client: Client) => {
     setEditingClient(client);
+
+    let a1 = client.addressLine1 || "";
+    let a2 = client.addressLine2 || "";
+    let st = client.state || "Maharashtra";
+    let pin = client.pincode || "";
+
+    if (!a1 && client.address) {
+      const parts = client.address.split(";").map(s => s.trim());
+      if (parts.length >= 4) {
+        a1 = parts[0];
+        a2 = parts[1];
+        st = parts[2];
+        pin = parts[3];
+      } else if (parts.length === 3) {
+        a1 = parts[0];
+        st = parts[1];
+        pin = parts[2];
+      } else if (parts.length === 2) {
+        a1 = parts[0];
+        st = parts[1];
+      } else {
+        a1 = client.address;
+      }
+    }
+
     setFormData({
       ...client,
       phone: client.phone || client.mobile || "",
+      addressLine1: a1,
+      addressLine2: a2,
+      state: st,
+      pincode: pin,
       documentCount: client.documentCount || client.documents?.length || 0
     });
     setIsModalOpen(true);
@@ -66,18 +112,52 @@ export default function ClientsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const phoneVal = formData.phone || formData.mobile;
-    if (!formData.name || !phoneVal) {
-      toast.error("Please fill in Client Name and Phone Number");
+    const phoneVal = (formData.phone || formData.mobile || "").trim();
+    const cleanPhone = phoneVal.replace(/\D/g, "");
+    const emailVal = (formData.email || "").trim();
+
+    if (!formData.name?.trim()) {
+      toast.error("Please fill in Client / Firm Name");
       return;
     }
+
+    if (!phoneVal) {
+      toast.error("Please fill in Phone / Mobile Number");
+      return;
+    }
+
+    // Strict 10-digit mobile number validation
+    if (cleanPhone.length !== 10 || !/^[6-9]\d{9}$/.test(cleanPhone)) {
+      toast.error("Invalid Mobile Number! Please enter a valid 10-digit Indian mobile number (e.g. 9876543210).");
+      return;
+    }
+
+    // Strict Email validation if provided
+    if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+      toast.error("Invalid Email Address! Please enter a valid email address (e.g. client@company.com).");
+      return;
+    }
+
+    // Format address as: Address 1; Address 2; State; Pincode
+    const addrParts = [
+      formData.addressLine1?.trim(),
+      formData.addressLine2?.trim(),
+      formData.state?.trim(),
+      formData.pincode?.trim()
+    ].filter(Boolean);
+
+    const formattedAddress = addrParts.join("; ");
 
     if (editingClient) {
       updateClient({
         ...editingClient,
         ...formData,
+        name: formData.name.trim(),
+        ownerName: formData.name.trim(),
         phone: phoneVal,
         mobile: phoneVal,
+        email: emailVal,
+        address: formattedAddress,
         documentCount: Number(formData.documentCount || 0)
       } as Client);
       toast.success("Client details updated successfully!");
@@ -89,16 +169,21 @@ export default function ClientsPage() {
 
       const newClient: Client = {
         id: `c_${Date.now()}`,
-        name: formData.name || "",
-        ownerName: formData.name || "",
+        name: formData.name?.trim() || "",
+        ownerName: formData.name?.trim() || "",
         type: formData.type || "PROPRIETORSHIP",
         pan: formData.pan || "",
         gstin: formData.gstin || "",
         contactPerson: formData.contactPerson || "",
         phone: phoneVal,
         mobile: phoneVal,
-        email: formData.email || "",
+        email: emailVal,
         city: formData.city || "",
+        address: formattedAddress,
+        addressLine1: formData.addressLine1 || "",
+        addressLine2: formData.addressLine2 || "",
+        state: formData.state || "",
+        pincode: formData.pincode || "",
         documentCount: Number(formData.documentCount || 2),
         documents: initialDocs,
         status: formData.status || "ACTIVE",
@@ -351,12 +436,14 @@ export default function ClientsPage() {
                   <input
                     type="text"
                     required
+                    maxLength={10}
                     className="command-palette-input"
                     style={{ borderRadius: 8, border: "1px solid #CBD5E1", padding: 10, fontSize: 14 }}
-                    placeholder="9876543210"
+                    placeholder="e.g. 9876543210"
                     value={formData.phone || formData.mobile || ""}
-                    onChange={e => setFormData({ ...formData, phone: e.target.value, mobile: e.target.value })}
+                    onChange={e => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, ""), mobile: e.target.value.replace(/\D/g, "") })}
                   />
+                  <div style={{ fontSize: 10.5, color: "#64748B", marginTop: 2 }}>Must be valid 10-digit mobile number</div>
                 </div>
               </div>
 
@@ -377,16 +464,86 @@ export default function ClientsPage() {
 
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>
-                    Address / Location
+                    City / Location
                   </label>
                   <input
                     type="text"
                     className="command-palette-input"
                     style={{ borderRadius: 8, border: "1px solid #CBD5E1", padding: 10, fontSize: 14 }}
-                    placeholder="e.g. 12/3, MG Road, Bengaluru - 560001"
-                    value={(formData as any).address || ""}
-                    onChange={e => setFormData({ ...formData, address: e.target.value } as any)}
+                    placeholder="e.g. Bengaluru, Mumbai..."
+                    value={formData.city || ""}
+                    onChange={e => setFormData({ ...formData, city: e.target.value })}
                   />
+                </div>
+              </div>
+
+              {/* Structured Address Section */}
+              <div style={{ background: "#F8FAFC", padding: 12, borderRadius: 10, border: "1px solid #E2E8F0" }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#475569", textTransform: "uppercase", marginBottom: 8, letterSpacing: "0.5px" }}>
+                  Address Format (Saved as: Address 1; Address 2; State; Pincode)
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 11.5, fontWeight: 700, color: "#475569", display: "block", marginBottom: 3 }}>
+                      Address Line 1
+                    </label>
+                    <input
+                      type="text"
+                      className="command-palette-input"
+                      style={{ borderRadius: 8, border: "1px solid #CBD5E1", padding: 8, fontSize: 13, background: "white" }}
+                      placeholder="e.g. Flat 101, Sai Residency"
+                      value={formData.addressLine1 || ""}
+                      onChange={e => setFormData({ ...formData, addressLine1: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 11.5, fontWeight: 700, color: "#475569", display: "block", marginBottom: 3 }}>
+                      Address Line 2
+                    </label>
+                    <input
+                      type="text"
+                      className="command-palette-input"
+                      style={{ borderRadius: 8, border: "1px solid #CBD5E1", padding: 8, fontSize: 13, background: "white" }}
+                      placeholder="e.g. MG Road, Landmark"
+                      value={formData.addressLine2 || ""}
+                      onChange={e => setFormData({ ...formData, addressLine2: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 11.5, fontWeight: 700, color: "#475569", display: "block", marginBottom: 3 }}>
+                      State
+                    </label>
+                    <select
+                      className="fy-selector-slds"
+                      style={{ width: "100%", background: "white", color: "#0F172A", border: "1px solid #CBD5E1", padding: 8, fontSize: 13, borderRadius: 8 }}
+                      value={formData.state || "Maharashtra"}
+                      onChange={e => setFormData({ ...formData, state: e.target.value })}
+                    >
+                      {INDIAN_STATES.map(st => (
+                        <option key={st} value={st}>{st}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 11.5, fontWeight: 700, color: "#475569", display: "block", marginBottom: 3 }}>
+                      Pincode (6 digits)
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      className="command-palette-input"
+                      style={{ borderRadius: 8, border: "1px solid #CBD5E1", padding: 8, fontSize: 13, background: "white" }}
+                      placeholder="e.g. 560001"
+                      value={formData.pincode || ""}
+                      onChange={e => setFormData({ ...formData, pincode: e.target.value.replace(/\D/g, "") })}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -872,11 +1029,34 @@ export default function ClientsPage() {
                               </td>
                               <td>
                                 <div style={{ display: "flex", gap: 6 }}>
-                                  {/* Download button */}
+                                  {/* Download button with real file download blob */}
                                   <button
                                     className="btn-slds btn-slds-secondary"
                                     style={{ padding: "4px 8px", fontSize: 11 }}
-                                    onClick={() => toast.success(`Downloading ${doc.name}...`)}
+                                    onClick={() => {
+                                      if (doc.fileUrl) {
+                                        const a = document.createElement("a");
+                                        a.href = doc.fileUrl;
+                                        a.download = doc.name;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        document.body.removeChild(a);
+                                      } else {
+                                        const dummyContent = `CLIENT STATUTORY & COMPLIANCE FILE\n=======================================\nDocument Name: ${doc.name}\nCategory: ${doc.category || "General"}\nUpload Date: ${doc.uploadDate}\nStatus: ${doc.status || "RECEIVED"}\nClient Name: ${viewingClient.name}\n\n[Official document file content demo]`;
+                                        const mime = doc.type === "XLSX" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : doc.type === "PDF" ? "application/pdf" : "text/plain";
+                                        const blob = new Blob([dummyContent], { type: mime });
+                                        const blobUrl = URL.createObjectURL(blob);
+                                        const a = document.createElement("a");
+                                        a.href = blobUrl;
+                                        const ext = doc.name.includes(".") ? "" : `.${(doc.type || "txt").toLowerCase()}`;
+                                        a.download = `${doc.name}${ext}`;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        document.body.removeChild(a);
+                                        URL.revokeObjectURL(blobUrl);
+                                      }
+                                      toast.success(`Successfully downloaded "${doc.name}"`);
+                                    }}
                                     title="Download Document"
                                   >
                                     <Download size={13} />
@@ -884,7 +1064,7 @@ export default function ClientsPage() {
                                   </button>
                                   {/* Share to WhatsApp button */}
                                   <a
-                                    href={getWhatsAppLink(viewingClient.phone || viewingClient.mobile, `📄 Document Shared: ${doc.name}\nClient: ${viewingClient.name}\nStatus: ${doc.status || "Ready"}`)}
+                                    href={getWhatsAppLink(viewingClient.phone || viewingClient.mobile, `📄 Compliance Document Notice:\nClient: ${viewingClient.name}\nDocument: ${doc.name}\nCategory: ${doc.category || "General"}\nStatus: ${doc.status || "RECEIVED"}`)}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="btn-slds btn-slds-success"
