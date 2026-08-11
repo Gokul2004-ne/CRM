@@ -87,6 +87,8 @@ export async function fetchAllCRMData() {
       collaborations,
       invoices,
       oneTimeServices,
+      renewals,
+      userSettingsData,
     ] = await Promise.all([
       safeTableFetch("clients", userId),
       safeTableFetch("services", userId),
@@ -99,6 +101,8 @@ export async function fetchAllCRMData() {
       safeTableFetch("collaborations", userId),
       safeTableFetch("invoices", userId),
       safeTableFetch("one_time_services", userId),
+      safeTableFetch("renewals", userId),
+      safeTableFetch("user_settings", userId),
     ]);
 
     const formattedClients: Client[] = (clients || []).map((c: any) => ({
@@ -240,6 +244,23 @@ export async function fetchAllCRMData() {
       createdAt: ots.created_at,
     }));
 
+    const formattedRenewals: any[] = (renewals || []).map((rn: any) => ({
+      id: rn.id,
+      clientName: rn.client_name,
+      serviceName: rn.service_name,
+      registrationDate: rn.registration_date,
+      dueDate: rn.due_date,
+      fromDate: rn.from_date,
+      toDate: rn.to_date,
+      financialYear: rn.financial_year,
+      recurrencePeriod: rn.recurrence_period,
+      progress: rn.progress,
+      notes: rn.notes,
+      createdAt: rn.created_at,
+    }));
+
+    const userSettings = userSettingsData?.[0]?.settings || null;
+
     return {
       clients: formattedClients,
       services: formattedServices,
@@ -252,10 +273,27 @@ export async function fetchAllCRMData() {
       collaborations: formattedCollaborations,
       invoices: formattedInvoices,
       oneTimeServices: formattedOneTimeServices,
+      renewals: formattedRenewals,
+      userSettings: userSettings,
     };
   } catch (error) {
     console.error("Error fetching CRM data from Supabase:", error);
     return null;
+  }
+}
+
+// User Settings Sync
+export async function syncUserSettingsToSupabase(settings: any) {
+  try {
+    const userId = await getUserId();
+    if (!userId) return;
+    await supabase.from("user_settings").upsert({
+      user_id: userId,
+      settings: settings,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+  } catch (err) {
+    console.error("Error syncing user settings to Supabase:", err);
   }
 }
 

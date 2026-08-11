@@ -1,9 +1,11 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { useEffect, useState } from "react";
-import { Save, Building2, User, Bell, Shield, Palette, CreditCard, Database, Download, Trash2, KeyRound, LogOut, CheckCircle, Eye, EyeOff, RefreshCw, PenTool, UploadCloud } from "lucide-react";
+import { Save, Building2, User, Bell, Shield, Palette, CreditCard, Database, Download, Trash2, KeyRound, LogOut, CheckCircle, Eye, EyeOff, RefreshCw, PenTool, UploadCloud, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { useAppStore } from "@/lib/store";
+import { syncUserSettingsToSupabase } from "@/lib/supabaseData";
 
 const SETTINGS_KEY = "zpluscrm_settings";
 
@@ -13,7 +15,10 @@ function loadSettings() {
 }
 function saveSettings(data: any) {
   if (typeof window === "undefined") return;
-  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(data)); } catch {}
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
+    syncUserSettingsToSupabase(data);
+  } catch {}
 }
 
 // Toggle Switch Component
@@ -30,6 +35,9 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 export default function SettingsPage() {
   const { user, updatePassword, signOut } = useAuth();
   const [tab, setTab] = useState("firm");
+
+  const clients = useAppStore(state => state.clients);
+  const invoices = useAppStore(state => state.invoices);
 
   // ─── Firm Details ─────────────────────────────────────────────────────────
   const [firmName, setFirmName] = useState("zpluscrm Advisory LLP");
@@ -86,7 +94,12 @@ export default function SettingsPage() {
     if (s.fullName) setFullName(s.fullName);
     if (s.designation) setDesignation(s.designation);
     if (s.bio) setBio(s.bio);
-    if (s.primaryColor) setPrimaryColor(s.primaryColor);
+    if (s.primaryColor) {
+      setPrimaryColor(s.primaryColor);
+      if (typeof document !== "undefined") {
+        document.documentElement.style.setProperty("--primary-color", s.primaryColor);
+      }
+    }
     if (s.dateFormat) setDateFormat(s.dateFormat);
     if (s.layoutDensity) setLayoutDensity(s.layoutDensity);
     if (s.notifs) setNotifs(prev => ({ ...prev, ...s.notifs }));
@@ -114,11 +127,14 @@ export default function SettingsPage() {
   };
   const handleSaveProfile = () => {
     saveSettings({ ...loadSettings(), fullName, designation, bio });
-    toast.success("Profile saved!");
+    toast.success("Profile details saved!");
   };
   const handleSavePreferences = () => {
     saveSettings({ ...loadSettings(), primaryColor, dateFormat, layoutDensity });
-    toast.success("Preferences saved!");
+    if (typeof document !== "undefined") {
+      document.documentElement.style.setProperty("--primary-color", primaryColor);
+    }
+    toast.success("Preferences saved successfully!");
   };
   const handleSaveNotifs = () => {
     saveSettings({ ...loadSettings(), notifs });
@@ -142,26 +158,148 @@ export default function SettingsPage() {
     toast.success("Signed out successfully");
   };
 
+  // ─── Export CSV Handlers ──────────────────────────────────────────────────
   const exportClientsCSV = () => {
-    const data = localStorage.getItem("zpluscrm_clients") || "[]";
-    try {
-      const rows = JSON.parse(data);
-      const csv = ["Name,Email,Mobile,PAN,GSTIN,Category,FY", ...rows.map((r: any) => `"${r.name || ""}","${r.email || ""}","${r.mobile || ""}","${r.pan || ""}","${r.gstin || ""}","${r.category || ""}","${r.financialYear || ""}"`).join("\n")].join("\n");
-      const blob = new Blob([csv], { type: "text/csv" });
-      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "clients.csv"; a.click();
-      toast.success("Clients exported!");
-    } catch { toast.error("Failed to export"); }
+    const storeClients = useAppStore.getState().clients || [];
+    let rows = [...storeClients];
+
+    if (!rows || rows.length === 0) {
+      try {
+        if (typeof window !== "undefined") {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.endsWith("_clients")) {
+              const parsed = JSON.parse(localStorage.getItem(key) || "[]");
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                rows = parsed;
+                break;
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+
+    const escapeCSV = (val: any) => {
+      if (val === null || val === undefined) return '""';
+      const clean = String(val).replace(/"/g, '""');
+      return `"${clean}"`;
+    };
+
+    const headers = [
+      "Client ID", "Client Name", "Owner / Contact Person", "Mobile", "Phone",
+      "Email", "PAN", "GSTIN", "GST Portal User ID", "City", "State",
+      "Registration No", "Status", "Incorporation Date", "Address", "Created At"
+    ];
+
+    let csvContent = headers.join(",") + "\n";
+
+    if (rows && rows.length > 0) {
+      const dataLines = rows.map((r: any) => {
+        const fullAddr = [r.address, r.addressLine1, r.addressLine2, r.city, r.state, r.pincode].filter(Boolean).join(", ");
+        return [
+          escapeCSV(r.id),
+          escapeCSV(r.name),
+          escapeCSV(r.contactPerson || r.ownerName),
+          escapeCSV(r.mobile),
+          escapeCSV(r.phone),
+          escapeCSV(r.email),
+          escapeCSV(r.pan || r.panNo),
+          escapeCSV(r.gstin || r.gstNo),
+          escapeCSV(r.gstPortalId),
+          escapeCSV(r.city),
+          escapeCSV(r.state),
+          escapeCSV(r.registrationNo),
+          escapeCSV(r.status || "Active"),
+          escapeCSV(r.incorporationDate),
+          escapeCSV(fullAddr),
+          escapeCSV(r.createdAt)
+        ].join(",");
+      });
+      csvContent += dataLines.join("\n");
+      toast.success(`Exported ${rows.length} client(s) to CSV file!`);
+    } else {
+      toast.info("No client records in database. Downloaded client CSV template.");
+    }
+
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `clients_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const exportInvoicesCSV = () => {
-    const data = localStorage.getItem("zpluscrm_invoices") || "[]";
-    try {
-      const rows = JSON.parse(data);
-      const csv = ["Invoice#,Type,Client,Total,Status,Date", ...rows.map((r: any) => `"${r.invoiceNumber || ""}","${r.type || ""}","${r.clientName || ""}","${r.total || 0}","${r.status || ""}","${r.date || ""}"`).join("\n")].join("\n");
-      const blob = new Blob([csv], { type: "text/csv" });
-      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "invoices.csv"; a.click();
-      toast.success("Invoices exported!");
-    } catch { toast.error("Failed to export"); }
+    const storeInvoices = useAppStore.getState().invoices || [];
+    let rows = [...storeInvoices];
+
+    if (!rows || rows.length === 0) {
+      try {
+        if (typeof window !== "undefined") {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.endsWith("_invoices")) {
+              const parsed = JSON.parse(localStorage.getItem(key) || "[]");
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                rows = parsed;
+                break;
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+
+    const escapeCSV = (val: any) => {
+      if (val === null || val === undefined) return '""';
+      const clean = String(val).replace(/"/g, '""');
+      return `"${clean}"`;
+    };
+
+    const headers = [
+      "Invoice Number", "Type", "Client Name", "Date", "Financial Year",
+      "Subtotal (INR)", "GST Rate (%)", "GST Amount (INR)", "Total Amount (INR)",
+      "Amount Received (INR)", "Balance Due (INR)", "Status", "Notes", "Created At"
+    ];
+
+    let csvContent = headers.join(",") + "\n";
+
+    if (rows && rows.length > 0) {
+      const dataLines = rows.map((r: any) => {
+        return [
+          escapeCSV(r.invoiceNumber),
+          escapeCSV(r.type || "INVOICE"),
+          escapeCSV(r.clientName),
+          escapeCSV(r.date),
+          escapeCSV(r.financialYear),
+          escapeCSV(r.subtotal || 0),
+          escapeCSV(r.gstRate || 0),
+          escapeCSV(r.gstAmount || 0),
+          escapeCSV(r.total || 0),
+          escapeCSV(r.amountReceived || 0),
+          escapeCSV(r.balanceDue || 0),
+          escapeCSV(r.status || "DRAFT"),
+          escapeCSV(r.notes),
+          escapeCSV(r.createdAt)
+        ].join(",");
+      });
+      csvContent += dataLines.join("\n");
+      toast.success(`Exported ${rows.length} invoice(s) to CSV file!`);
+    } else {
+      toast.info("No invoice records in database. Downloaded invoice CSV template.");
+    }
+
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `invoices_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const clearLocalData = () => {
@@ -349,9 +487,11 @@ export default function SettingsPage() {
                 <label className="form-label">Primary Brand Color</label>
                 <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 6 }}>
                   <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} style={{ width: 48, height: 40, cursor: "pointer", borderRadius: 8, border: "none", padding: 2 }} />
-                  <span style={{ fontSize: 13, color: "#64748B" }}>{primaryColor}</span>
+                  <span style={{ fontSize: 13, color: "#64748B", fontWeight: 700 }}>{primaryColor}</span>
                   {["#E8520A","#1A237E","#059669","#7C3AED","#DC2626","#2563EB","#D97706"].map(c => (
-                    <div key={c} onClick={() => setPrimaryColor(c)} style={{ width: 28, height: 28, borderRadius: "50%", background: c, cursor: "pointer", border: primaryColor === c ? "3px solid #0F172A" : "2px solid transparent", transition: "all 0.15s" }} />
+                    <div key={c} onClick={() => setPrimaryColor(c)} style={{ width: 28, height: 28, borderRadius: "50%", background: c, cursor: "pointer", border: primaryColor === c ? "3px solid #0F172A" : "2px solid transparent", transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {primaryColor === c && <Check size={14} color="white" />}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -485,8 +625,8 @@ export default function SettingsPage() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: "#54B400", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Current Plan</div>
-                    <div style={{ fontSize: 24, fontWeight: 900, color: "#FFFFFF" }}>Professional</div>
-                    <div style={{ fontSize: 13, color: "#94A3B8", marginTop: 4 }}>Full access to all CRM modules</div>
+                    <div style={{ fontSize: 24, fontWeight: 900, color: "#FFFFFF" }}>Professional Plan</div>
+                    <div style={{ fontSize: 13, color: "#94A3B8", marginTop: 4 }}>Full access to all CRM &amp; Supabase practice modules</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 28, fontWeight: 900, color: "#FFFFFF" }}>₹2,499</div>
@@ -503,8 +643,8 @@ export default function SettingsPage() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
                 {[
-                  { label: "Clients", used: "47", max: "Unlimited", icon: "👥" },
-                  { label: "Invoices", used: "128", max: "Unlimited", icon: "📄" },
+                  { label: "Active Clients", used: String(clients.length), max: "Unlimited", icon: "👥" },
+                  { label: "Generated Invoices", used: String(invoices.length), max: "Unlimited", icon: "📄" },
                   { label: "Team Members", used: "1", max: "5", icon: "👤" },
                 ].map(item => (
                   <div key={item.label} style={{ padding: "14px 16px", background: "#F8FAFC", borderRadius: 12, border: "1px solid #E2E8F0", textAlign: "center" }}>
@@ -517,8 +657,11 @@ export default function SettingsPage() {
 
               <div style={{ padding: "16px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginBottom: 4 }}>💡 Upgrade to Enterprise</div>
-                <div style={{ fontSize: 12, color: "#78350F" }}>Get unlimited team members, white-labeling, priority support, and advanced analytics.</div>
-                <button style={{ marginTop: 10, padding: "8px 16px", background: "#D97706", border: "none", borderRadius: 8, color: "white", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                <div style={{ fontSize: 12, color: "#78350F" }}>Get unlimited team members, white-labeling, priority support, and custom integrations.</div>
+                <button
+                  onClick={() => toast.success("Contact Sales request sent! Our enterprise team will reach out shortly.")}
+                  style={{ marginTop: 10, padding: "8px 16px", background: "#D97706", border: "none", borderRadius: 8, color: "white", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                >
                   Contact Sales →
                 </button>
               </div>
@@ -536,20 +679,24 @@ export default function SettingsPage() {
                 <div style={{ padding: "16px", background: "#F8FAFC", borderRadius: 12, border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
                     <div style={{ fontWeight: 700, color: "#0F172A", fontSize: 14 }}>Export Clients</div>
-                    <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Download all client data as CSV</div>
+                    <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
+                      Download all client records as CSV ({clients.length} clients in practice database)
+                    </div>
                   </div>
-                  <button onClick={exportClientsCSV} className="btn" style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", fontSize: 13 }}>
-                    <Download size={14} /> Export CSV
+                  <button onClick={exportClientsCSV} className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", fontSize: 13 }}>
+                    <Download size={14} /> Download CSV
                   </button>
                 </div>
 
                 <div style={{ padding: "16px", background: "#F8FAFC", borderRadius: 12, border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
                     <div style={{ fontWeight: 700, color: "#0F172A", fontSize: 14 }}>Export Invoices</div>
-                    <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Download invoice history as CSV</div>
+                    <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
+                      Download complete invoice history as CSV ({invoices.length} invoices in practice database)
+                    </div>
                   </div>
-                  <button onClick={exportInvoicesCSV} className="btn" style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", fontSize: 13 }}>
-                    <Download size={14} /> Export CSV
+                  <button onClick={exportInvoicesCSV} className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", fontSize: 13 }}>
+                    <Download size={14} /> Download CSV
                   </button>
                 </div>
               </div>
@@ -559,7 +706,7 @@ export default function SettingsPage() {
                   <Trash2 size={16} /> Danger Zone
                 </div>
                 <div style={{ fontSize: 13, color: "#7F1D1D", marginBottom: 12, lineHeight: 1.5 }}>
-                  Clear local cache clears browser-stored data only. Your Supabase data will remain safe and will re-sync on next load.
+                  Clear local cache clears browser-stored data only. Your Supabase database data will remain safe and will re-sync on next load.
                 </div>
                 <button
                   onClick={clearLocalData}

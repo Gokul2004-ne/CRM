@@ -113,7 +113,12 @@ export default function ClientsPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const phoneVal = (formData.phone || formData.mobile || "").trim();
-    const cleanPhone = phoneVal.replace(/\D/g, "");
+    let cleanPhone = phoneVal.replace(/\D/g, "");
+    if (cleanPhone.length === 12 && cleanPhone.startsWith("91")) {
+      cleanPhone = cleanPhone.slice(2);
+    } else if (cleanPhone.length === 11 && cleanPhone.startsWith("0")) {
+      cleanPhone = cleanPhone.slice(1);
+    }
     const emailVal = (formData.email || "").trim();
 
     if (!formData.name?.trim()) {
