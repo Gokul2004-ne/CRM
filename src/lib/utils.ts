@@ -33,11 +33,18 @@ export function getFYDateRange(fy: string): { start: Date; end: Date } {
 }
 
 export function getDaysUntilDue(dueDate: string | Date): number {
-  return differenceInDays(new Date(dueDate), new Date());
+  if (!dueDate) return 999;
+  try {
+    const d = new Date(dueDate);
+    if (isNaN(d.getTime())) return 999;
+    return differenceInDays(d, new Date());
+  } catch {
+    return 999;
+  }
 }
 
 export function getDaysRemaining(dueDate: string | Date): number {
-  return differenceInDays(new Date(dueDate), new Date());
+  return getDaysUntilDue(dueDate);
 }
 
 export function formatCurrency(amount: number): string {
@@ -50,7 +57,13 @@ export function formatCurrency(amount: number): string {
 
 export function formatDate(date: string | Date): string {
   if (!date) return "-";
-  return format(new Date(date), "dd MMM yyyy");
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return String(date);
+    return format(d, "dd MMM yyyy");
+  } catch {
+    return String(date);
+  }
 }
 
 export function getWhatsAppLink(mobile?: string, message?: string): string {

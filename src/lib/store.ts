@@ -258,6 +258,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     collaborations: [],
     invoices: [],
     oneTimeServices: [],
+    renewals: [],
     isLoadingSupabase: false,
   }),
 
@@ -276,8 +277,16 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const localDrafts = loadFromLocal<DocumentDraft[]>("drafts", []);
     const localInvoices = loadFromLocal<any[]>("invoices", []);
     const localOneTime = loadFromLocal<any[]>("oneTimeServices", []);
+    const localRenewals = loadFromLocal<any[]>("renewals", []);
 
     const data = await fetchAllCRMData();
+
+    if (data?.userSettings && typeof window !== "undefined") {
+      try {
+        localStorage.setItem("zpluscrm_settings", JSON.stringify(data.userSettings));
+        saveToLocal("settings", data.userSettings);
+      } catch {}
+    }
 
     const rawClients = data ? [...data.clients, ...localClients] : localClients;
     const rawServices = data ? [...data.services, ...localServices] : localServices;
@@ -290,6 +299,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const rawCollabs = data ? [...data.collaborations, ...localCollabs] : localCollabs;
     const rawInvoices = data ? [...(data.invoices || []), ...localInvoices] : localInvoices;
     const rawOneTime = data ? [...(data.oneTimeServices || []), ...localOneTime] : localOneTime;
+    const rawRenewals = data ? [...(data.renewals || []), ...localRenewals] : localRenewals;
 
     const clientsRes = deduplicateItems(rawClients, getClientKey);
     const servicesRes = deduplicateItems(rawServices, getServiceKey);
@@ -302,6 +312,51 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const collabsRes = deduplicateItems(rawCollabs, getCollabKey);
     const invoicesRes = deduplicateItems(rawInvoices, getInvoiceKey);
     const oneTimeRes = deduplicateItems(rawOneTime, getOneTimeKey);
+    const renewalsRes = deduplicateItems(rawRenewals, (rn: any) => `${(rn.clientName || '').toLowerCase()}_${(rn.serviceName || '').toLowerCase()}`);
+
+    // Auto-derive missing banking entries from assignedServices and invoices
+    const existingBankingIds = new Set(bankingRes.unique.map(b => b.id));
+    const derivedBanking: BankingEntry[] = [];
+
+    assignedRes.unique.forEach((a) => {
+      const bId = `b-${a.id}`;
+      if (!existingBankingIds.has(bId) && !existingBankingIds.has(a.id)) {
+        derivedBanking.push({
+          id: bId,
+          financialYear: a.financialYear || getCurrentFY(),
+          clientId: a.clientId,
+          serviceId: a.serviceId,
+          amountBilled: a.amountBilled || 0,
+          amountReceived: a.amountReceived || 0,
+          amountPending: a.amountPending || Math.max(0, (a.amountBilled || 0) - (a.amountReceived || 0)),
+          paymentStatus: (a.amountReceived || 0) >= (a.amountBilled || 1) && (a.amountBilled || 0) > 0 ? "PAID" : (a.amountReceived || 0) > 0 ? "PARTIAL" : "PENDING",
+          remark: "Assigned service billing record"
+        });
+      }
+    });
+
+    invoicesRes.unique.forEach((inv) => {
+      if (inv.type !== "PROFORMA" && inv.clientId) {
+        const invBId = `b_inv_${inv.id}`;
+        if (!existingBankingIds.has(invBId)) {
+          const rcv = inv.amountReceived || (inv.status === "PAID" ? inv.total : 0);
+          const billed = inv.total || 0;
+          derivedBanking.push({
+            id: invBId,
+            financialYear: inv.financialYear || getCurrentFY(),
+            clientId: inv.clientId,
+            serviceId: servicesRes.unique[0]?.id || "s1",
+            amountBilled: billed,
+            amountReceived: rcv,
+            amountPending: Math.max(0, billed - rcv),
+            paymentStatus: rcv >= billed && billed > 0 ? "PAID" : rcv > 0 ? "PARTIAL" : "PENDING",
+            remark: `${inv.type} #${inv.invoiceNumber} payment record`
+          });
+        }
+      }
+    });
+
+    const finalBanking = deduplicateItems([...bankingRes.unique, ...derivedBanking], getBankingEntryKey).unique;
 
     set({
       clients: clientsRes.unique,
@@ -309,12 +364,13 @@ export const useAppStore = create<AppState>()((set, get) => ({
       subServices: subServicesRes.unique,
       requiredDocs: requiredDocsRes.unique,
       assignedServices: assignedRes.unique,
-      bankingEntries: bankingRes.unique,
+      bankingEntries: finalBanking,
       leads: leadsRes.unique,
       drafts: draftsRes.unique,
       collaborations: collabsRes.unique,
       invoices: invoicesRes.unique,
       oneTimeServices: oneTimeRes.unique,
+      renewals: renewalsRes.unique,
       isLoadingSupabase: false,
     });
 
@@ -323,12 +379,13 @@ export const useAppStore = create<AppState>()((set, get) => ({
     saveToLocal("subServices", subServicesRes.unique);
     saveToLocal("requiredDocs", requiredDocsRes.unique);
     saveToLocal("assignedServices", assignedRes.unique);
-    saveToLocal("bankingEntries", bankingRes.unique);
+    saveToLocal("bankingEntries", finalBanking);
     saveToLocal("leads", leadsRes.unique);
     saveToLocal("drafts", draftsRes.unique);
     saveToLocal("collaborations", collabsRes.unique);
     saveToLocal("invoices", invoicesRes.unique);
     saveToLocal("oneTimeServices", oneTimeRes.unique);
+    saveToLocal("renewals", renewalsRes.unique);
 
     // Sync clean data & purge duplicate IDs from Supabase
     if (clientsRes.duplicateIds.length) purgeDuplicatesFromSupabase("clients", clientsRes.duplicateIds);
