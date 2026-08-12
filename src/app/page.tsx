@@ -6,11 +6,12 @@ import { formatCurrency, getDaysRemaining, formatDate, getWhatsAppLink } from "@
 import {
   Users, Package, DollarSign, Clock, MessageCircle, Mail,
   TrendingUp, Download, Filter, Search, AlertTriangle, ShieldCheck, ArrowUpDown, ArrowUp, ArrowDown,
-  CheckCircle2
+  CheckCircle2, X
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from "recharts";
+import { toast } from "sonner";
 
 import PaymentAndDeliveryCell from "@/components/PaymentAndDeliveryCell";
 
@@ -18,6 +19,7 @@ export default function Dashboard() {
   const { clients, services, subServices, assignedServices, invoices, selectedFY } = useAppStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
 
   const totalClients = clients.length;
   const totalServices = services.length;
@@ -27,6 +29,10 @@ export default function Dashboard() {
   const totalBilled = taxInvoices.reduce((acc, inv) => acc + (inv.total || 0), 0);
   const totalReceived = taxInvoices.reduce((acc, inv) => acc + (inv.amountReceived || 0), 0);
   const totalPending = taxInvoices.reduce((acc, inv) => acc + (inv.balanceDue || Math.max(0, (inv.total || 0) - (inv.amountReceived || 0))), 0);
+
+  const collectionEfficiency = totalBilled > 0 ? ((totalReceived / totalBilled) * 100).toFixed(1) : "0.0";
+  const avgMonthlyBilled = totalBilled / 12;
+  const avgMonthlyReceived = totalReceived / 12;
 
   // Chart data: group invoices by the actual month they were created in
   const fyStart = parseInt(selectedFY?.split("-")[0] || "2024");
@@ -47,6 +53,52 @@ export default function Dashboard() {
     const Pending = monthInvoices.reduce((s, inv) => s + (inv.balanceDue || Math.max(0, (inv.total || 0) - (inv.amountReceived || 0))), 0);
     return { month, Billed, Received, Pending };
   });
+
+  // Export Executive Practice & Billing Report as formatted CSV with UTF-8 BOM
+  const exportExecutiveReportCSV = () => {
+    const BOM = "\ufeff";
+    const lines: string[] = [];
+
+    lines.push("--- ZPLUSCRM EXECUTIVE PRACTICE SUMMARY ---");
+    lines.push(`Financial Year,${selectedFY}`);
+    lines.push(`Total Active Clients,${totalClients}`);
+    lines.push(`Configured Service Packages,${totalServices}`);
+    lines.push(`Total Amount Billed,${totalBilled}`);
+    lines.push(`Total Amount Received,${totalReceived}`);
+    lines.push(`Total Amount Pending,${totalPending}`);
+    lines.push(`Collection Efficiency Rate,${collectionEfficiency}%`);
+    lines.push(`Report Generation Date,${new Date().toLocaleDateString("en-IN")}`);
+    lines.push("");
+
+    lines.push("--- MONTHLY BILLING & COLLECTIONS BREAKDOWN (FY " + selectedFY + ") ---");
+    lines.push("Month,Amount Billed (INR),Amount Received (INR),Amount Pending (INR)");
+    chartData.forEach(c => {
+      lines.push(`"${c.month}",${c.Billed},${c.Received},${c.Pending}`);
+    });
+    lines.push("");
+
+    lines.push("--- UPCOMING COMPLIANCE DUE DATES & PAYMENT STATUS ---");
+    lines.push("Client Name,Package / Service,Due Date,Days Remaining,Payment Status");
+    sortedDueServices.forEach(item => {
+      const cName = item.client?.name || "Client";
+      const sName = item.service?.name || "Service";
+      const dDate = item.dueDate ? formatDate(item.dueDate) : "-";
+      const daysStr = item.daysLeft < 0 ? `${Math.abs(item.daysLeft)} days overdue` : `${item.daysLeft} days left`;
+      const pStatus = item.status || "PENDING";
+      lines.push(`"${cName.replace(/"/g, '""')}","${sName.replace(/"/g, '""')}","${dDate}","${daysStr}","${pStatus}"`);
+    });
+
+    const csvContent = BOM + lines.join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `zpluscrm-executive-report-FY${selectedFY}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast.success(`🎉 Executive Practice Report for FY ${selectedFY} downloaded!`);
+  };
 
   // Section 8: Dynamic sorting & Proximity color coding
   // Sort items closer to (or past) the due date to the top (Ascending default), with toggle support
@@ -88,11 +140,11 @@ export default function Dashboard() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <button type="button" className="btn-slds btn-slds-secondary">
+          <button type="button" className="btn-slds btn-slds-secondary" onClick={exportExecutiveReportCSV}>
             <Download size={15} />
             <span>Export Report</span>
           </button>
-          <button type="button" className="btn-slds btn-slds-primary">
+          <button type="button" className="btn-slds btn-slds-primary" onClick={() => setIsInsightsOpen(true)}>
             <TrendingUp size={15} />
             <span>Billing Insights</span>
           </button>
@@ -375,6 +427,106 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
+
+      {/* Billing Insights Modal */}
+      {isInsightsOpen && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 9999,
+          background: "rgba(15, 23, 42, 0.65)",
+          backdropFilter: "blur(6px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 20
+        }}>
+          <div style={{
+            background: "#FFFFFF",
+            borderRadius: 20,
+            maxWidth: 580,
+            width: "100%",
+            padding: 28,
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+            border: "1px solid #E2E8F0"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: "#EFF6FF", color: "#0284C7", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <TrendingUp size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, color: "#0F172A", margin: 0 }}>Billing & Financial Insights</h3>
+                  <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>Performance breakdown for FY {selectedFY}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsInsightsOpen(false)}
+                style={{ background: "#F1F5F9", border: "none", borderRadius: 10, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#64748B" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Collection Progress Bar */}
+            <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 16, padding: 18, marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13, fontWeight: 700 }}>
+                <span style={{ color: "#475569" }}>Collection Efficiency Rate</span>
+                <span style={{ color: Number(collectionEfficiency) >= 75 ? "#059669" : Number(collectionEfficiency) >= 50 ? "#D97706" : "#DC2626" }}>
+                  {collectionEfficiency}% ({formatCurrency(totalReceived)} / {formatCurrency(totalBilled)})
+                </span>
+              </div>
+              <div style={{ width: "100%", height: 10, borderRadius: 5, background: "#E2E8F0", overflow: "hidden" }}>
+                <div style={{ width: `${Math.min(100, Math.max(0, parseFloat(collectionEfficiency)))}%`, height: "100%", background: Number(collectionEfficiency) >= 75 ? "#059669" : Number(collectionEfficiency) >= 50 ? "#D97706" : "#DC2626", transition: "width 0.4s ease" }} />
+              </div>
+            </div>
+
+            {/* Detailed Insights Grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 22 }}>
+              <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 14, padding: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", textTransform: "uppercase" }}>Monthly Avg Billed</div>
+                <div style={{ fontSize: 18, fontWeight: 900, color: "#15803D", marginTop: 4 }}>{formatCurrency(avgMonthlyBilled)}</div>
+              </div>
+
+              <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 14, padding: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#92400E", textTransform: "uppercase" }}>Monthly Avg Collection</div>
+                <div style={{ fontSize: 18, fontWeight: 900, color: "#B45309", marginTop: 4 }}>{formatCurrency(avgMonthlyReceived)}</div>
+              </div>
+
+              <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 14, padding: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#991B1B", textTransform: "uppercase" }}>Total Outstanding Dues</div>
+                <div style={{ fontSize: 18, fontWeight: 900, color: "#B91C1C", marginTop: 4 }}>{formatCurrency(totalPending)}</div>
+              </div>
+
+              <div style={{ background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 14, padding: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#075985", textTransform: "uppercase" }}>Tax Invoices Created</div>
+                <div style={{ fontSize: 18, fontWeight: 900, color: "#0284C7", marginTop: 4 }}>{taxInvoices.length} Invoices</div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => { setIsInsightsOpen(false); window.location.href = "/banking"; }}
+                className="btn-slds btn-slds-secondary"
+                style={{ padding: "10px 16px" }}
+              >
+                <span>View Banking Ledger →</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsInsightsOpen(false); window.location.href = "/invoice"; }}
+                className="btn-slds btn-slds-primary"
+                style={{ padding: "10px 16px" }}
+              >
+                <span>Create Tax Invoice →</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
