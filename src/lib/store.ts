@@ -314,26 +314,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const oneTimeRes = deduplicateItems(rawOneTime, getOneTimeKey);
     const renewalsRes = deduplicateItems(rawRenewals, (rn: any) => `${(rn.clientName || '').toLowerCase()}_${(rn.serviceName || '').toLowerCase()}`);
 
-    // Auto-derive missing banking entries from assignedServices and invoices
+    // Auto-derive missing banking entries ONLY from Tax Invoices (assigned services do NOT create banking entries)
     const existingBankingIds = new Set(bankingRes.unique.map(b => b.id));
     const derivedBanking: BankingEntry[] = [];
-
-    assignedRes.unique.forEach((a) => {
-      const bId = `b-${a.id}`;
-      if (!existingBankingIds.has(bId) && !existingBankingIds.has(a.id)) {
-        derivedBanking.push({
-          id: bId,
-          financialYear: a.financialYear || getCurrentFY(),
-          clientId: a.clientId,
-          serviceId: a.serviceId,
-          amountBilled: a.amountBilled || 0,
-          amountReceived: a.amountReceived || 0,
-          amountPending: a.amountPending || Math.max(0, (a.amountBilled || 0) - (a.amountReceived || 0)),
-          paymentStatus: (a.amountReceived || 0) >= (a.amountBilled || 1) && (a.amountBilled || 0) > 0 ? "PAID" : (a.amountReceived || 0) > 0 ? "PARTIAL" : "PENDING",
-          remark: "Assigned service billing record"
-        });
-      }
-    });
 
     invoicesRes.unique.forEach((inv) => {
       if (inv.type !== "PROFORMA" && inv.clientId) {

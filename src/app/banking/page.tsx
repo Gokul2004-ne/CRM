@@ -18,11 +18,12 @@ export default function BankingPage() {
   const { bankingEntries, assignedServices, clients, services, subServices, selectedFY, updateBankingEntry } = useAppStore();
   const [editId, setEditId] = useState<string | null>(null);
   const [editRemark, setEditRemark] = useState("");
-  const [editReceived, setEditReceived] = useState(0);
+  const [editReceived, setEditReceived] = useState<string>("0");
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
-    const list = [...bankingEntries.filter(b => b.financialYear === selectedFY)];
+    // Only show banking entries from Invoices (exclude assigned service auto-derivations)
+    const list = [...bankingEntries.filter(b => b.financialYear === selectedFY && b.remark !== "Assigned service billing record")];
 
     // Apply search filter
     return list.filter(b => {
@@ -43,13 +44,14 @@ export default function BankingPage() {
   const startEdit = (b: typeof filtered[0]) => {
     setEditId(b.id);
     setEditRemark(b.remark || "");
-    setEditReceived(b.amountReceived);
+    setEditReceived(String(b.amountReceived || 0));
   };
 
   const saveEdit = (b: typeof filtered[0]) => {
-    const newPending = b.amountBilled - editReceived;
-    const newStatus: PaymentStatus = editReceived >= b.amountBilled && b.amountBilled > 0 ? "PAID" : editReceived > 0 ? "PARTIAL" : "PENDING";
-    updateBankingEntry({ ...b, amountReceived: editReceived, amountPending: newPending, remark: editRemark, paymentStatus: newStatus });
+    const numReceived = parseFloat(editReceived) || 0;
+    const newPending = Math.max(0, b.amountBilled - numReceived);
+    const newStatus: PaymentStatus = numReceived >= b.amountBilled && b.amountBilled > 0 ? "PAID" : numReceived > 0 ? "PARTIAL" : "PENDING";
+    updateBankingEntry({ ...b, amountReceived: numReceived, amountPending: newPending, remark: editRemark, paymentStatus: newStatus });
     setEditId(null);
     toast.success("Entry updated");
   };
@@ -151,8 +153,9 @@ export default function BankingPage() {
                 const client = clients.find(c => c.id === b.clientId);
                 const service = services.find(s => s.id === b.serviceId);
                 const isEditing = editId === b.id;
-                const currentReceived = isEditing ? editReceived : b.amountReceived;
-                const currentPending = isEditing ? b.amountBilled - editReceived : b.amountPending;
+                const numEditReceived = parseFloat(editReceived) || 0;
+                const currentReceived = isEditing ? numEditReceived : b.amountReceived;
+                const currentPending = isEditing ? Math.max(0, b.amountBilled - numEditReceived) : b.amountPending;
                 const currentStatus = (currentReceived >= b.amountBilled && b.amountBilled > 0 ? "PAID" : currentReceived > 0 ? "PARTIAL" : "PENDING") as PaymentStatus;
                 const cfg = paymentStatusConfig[currentStatus];
                 const StatusIcon = cfg.icon;
@@ -182,7 +185,17 @@ export default function BankingPage() {
                     <td className="col-right" style={{ fontWeight: 600, color: "#059669" }}>{formatCurrency(b.amountBilled)}</td>
                     <td className="col-right">
                       {isEditing
-                        ? <input type="number" value={editReceived} onChange={e => setEditReceived(Number(e.target.value))} className="form-input" style={{ width: 120, padding: "4px 8px" }} />
+                        ? <input
+                            type="number"
+                            value={editReceived}
+                            onFocus={e => {
+                              if (e.target.value === "0") setEditReceived("");
+                            }}
+                            onChange={e => setEditReceived(e.target.value)}
+                            className="form-input"
+                            style={{ width: 120, padding: "4px 8px" }}
+                            placeholder="0"
+                          />
                         : <span style={{ fontWeight: 600, color: "#D97706" }}>{formatCurrency(b.amountReceived)}</span>
                       }
                     </td>
