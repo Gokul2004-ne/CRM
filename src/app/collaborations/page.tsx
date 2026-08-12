@@ -4,7 +4,7 @@ import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState } from "react";
 import { Collaboration } from "@/lib/types";
-import { Plus, Search, Handshake, Phone, Mail, MessageCircle, Edit3, Trash2, ExternalLink } from "lucide-react";
+import { Plus, Search, Handshake, Phone, Mail, MessageCircle, Edit3, Trash2, ExternalLink, X } from "lucide-react";
 import { getWhatsAppLink, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -274,15 +274,35 @@ export default function CollaborationsPage() {
       {/* Modal for Add/Edit Collaboration */}
       {modal.open && (
         <div className="command-palette-backdrop" onClick={() => setModal({ open: false, editing: false })}>
-          <div className="command-palette-card" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ padding: "18px 24px", borderBottom: "1px solid #E2E8F0" }}>
+          <div
+            className="command-palette-card"
+            style={{
+              maxWidth: 520,
+              maxHeight: "85vh",
+              display: "flex",
+              flexDirection: "column",
+              borderRadius: 16,
+              overflow: "hidden",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{ padding: "16px 24px", borderBottom: "1px solid #E2E8F0", background: "#F8FAFC", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ fontSize: 17, fontWeight: 800, color: "#0F172A", display: "flex", alignItems: "center", gap: 8 }}>
                 <Handshake size={20} color="#0176D3" />
                 <span>{modal.editing ? "Edit Collaboration Details" : "Add New Co-laboration Partner"}</span>
               </div>
+              <button
+                type="button"
+                onClick={() => setModal({ open: false, editing: false })}
+                style={{ background: "#F1F5F9", border: "none", borderRadius: 8, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#64748B" }}
+              >
+                <X size={18} />
+              </button>
             </div>
 
-            <div style={{ padding: 24, display: "grid", gap: 14 }}>
+            {/* Scrollable Form Body */}
+            <div style={{ padding: 24, overflowY: "auto", display: "grid", gap: 14, flex: 1 }}>
               {/* Section 1: Name */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>
@@ -336,7 +356,7 @@ export default function CollaborationsPage() {
                   style={{ borderRadius: 8, border: "1px solid #CBD5E1", padding: 10, fontSize: 14 }}
                   value={form.type || ""}
                   onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-                  placeholder="e.g. IT Vendor, Legal Advisory, Marketing Agency"
+                  placeholder="e.g. Business Partner, IT Vendor, Legal Advisory"
                 />
               </div>
 
@@ -347,25 +367,26 @@ export default function CollaborationsPage() {
                 </label>
                 <textarea
                   className="command-palette-input"
-                  style={{ borderRadius: 8, border: "1px solid #CBD5E1", padding: 10, fontSize: 14, minHeight: 70 }}
+                  style={{ borderRadius: 8, border: "1px solid #CBD5E1", padding: 10, fontSize: 14, minHeight: 60 }}
                   value={form.notes || ""}
                   onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                   placeholder="e.g. Joint agreement signed for joint project deliveries."
                 />
               </div>
+            </div>
 
-              {/* Modal Actions */}
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
-                <button
-                  className="btn-slds btn-slds-secondary"
-                  onClick={() => setModal({ open: false, editing: false })}
-                >
-                  Cancel
-                </button>
-                <button className="btn-slds btn-slds-primary" onClick={handleSave}>
-                  {modal.editing ? "Update Collaboration" : "Create Collaboration"}
-                </button>
-              </div>
+            {/* Fixed Modal Action Buttons Footer */}
+            <div style={{ padding: "14px 24px", borderTop: "1px solid #E2E8F0", background: "#F8FAFC", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                type="button"
+                className="btn-slds btn-slds-secondary"
+                onClick={() => setModal({ open: false, editing: false })}
+              >
+                Cancel
+              </button>
+              <button type="button" className="btn-slds btn-slds-primary" onClick={handleSave}>
+                {modal.editing ? "Update Collaboration" : "Create Collaboration"}
+              </button>
             </div>
           </div>
         </div>
