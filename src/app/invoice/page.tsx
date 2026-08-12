@@ -151,7 +151,10 @@ export default function InvoicePage() {
       if (invoiceRecord.type === "PROFORMA") {
         toast.success(`🎉 Pro Forma #${invoiceRecord.invoiceNumber} created successfully!`);
       } else {
-        toast.success(`🎉 Tax Invoice #${invoiceRecord.invoiceNumber} created & linked to Banking Ledger!`);
+        toast.success(`🎉 Tax Invoice #${invoiceRecord.invoiceNumber} created! Redirecting to Banking Ledger...`);
+        setTimeout(() => {
+          window.location.href = "/banking";
+        }, 800);
       }
     }
 
