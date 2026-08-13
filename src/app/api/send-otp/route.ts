@@ -138,13 +138,16 @@ export async function POST(req: Request) {
       }
     }
 
+    // 3. Fallback when no email provider credentials are configured in .env.local
     return NextResponse.json({
       success: true,
-      delivered: true,
-      message: `OTP verification code processed for ${email}`,
+      delivered: false,
+      noCredentials: true,
+      code: code,
+      message: `No SMTP_USER / RESEND_API_KEY configured in .env.local. Verification OTP code: ${code}`,
     });
   } catch (error: any) {
     console.error("Failed to send OTP email:", error);
-    return NextResponse.json({ success: true, message: "OTP code processed" });
+    return NextResponse.json({ success: false, error: error.message || "Failed to process OTP" }, { status: 500 });
   }
 }
