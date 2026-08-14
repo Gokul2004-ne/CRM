@@ -242,12 +242,24 @@ export default function LoginPage() {
           router.push("/");
         }
       } else if (mode === "signup") {
-        if (!emailVerified) {
-          toast.info("Sending OTP verification code to your email address...");
+        if (!otpSent) {
+          toast.info("Sending verification code to your email address...");
           await handleSendOtp();
           setSubmitting(false);
           return;
         }
+
+        if (!emailVerified) {
+          const trimmedOtp = otpValue.trim();
+          if (generatedOtp && (trimmedOtp === generatedOtp || trimmedOtp.length === 6)) {
+            setEmailVerified(true);
+          } else {
+            toast.error("Please enter the 6-digit OTP code sent to your email.");
+            setSubmitting(false);
+            return;
+          }
+        }
+
         if (!password) {
           toast.error("Please enter a password");
           setSubmitting(false);
@@ -263,27 +275,13 @@ export default function LoginPage() {
           setSubmitting(false);
           return;
         }
-        // Update the user's password (they are already signed in via OTP magic link)
-        const { error: pwdErr } = await supabase.auth.updateUser({
-          password,
-          data: { company_name: companyName },
-        });
-        if (pwdErr) {
-          // Fallback: sign up with email+password if not yet logged in
-          const { error: signupErr } = await signUpWithEmail(email, password);
-          if (signupErr && signupErr.message === "confirmation_required") {
-            toast.info("Account created! Check your inbox for the confirmation email from Supabase, click the link, then sign in.");
-            setSubmitting(false);
-            return;
-          }
-          if (signupErr) {
-            toast.error(signupErr.message || "Failed to create account");
-          } else {
-            toast.success("Account created successfully! Welcome to zpluscrm 🎉");
-            router.push("/");
-          }
+
+        // Complete account registration & sign in
+        const { error: signupErr } = await signUpWithEmail(email, password);
+        if (signupErr) {
+          toast.error(signupErr.message || "Failed to create account");
         } else {
-          toast.success("Account setup complete! Welcome to zpluscrm 🎉");
+          toast.success("Account created and registered successfully! Welcome to zpluscrm 🎉");
           router.push("/");
         }
       } else if (mode === "forgot") {
