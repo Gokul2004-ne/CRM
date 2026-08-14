@@ -67,34 +67,33 @@ export default function LeadsPage() {
   const handleSyncWhatsAppBusiness = () => {
     setIsSyncing(true);
     setTimeout(() => {
-      // Simulate receiving tagged contacts from WhatsApp Business API / Webhook
-      const sampleWhatsAppContacts = [
-        { name: "Siddharth Malhotra", mobile: "9811223344", email: "siddharth@malhotragroup.in", pan: "SMMPM1234K", type: "PRIVATE_LIMITED" },
-        { name: "Ananya Roy", mobile: "9822334455", email: "ananya@royenterprises.com", pan: "ARPAR5678L", type: "PROPRIETORSHIP" }
-      ];
-
-      sampleWhatsAppContacts.forEach(contact => {
-        const existing = clients.find(c => (c.phone || c.mobile) === contact.mobile);
-        if (existing) {
-          updateClient({ ...existing, name: contact.name, email: contact.email, pan: contact.pan });
-        } else {
-          addClient({
-            id: `c_wa_${Date.now()}_${Math.floor(Math.random() * 100)}`,
-            name: contact.name,
-            type: contact.type,
-            phone: contact.mobile,
-            mobile: contact.mobile,
-            email: contact.email,
-            pan: contact.pan,
-            documentCount: 3,
-            status: "ACTIVE",
-            createdAt: new Date().toISOString().split("T")[0]
-          });
-        }
-      });
-
+      // Sync active un-converted leads into Client Directory if phone is present
+      const unconvertedLeads = leads.filter(l => l.status !== "CONVERTED" && l.mobile);
+      if (unconvertedLeads.length > 0) {
+        unconvertedLeads.forEach(lead => {
+          const phoneVal = lead.mobile;
+          const existing = clients.find(c => (c.phone || c.mobile) === phoneVal);
+          if (!existing) {
+            addClient({
+              id: `c_wa_${Date.now()}_${Math.floor(Math.random() * 100)}`,
+              name: lead.name,
+              type: "PROPRIETORSHIP",
+              phone: phoneVal,
+              mobile: phoneVal,
+              email: `${lead.name.toLowerCase().replace(/\s+/g, "")}@whatsapp-client.com`,
+              documentCount: 1,
+              status: "ACTIVE",
+              notes: lead.notes || "Synced from WhatsApp Business",
+              createdAt: new Date().toISOString().split("T")[0]
+            });
+            convertLead(lead.id, lead.name);
+          }
+        });
+        toast.success(`Synced ${unconvertedLeads.length} WhatsApp Business lead(s) into Client Directory!`);
+      } else {
+        toast.success("WhatsApp Business connection active. All client contacts are fully up to date!");
+      }
       setIsSyncing(false);
-      toast.success("WhatsApp Business Contacts synced automatically into Client Directory!");
     }, 1200);
   };
 

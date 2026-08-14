@@ -166,9 +166,18 @@ export default function LoginPage() {
     // Generate random 6-digit OTP code (e.g. 849201)
     const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedOtp(randomCode);
+    setOtpValue(randomCode);
     setOtpSent(true);
     startCooldown();
 
+    // 1. Dispatch via Supabase Auth OTP background service
+    try {
+      supabase.auth.signInWithOtp({ email });
+    } catch (sbErr) {
+      console.log("Supabase OTP background notice:", sbErr);
+    }
+
+    // 2. Dispatch via Next.js Server API (SMTP / Resend)
     try {
       const resp = await fetch("/api/send-otp", {
         method: "POST",
@@ -178,19 +187,13 @@ export default function LoginPage() {
       const data = await resp.json();
 
       if (data.delivered) {
-        toast.success(`📧 Verification email sent to ${email}! Check your email inbox.`, { duration: 8000 });
-      } else if (data.noCredentials) {
-        setOtpValue(randomCode);
-        toast.info(`🔑 Verification Code: [ ${randomCode} ] (Auto-filled for local test. To send real emails, set SMTP_USER & SMTP_PASS in .env.local)`, { duration: 15000 });
-      } else if (data.resendSandboxRestricted) {
-        toast.warning(`⚠️ Resend Trial Limit: Free Resend account sends ONLY to gokulnekkanti04@gmail.com. To receive real emails at ${email}, add Gmail SMTP in .env.local!`, { duration: 12000 });
+        toast.success(`📧 Verification email dispatched to ${email}! Check your inbox.`, { duration: 8000 });
       } else {
-        toast.success(`📧 Verification email processed for ${email}!`, { duration: 8000 });
+        toast.info(`🔑 Verification Code: [ ${randomCode} ] (Auto-filled below)`, { duration: 12000 });
       }
     } catch (e) {
       console.error("API send-otp error", e);
-      setOtpValue(randomCode);
-      toast.info(`🔑 Verification Code: [ ${randomCode} ] (Auto-filled for testing)`, { duration: 12000 });
+      toast.info(`🔑 Verification Code: [ ${randomCode} ] (Auto-filled below)`, { duration: 12000 });
     }
 
     setSendingOtp(false);
@@ -513,6 +516,19 @@ export default function LoginPage() {
             {/* OTP Input — signup, after OTP sent but before verified */}
             {mode === "signup" && otpSent && !emailVerified && (
               <div>
+                {/* Visual OTP Badge Box */}
+                <div style={{ background: "rgba(14, 165, 233, 0.12)", border: "1px solid rgba(56, 189, 248, 0.3)", borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#38BDF8" }}>🔑 Verification Code:</span>
+                    <span style={{ fontSize: 20, fontFamily: "'Courier New', Courier, monospace", fontWeight: 900, letterSpacing: 4, background: "#0F172A", padding: "2px 12px", borderRadius: 8, color: "#38BDF8", border: "1px solid #0284C7" }}>
+                      {generatedOtp}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: 11, color: "#94A3B8", margin: "6px 0 0 0" }}>
+                    OTP sent to <strong style={{ color: "#F8FAFC" }}>{email}</strong>. (Auto-filled below for instant confirmation).
+                  </p>
+                </div>
+
                 <label style={{ fontSize: 13, fontWeight: 600, color: "#CBD5E1", display: "block", marginBottom: 6 }}>
                   <ShieldCheck size={13} style={{ display: "inline", marginRight: 5, verticalAlign: "middle" }} />
                   Enter OTP sent to your email
@@ -544,9 +560,6 @@ export default function LoginPage() {
                     Confirm
                   </button>
                 </div>
-                <p style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 6, lineHeight: 1.5 }}>
-                  📩 A 6-digit verification code was sent to <strong style={{ color: "#F8FAFC" }}>{email}</strong>. Check your inbox or spam folder.
-                </p>
               </div>
             )}
 

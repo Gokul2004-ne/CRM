@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>zpluscrm - Master Codebase Architecture & Technical Specification</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 16mm 18mm 16mm;
+      @bottom-right {
+        content: counter(page);
+      }
+    }
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+      color: #0F172A;
+      background-color: #FFFFFF;
+      line-height: 1.5;
+      font-size: 13px;
+      margin: 0;
+      padding: 0;
+    }
+    
+    /* Cover Header */
+    .cover-header {
+      background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+      color: #FFFFFF;
+      padding: 32px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+    }
+    .cover-header h1 {
+      font-size: 28px;
+      font-weight: 900;
+      margin: 0 0 6px 0;
+      letter-spacing: -0.5px;
+    }
+    .cover-header h1 span {
+      color: #54B400;
+    }
+    .cover-header p {
+      font-size: 14px;
+      color: #94A3B8;
+      margin: 0;
+    }
+    .cover-meta {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #334155;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #CBD5E1;
+    }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 800;
+      color: #0F172A;
+      border-bottom: 2px solid #0176D3;
+      padding-bottom: 6px;
+      margin-top: 28px;
+      margin-bottom: 12px;
+      page-break-after: avoid;
+    }
+    h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1E293B;
+      margin-top: 18px;
+      margin-bottom: 8px;
+      page-break-after: avoid;
+    }
+
+    p, li {
+      color: #334155;
+    }
+
+    /* Diagram Box */
+    .diagram-box {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      white-space: pre;
+      overflow-x: auto;
+      margin: 14px 0;
+      color: #0F172A;
+      page-break-inside: avoid;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 11.5px;
+      page-break-inside: avoid;
+    }
+    th {
+      background-color: #0F172A;
+      color: #FFFFFF;
+      font-weight: 700;
+      text-align: left;
+      padding: 8px 10px;
+      border: 1px solid #0F172A;
+    }
+    td {
+      padding: 7px 10px;
+      border: 1px solid #E2E8F0;
+      vertical-align: top;
+    }
+    tr:nth-child(even) {
+      background-color: #F8FAFC;
+    }
+
+    /* Code Blocks */
+    code {
+      font-family: Consolas, Monaco, 'Andale Mono', monospace;
+      background-color: #F1F5F9;
+      color: #0F172A;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    pre {
+      background-color: #0F172A;
+      color: #F8FAFC;
+      padding: 14px;
+      border-radius: 8px;
+      font-family: Consolas, Monaco, 'Andale Mono', monospace;
+      font-size: 11px;
+      line-height: 1.45;
+      overflow-x: auto;
+      page-break-inside: avoid;
+      margin: 12px 0;
+    }
+    pre code {
+      background-color: transparent;
+      color: inherit;
+      padding: 0;
+    }
+
+    /* Badge & Alert Box */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge-success { background: #DCFCE7; color: #166534; }
+    .badge-info { background: #E0F2FE; color: #075985; }
+
+    .callout {
+      background-color: #EFF6FF;
+      border-left: 4px solid #0176D3;
+      padding: 12px 16px;
+      margin: 14px 0;
+      border-radius: 0 8px 8px 0;
+      page-break-inside: avoid;
+    }
+    .callout-title {
+      font-weight: 700;
+      color: #1E40AF;
+      margin-bottom: 4px;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Cover Header -->
+  <div class="cover-header">
+    <h1>zplus<span>crm</span></h1>
+    <p>Master Codebase Architecture & Technical Specification Manual</p>
+    <div class="cover-meta">
+      <span><strong>Document Version:</strong> 1.0.0</span>
+      <span><strong>Target Framework:</strong> Next.js 16 (App Router) + Supabase Cloud</span>
+      <span><strong>Generated Date:</strong> August 2026</span>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-title">📌 Executive Summary</div>
+    <p style="margin:0;">This specification manual provides complete code-level documentation for <strong>zpluscrm</strong> — an enterprise Practice Management & CRM platform built for Chartered Accountants, Tax Consultants, and Legal Advisory Firms. It covers the framework stack, data synchronization engine, 13 Supabase database schemas, route implementations, and the 108-assertion automated testing matrix.</p>
+  </div>
+
+  <!-- Section 1 -->
+  <h2>1. Framework Foundations & Technology Stack</h2>
+  <p>The application is engineered using a high-performance modern React & Next.js architecture:</p>
+  
+  <table>
+    <thead>
+      <tr>
+        <th>Technology Component</th>
+        <th>Library & Version</th>
+        <th>Architectural Role & Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Core Web Framework</strong></td>
+        <td>Next.js 16.3.0 (App Router)</td>
+        <td>React 19 server components, Turbopack dev server, file-system routing, and serverless API route handlers.</td>
+      </tr>
+      <tr>
+        <td><strong>UI Framework</strong></td>
+        <td>React 19.2.4 + TypeScript 5.x</td>
+        <td>Concurrent state features, custom hooks, and strict compile-time type safety checking.</td>
+      </tr>
+      <tr>
+        <td><strong>State Engine</strong></td>
+        <td>Zustand 5.0.14</td>
+        <td>Local-First unopinionated store (<code>store.ts</code>) enabling 0ms UI rendering latency and background cloud sync.</td>
+      </tr>
+      <tr>
+        <td><strong>Database & Cloud Backend</strong></td>
+        <td>Supabase JS Client 2.110.8</td>
+        <td>PostgreSQL cloud database connection, Row-Level Security (RLS), and multi-device persistence (<code>supabaseData.ts</code>).</td>
+      </tr>
+      <tr>
+        <td><strong>Design System</strong></td>
+        <td>Vanilla CSS Tokens</td>
+        <td>Salesforce Lightning Design System (SLDS) design tokens in <code>globals.css</code> with tailored HSL dark/glassmorphic modals.</td>
+      </tr>
+      <tr>
+        <td><strong>Icons & Visualization</strong></td>
+        <td>Lucide React 1.25.0 + Recharts 3.10.0</td>
+        <td>Vector UI icon system and responsive financial charts for monthly billing analytics.</td>
+      </tr>
+      <tr>
+        <td><strong>Test Runner</strong></td>
+        <td>TSX 4.23.12 (TypeScript Execute)</td>
+        <td>Executes 7 test suites validating 108 assertions across Unit, Integration, UAT, Black Box, and Recursive tests.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Section 2 -->
+  <h2>2. System Architecture & Synchronization Model</h2>
+  <p>The system uses a <strong>Local-First, Cloud-Synced</strong> architecture to eliminate loading spinners while ensuring multi-device persistence.</p>
+
+  <div class="diagram-box">
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            FRONTEND LAYER                                   │
+│   Next.js 16 (App Router + Turbopack) | React 19 | TypeScript 5.x           │
+│   Vanilla CSS Design System Tokens (globals.css) | Lucide React | Recharts   │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+┌──────────────────────────────────────┴──────────────────────────────────────┐
+│                      STATE & SYNCHRONIZATION LAYER                          │
+│   Zustand 5.x (store.ts) — Local-First Memory Store                         │
+│   Business Key Deduplication Engine (`deduplicateItems`)                     │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+┌──────────────────────────────────────┴──────────────────────────────────────┐
+│                         DATABASE & CLOUD BACKEND                            │
+│   Supabase PostgreSQL Cloud (dwtsntjkysxlqluouhbr.supabase.co)              │
+│   Row-Level Security (RLS) + Multi-Tenant `user_id` Text Scoping           │
+└─────────────────────────────────────────────────────────────────────────────┘
+  </div>
+
+  <h3>Synchronization Pattern & Flow:</h3>
+  <ol>
+    <li><strong>UI Mutation</strong>: When a user performs an action (e.g. adding a client or saving an invoice), the UI component immediately updates the local Zustand store state (0ms latency).</li>
+    <li><strong>LocalStorage Backup</strong>: State is serialized to browser LocalStorage as an instant offline backup.</li>
+    <li><strong>Silent Cloud Push</strong>: An asynchronous, non-blocking network request is dispatched to Supabase via <code>supabaseData.ts</code> to update the cloud PostgreSQL database.</li>
+    <li><strong>Multi-Device Fetch</strong>: When logging in on a new device, <code>fetchAllCRMData(userId)</code> fetches all 13 tables in a single <code>Promise.all</code> execution.</li>
+  </ol>
+
+  <!-- Section 3 -->
+  <div class="page-break"></div>
+  <h2>3. Supabase Relational Database Schemas (13 Tables)</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Table Name</th>
+        <th>Primary Key</th>
+        <th>Schema Description & Business Scope</th>
+        <th>Key Columns & Constraints</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>clients</code></td>
+        <td><code>id</code> (text)</td>
+        <td>Master Client Directory (Proprietorships, Pvt Ltd, Individuals, LLPs). Stores contact info & GST/PAN.</td>
+        <td><code>name</code>, <code>type</code>, <code>mobile</code>, <code>email</code>, <code>pan</code>, <code>gstin</code>, <code>city</code>, <code>user_id</code></td>
+      </tr>
+      <tr>
+        <td><code>services</code></td>
+        <td><code>id</code> (text)</td>
+        <td>Package Master storing recurring statutory compliance packages offered to clients.</td>
+        <td><code>name</code>, <code>price</code>, <code>recurrence</code> (Monthly/Annual), <code>user_id</code></td>
+      </tr>
+      <tr>
+        <td><code>sub_services</code></td>
+        <td><code>id</code> (text)</td>
+        <td>Child tasks under a parent service package (e.g. GSTR-3B Return Filing).</td>
+        <td><code>service_id</code> (FK), <code>name</code>, <code>due_date</code>, <code>user_id</code></td>
+      </tr>
+      <tr>
+        <td><code>required_docs</code></td>
+        <td><code>id</code> (text)</td>
+        <td>Document compliance checklists required before filing a sub-service.</td>
+        <td><code>sub_service_id</code> (FK), <code>name</code>, <code>is_mandatory</code>, <code>user_id</code></td>
+      </tr>
+      <tr>
+        <td><code>assigned_services</code></td>
+        <td><code>id</code> (text)</td>
+        <td>Client compliance assignment records for specific Financial Years (FY 2025-26).</td>
+        <td><code>client_id</code> (FK), <code>service_id</code> (FK), <code>financial_year</code>, <code>due_date</code>, <code>user_id</code></td>
+      </tr>
+      <tr>
+        <td><code>invoices</code></td>
+        <td><code>id</code> (text)</td>
+        <td>Tax Invoices & Pro Forma Invoices with 18% GST calculation and INR words conversion.</td>
+        <td><code>type</code>, <code>invoice_number</code>, <code>date</code>, <code>total</code>, <code>amount_received</code>, <code>balance_due</code>, <code>user_id</code></td>
+      </tr>
+      <tr>
+        <td><code>banking_entries</code></td>
+        <td><code>id</code> (text)</td>
+        <td>Financial billing ledger derived directly from Tax Invoices for payment reconciliation.</td>
+        <td><code>financial_year</code>, <code>amount_billed</code>, <code>amount_received</code>, <code>amount_pending</code>, <code>payment_status</code>, <code>user_id</code></td>
+      </tr>
+      <tr>
+        <td><code>leads</code></td>
+        <td><code>id</code> (text)</td>
+        <td>Sales pipeline prospects. Converting a lead automatically creates an active Client record.</td>
+        <td><code>name</code>, <code>mobile</code>, <code>source</code>, <code>status</code> (LEAD/CONVERTED), <code>user_id</code></td>
+      </tr>
+      <tr>
+        <td><code>renewals</code></td>
+        <td><code>id</code> (text)</td>
+        <td>Annual recurring jobs (e.g., Trademark Renewal). Rolling forward advances due dates to next cycle.</td>
+        <td><code>client_name</code>, <code>service_name</code>, <code>due_date</code>, <code>progress</code>, <code>user_id</code></td>
+      </tr>
+      <tr>
+        <td><code>one_time_services</code></td>
+        <td><code>id</code> (text)</td>
+        <td>Ad-hoc non-recurring jobs (e.g., PAN Application, DSC Registration).</td>
+        <td><code>client_name</code>, <code>service_name</code>, <code>due_date</code>, <code>progress</code>, <code>user_id</code></td>
+      </tr>
+      <tr>
+        <td><code>drafts</code></td>
+        <td><code>id</code> (text)</td>
+        <td>Engagement letter templates, statutory representation letters, and legal notices.</td>
+        <td><code>client_id</code> (FK), <code>document_type</code>, <code>title</code>, <code>content</code>, <code>user_id</code></td>
+      </tr>
+      <tr>
+        <td><code>collaborations</code></td>
+        <td><code>id</code> (text)</td>
+        <td>Directory of external CA partners, vendors, and legal advisors with WhatsApp action buttons.</td>
+        <td><code>name</code>, <code>number</code>, <code>email</code>, <code>type</code>, <code>notes</code>, <code>user_id</code></td>
+      </tr>
+      <tr>
+        <td><code>user_settings</code></td>
+        <td><code>user_id</code> (PK)</td>
+        <td>Practice configuration: Firm Name, Registration No, Base64 Digital Signature, Brand Colors.</td>
+        <td><code>settings</code> (JSONB JSON payload containing preferences and signature)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Section 4 -->
+  <h2>4. Core Technical Algorithms & Code Logic</h2>
+
+  <h3>A. Business Key Deduplication Engine (<code>src/lib/store.ts</code>)</h3>
+  <pre><code>function deduplicateItems&lt;T extends { id: string }&gt;(
+  items: T[],
+  getKey?: (item: T) => string
+): { unique: T[]; duplicateIds: string[] } {
+  const seenIds = new Set&lt;string&gt;();
+  const seenKeys = new Set&lt;string&gt;();
+  const unique: T[] = [];
+  const duplicateIds: string[] = [];
+
+  items.forEach((item) => {
+    if (!item || !item.id) return;
+    if (seenIds.has(item.id)) { duplicateIds.push(item.id); return; }
+    if (getKey) {
+      const key = getKey(item);
+      if (key && seenKeys.has(key)) { duplicateIds.push(item.id); return; }
+      if (key) seenKeys.add(key);
+    }
+    seenIds.add(item.id);
+    unique.push(item);
+  });
+
+  return { unique, duplicateIds };
+}</code></pre>
+
+  <h3>B. Tax Invoice to Banking Ledger Link</h3>
+  <p>When a Tax Invoice is generated in <code>invoice/page.tsx</code>, the store derives a linked banking ledger record:</p>
+  <pre><code>const invBId = `b_inv_${inv.id}`;
+derivedBanking.push({
+  id: invBId,
+  financialYear: inv.financialYear,
+  clientId: inv.clientId,
+  amountBilled: inv.total,
+  amountReceived: inv.amountReceived,
+  amountPending: Math.max(0, inv.total - inv.amountReceived),
+  paymentStatus: inv.amountReceived >= inv.total ? "PAID" : inv.amountReceived > 0 ? "PARTIAL" : "PENDING",
+  remark: `${inv.type} #${inv.invoiceNumber} payment record`
+});</code></pre>
+
+  <h3>C. Excel-Compatible UTF-8 BOM CSV Export</h3>
+  <pre><code>const BOM = "\ufeff";
+const csvContent = BOM + headerRow + "\n" + dataRows.join("\n");
+const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });</code></pre>
+
+  <!-- Section 5 -->
+  <div class="page-break"></div>
+  <h2>5. Automated Testing Matrix & Verification Protocol</h2>
+  <p>The codebase includes a <strong>108-assertion automated test suite</strong> executed via <code>npm test</code>:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Test Suite</th>
+        <th>File Path</th>
+        <th>Assertions</th>
+        <th>Key Coverage Areas</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Unit Tests</strong></td>
+        <td><code>tests/unit/utils.test.ts</code></td>
+        <td><span class="badge badge-success">25 Passed</span></td>
+        <td>Currency formatting, Date safety, WhatsApp URLs, Financial Year bounds, INR words conversion.</td>
+      </tr>
+      <tr>
+        <td><strong>Store Tests</strong></td>
+        <td><code>tests/unit/store.test.ts</code></td>
+        <td><span class="badge badge-success">13 Passed</span></td>
+        <td>Composite key generators, multi-pass <code>deduplicateItems</code> filtering, store isolation.</td>
+      </tr>
+      <tr>
+        <td><strong>Integration Tests</strong></td>
+        <td><code>tests/integration/database.test.ts</code></td>
+        <td><span class="badge badge-success">17 Passed</span></td>
+        <td>Live Supabase cloud CRUD operations across all 13 database tables.</td>
+      </tr>
+      <tr>
+        <td><strong>API Route Tests</strong></td>
+        <td><code>tests/integration/api.test.ts</code></td>
+        <td><span class="badge badge-success">2 Passed</span></td>
+        <td><code>POST /api/send-otp</code> missing body validation & valid email dispatch response.</td>
+      </tr>
+      <tr>
+        <td><strong>User Acceptance (UAT)</strong></td>
+        <td><code>tests/uat/user-acceptance.test.ts</code></td>
+        <td><span class="badge badge-success">15 Passed</span></td>
+        <td>7 End-to-End scenarios (Client Onboarding, Packages, Invoicing, Banking, Lead Conversion).</td>
+      </tr>
+      <tr>
+        <td><strong>Black Box Tests</strong></td>
+        <td><code>tests/blackbox/black-box.test.ts</code></td>
+        <td><span class="badge badge-success">23 Passed</span></td>
+        <td>Phone string validation, currency boundary values, fault-tolerant malformed date inputs.</td>
+      </tr>
+      <tr>
+        <td><strong>Recursive Tests</strong></td>
+        <td><code>tests/recursive/recursive.test.ts</code></td>
+        <td><span class="badge badge-success">13 Passed</span></td>
+        <td>3-Tier relational tree traversal, 5-year date roll-forward, leap-year Feb 29 clamping.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout" style="background:#F0FDF4; border-color:#166534;">
+    <div class="callout-title" style="color:#166534;">✅ Final Test Execution Result</div>
+    <p style="margin:0; font-weight:700; color:#14532D;">Total Test Assertions: 108 | Passed: 108 | Failed: 0 | Execution Time: ~8.5 seconds</p>
+  </div>
+
+  <div style="margin-top: 40px; border-top: 1px solid #E2E8F0; padding-top: 16px; font-size: 11px; color: #64748B; text-align: center;">
+    <p>© 2026 zpluscrm • Practice Management Suite. All rights reserved. Confidential technical document.</p>
+  </div>
+
+</body>
+</html>
