@@ -102,6 +102,7 @@ export async function POST(req: Request) {
         });
       } catch (mailErr: any) {
         console.error("Live SMTP send error:", mailErr);
+        // Continue to Resend fallback if available
       }
     }
 
@@ -132,19 +133,27 @@ export async function POST(req: Request) {
             provider: "Resend",
             message: `Live OTP code delivered via Resend to ${email}`,
           });
+        } else if (resData.message && resData.message.includes("validation_error")) {
+          return NextResponse.json({
+            success: true,
+            delivered: false,
+            resendSandboxRestricted: true,
+            code: code,
+            message: `Resend sandbox restriction: add domain or use SMTP in deployment`,
+          });
         }
       } catch (resendErr: any) {
         console.error("Resend API send error:", resendErr);
       }
     }
 
-    // 3. Fallback when no email provider credentials are configured in .env.local
+    // 3. Fallback when no email provider credentials are configured in environment variables
     return NextResponse.json({
       success: true,
       delivered: false,
       noCredentials: true,
       code: code,
-      message: `No SMTP_USER / RESEND_API_KEY configured in .env.local. Verification OTP code: ${code}`,
+      message: `No SMTP_USER / RESEND_API_KEY configured in environment variables. Verification OTP code: ${code}`,
     });
   } catch (error: any) {
     console.error("Failed to send OTP email:", error);
