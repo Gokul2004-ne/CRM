@@ -46,6 +46,27 @@ const checkLocalAccount = (email: string, pass: string): boolean => {
   return storedPass === pass;
 };
 
+const isAccountRegistered = (email: string): boolean => {
+  const accounts = getStoredAccounts();
+  const clean = email.toLowerCase().trim();
+  return Object.prototype.hasOwnProperty.call(accounts, clean);
+};
+
+const isValidRealEmail = (email: string): boolean => {
+  if (!email) return false;
+  const clean = email.toLowerCase().trim();
+  // RFC compliant strict email pattern
+  const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!regex.test(clean)) return false;
+
+  // Reject obvious placeholder/invalid domains
+  const domain = clean.split("@")[1];
+  const invalidDomains = ["b.c", "test.com", "example.com", "dummy.com", "asdf.com", "foo.bar"];
+  if (invalidDomains.includes(domain)) return false;
+
+  return true;
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -100,7 +121,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useAppStore.getState().resetStore();
     const cleanEmail = email.toLowerCase().trim();
 
-    // 1. Try native Supabase Auth first
+    // 1. Validate real email format
+    if (!isValidRealEmail(cleanEmail)) {
+      return { error: { message: "Please enter a valid real email address (e.g. name@company.com)." } };
+    }
+
+    // 2. Check if user has registered first
+    const isRegisteredLocally = isAccountRegistered(cleanEmail);
+
+    // Try native Supabase Auth first
     const { data, error } = await supabase.auth.signInWithPassword({
       email: cleanEmail,
       password: pass,
@@ -113,9 +142,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: null };
     }
 
-    // 2. Fallback: Authenticate via registered account store (solves Supabase unconfirmed email restriction)
-    if (checkLocalAccount(cleanEmail, pass) || (pass && pass.length >= 6)) {
-      saveStoredAccount(cleanEmail, pass);
+    // MANDATORY REQUIREMENT: Block sign in if account has NOT registered first!
+    if (!isRegisteredLocally) {
+      return {
+        error: {
+          message: "❌ Account not registered! You must sign up / register your email first before logging in.",
+        },
+      };
+    }
+
+    // Verify password for registered account
+    if (checkLocalAccount(cleanEmail, pass)) {
       const mockUser: any = {
         id: "usr_" + cleanEmail.replace(/[^a-z0-9]/gi, "_"),
         email: cleanEmail,
@@ -136,12 +173,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: null };
     }
 
-    return { error: error || { message: "Invalid login credentials" } };
+    return { error: { message: "❌ Incorrect password. Please check your credentials and try again." } };
   };
 
   const signUpWithEmail = async (email: string, pass: string) => {
     useAppStore.getState().resetStore();
     const cleanEmail = email.toLowerCase().trim();
+
+    if (!isValidRealEmail(cleanEmail)) {
+      return { error: { message: "Please enter a valid real email address for registration." } };
+    }
+
     saveStoredAccount(cleanEmail, pass);
 
     const mockUser: any = {
@@ -172,7 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Supabase signUp background notice:", e);
     }
 
-    // Set active session for verified OTP signup
+    // Set active session for verified registration
     setSession(mockSession);
     setUser(mockUser);
     if (typeof window !== "undefined") {

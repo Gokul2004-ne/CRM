@@ -157,8 +157,16 @@ export default function LoginPage() {
 
   // ─── OTP: Send ────────────────────────────────────────────────────────────
   const handleSendOtp = async () => {
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      toast.error("Please enter a valid email address");
+    const cleanEmail = email.toLowerCase().trim();
+    const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!cleanEmail || !regex.test(cleanEmail)) {
+      toast.error("Please enter a valid real email address (e.g. name@company.com)");
+      return;
+    }
+    const domain = cleanEmail.split("@")[1];
+    const invalidDomains = ["b.c", "test.com", "example.com", "dummy.com", "asdf.com", "foo.bar"];
+    if (invalidDomains.includes(domain)) {
+      toast.error("Please use a real, valid email address to register");
       return;
     }
     setSendingOtp(true);
