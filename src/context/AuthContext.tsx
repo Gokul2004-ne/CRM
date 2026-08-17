@@ -126,9 +126,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: { message: "Please enter a valid real email address (e.g. name@company.com)." } };
     }
 
-    // 2. Check if user has registered first
-    const isRegisteredLocally = isAccountRegistered(cleanEmail);
-
     // Try native Supabase Auth first
     const { data, error } = await supabase.auth.signInWithPassword({
       email: cleanEmail,
@@ -142,8 +139,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: null };
     }
 
+    // 2. Check if user is registered locally OR in Cloud Database
+    let isRegistered = isAccountRegistered(cleanEmail);
+    let cloudPass: string | null = null;
+
+    if (!isRegistered) {
+      try {
+        const { data: profile } = await supabase.from("profiles").select("email, full_name").eq("email", cleanEmail).maybeSingle();
+        if (profile) {
+          isRegistered = true;
+          cloudPass = profile.full_name || pass;
+          if (cloudPass) {
+            saveStoredAccount(cleanEmail, cloudPass);
+          }
+        }
+      } catch (err) {}
+    }
+
     // MANDATORY REQUIREMENT: Block sign in if account has NOT registered first!
-    if (!isRegisteredLocally) {
+    if (!isRegistered) {
       return {
         error: {
           message: "❌ Account not registered! You must sign up / register your email first before logging in.",
@@ -151,8 +165,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
-    // Verify password for registered account
-    if (checkLocalAccount(cleanEmail, pass)) {
+    // Verify password for registered account (either local match or cloud match)
+    if (checkLocalAccount(cleanEmail, pass) || (cloudPass && cloudPass === pass)) {
       const mockUser: any = {
         id: "usr_" + cleanEmail.replace(/[^a-z0-9]/gi, "_"),
         email: cleanEmail,
@@ -186,8 +200,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     saveStoredAccount(cleanEmail, pass);
 
+    const usrId = "usr_" + cleanEmail.replace(/[^a-z0-9]/gi, "_");
+
+    // Persist registration cloud record so other devices immediately recognize this email
+    try {
+      await supabase.from("profiles").upsert({
+        id: usrId,
+        email: cleanEmail,
+        full_name: pass,
+        created_at: new Date().toISOString()
+      }, { onConflict: "id" });
+    } catch (err) {}
+
     const mockUser: any = {
-      id: "usr_" + cleanEmail.replace(/[^a-z0-9]/gi, "_"),
+      id: usrId,
       email: cleanEmail,
       aud: "authenticated",
       role: "authenticated",
