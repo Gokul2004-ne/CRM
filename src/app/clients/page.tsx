@@ -4,8 +4,8 @@ import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { Client, ClientDocument, PortalCredential } from "@/lib/types";
 import {
-  Users, Search, Plus, Edit, Trash2, Phone, Mail,
-  Building, Copy, CheckCircle2, Shield, Eye, Download, MessageCircle, FileText, Share2, Layers, Lock
+  Users, Search, Plus, Edit, Pencil, Trash2, Phone, Mail,
+  Building, Copy, CheckCircle2, Shield, Eye, EyeOff, Download, MessageCircle, FileText, Share2, Layers, Lock
 } from "lucide-react";
 import { getWhatsAppLink, formatCurrency, formatDate, validatePAN, validateGSTIN } from "@/lib/utils";
 import { toast } from "sonner";
@@ -27,12 +27,16 @@ export default function ClientsPage() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [viewingClient, setViewingClient] = useState<Client | null>(null);
   const [activeTab, setActiveTab] = useState<"details" | "credentials" | "documents" | "services" | "360">("details");
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
+  const [editCredModal, setEditCredModal] = useState<{ open: boolean; cred: PortalCredential | null }>({ open: false, cred: null });
+  const [editCredForm, setEditCredForm] = useState<{ portalName: string; portalId: string; password: string }>({ portalName: "", portalId: "", password: "" });
 
-  const [formData, setFormData] = useState<Partial<Client>>({
+  const [formData, setFormData] = useState<Partial<Client> & { password?: string }>({
     name: "",
     type: "PROPRIETORSHIP",
     pan: "",
     gstin: "",
+    password: "",
     contactPerson: "",
     phone: "",
     email: "",
@@ -198,6 +202,12 @@ export default function ClientsPage() {
       } as Client);
       toast.success("Client details updated successfully!");
     } else {
+      const initPass = (formData.password && formData.password.trim()) ? formData.password.trim() : "TempPass@123";
+      const initialCreds: PortalCredential[] = [
+        { id: `cred_gst_${Date.now()}`, portalName: "GST Portal", portalId: gstinVal || "Not Set", password: initPass },
+        { id: `cred_it_${Date.now()}`, portalName: "Income Tax Portal", portalId: panVal || "Not Set", password: initPass }
+      ];
+
       const newClient: Client = {
         id: `c_${Date.now()}`,
         name: formData.name?.trim() || "",
@@ -217,6 +227,7 @@ export default function ClientsPage() {
         pincode: formData.pincode || "",
         documentCount: 0,
         documents: [],
+        portalCredentials: initialCreds,
         status: formData.status || "ACTIVE",
         createdAt: new Date().toISOString().split("T")[0]
       };
@@ -608,6 +619,21 @@ export default function ClientsPage() {
                 </div>
               </div>
 
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#1E293B", display: "block", marginBottom: 4 }}>
+                  <Lock size={13} style={{ display: "inline", marginRight: 5, verticalAlign: "middle", color: "#2563EB" }} />
+                  Create Temporary Password (Optional)
+                </label>
+                <input
+                  type="password"
+                  className="command-palette-input"
+                  style={{ borderRadius: 8, border: "1px solid #CBD5E1", padding: 10, fontSize: 14 }}
+                  placeholder="Initial password for portal credentials (e.g. Pass@123)"
+                  value={formData.password || ""}
+                  onChange={e => setFormData({ ...formData, password: e.target.value })}
+                />
+              </div>
+
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
                 <button
                   type="button"
@@ -926,32 +952,54 @@ export default function ClientsPage() {
                                 </button>
                               </td>
                               <td style={{ padding: "8px 12px", fontFamily: "monospace", color: "#1E293B", fontWeight: 600 }}>
-                                {cred.password}
+                                {visiblePasswords[cred.id] ? cred.password : "••••••••"}
                                 <button
                                   type="button"
-                                  style={{ background: "none", border: "none", cursor: "pointer", marginLeft: 6, color: "#0176D3" }}
+                                  style={{ background: "none", border: "none", cursor: "pointer", marginLeft: 6, color: "#475569" }}
+                                  onClick={() => setVisiblePasswords(prev => ({ ...prev, [cred.id]: !prev[cred.id] }))}
+                                  title={visiblePasswords[cred.id] ? "Hide Password" : "Show Password"}
+                                >
+                                  {visiblePasswords[cred.id] ? <EyeOff size={13} /> : <Eye size={13} />}
+                                </button>
+                                <button
+                                  type="button"
+                                  style={{ background: "none", border: "none", cursor: "pointer", marginLeft: 4, color: "#0176D3" }}
                                   onClick={() => { navigator.clipboard.writeText(cred.password); toast.success(`Copied Password for ${cred.portalName}`); }}
                                   title="Copy Password"
                                 >
-                                  📋
+                                  <Copy size={13} />
                                 </button>
                               </td>
                               <td style={{ padding: "8px 12px", textAlign: "center" }}>
-                                <button
-                                  className="btn-slds btn-slds-secondary"
-                                  style={{ padding: "3px 6px", fontSize: 10, color: "#DC2626", borderColor: "#FCA5A5" }}
-                                  onClick={() => {
-                                    if (confirm(`Remove login credentials for ${cred.portalName}?`)) {
-                                      const updatedCreds = (viewingClient.portalCredentials || []).filter(c => c.id !== cred.id);
-                                      const updated = { ...viewingClient, portalCredentials: updatedCreds };
-                                      updateClient(updated);
-                                      setViewingClient(updated);
-                                      toast.success("Credential removed.");
-                                    }
-                                  }}
-                                >
-                                  <Trash2 size={11} /> Delete
-                                </button>
+                                <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
+                                  <button
+                                    className="btn-slds btn-slds-secondary"
+                                    style={{ padding: "3px 8px", fontSize: 11 }}
+                                    onClick={() => {
+                                      setEditCredForm({ portalName: cred.portalName, portalId: cred.portalId, password: cred.password });
+                                      setEditCredModal({ open: true, cred });
+                                    }}
+                                    title="Edit Credentials"
+                                  >
+                                    <Pencil size={11} /> Edit
+                                  </button>
+                                  <button
+                                    className="btn-slds btn-slds-secondary"
+                                    style={{ padding: "3px 6px", fontSize: 11, color: "#DC2626", borderColor: "#FCA5A5" }}
+                                    onClick={() => {
+                                      if (confirm(`Remove login credentials for ${cred.portalName}?`)) {
+                                        const updatedCreds = (viewingClient.portalCredentials || []).filter(c => c.id !== cred.id);
+                                        const updated = { ...viewingClient, portalCredentials: updatedCreds };
+                                        updateClient(updated);
+                                        setViewingClient(updated);
+                                        toast.success("Credential removed.");
+                                      }
+                                    }}
+                                    title="Delete Credential"
+                                  >
+                                    <Trash2 size={11} />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -1006,21 +1054,30 @@ export default function ClientsPage() {
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              const newDoc: ClientDocument = {
-                                id: `cd_${Date.now()}`,
-                                clientId: viewingClient.id,
-                                name: file.name,
-                                type: file.name.split(".").pop()?.toUpperCase() || "PDF",
-                                category: "Taxation & Compliance",
-                                uploadDate: new Date().toISOString().split("T")[0],
-                                size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-                                status: "RECEIVED"
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                const fileUrl = reader.result as string;
+                                const newDoc: ClientDocument = {
+                                  id: `cd_${Date.now()}`,
+                                  clientId: viewingClient.id,
+                                  name: file.name,
+                                  type: file.name.split(".").pop()?.toUpperCase() || "PDF",
+                                  category: "Taxation & Compliance",
+                                  uploadDate: new Date().toISOString().split("T")[0],
+                                  size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+                                  status: "RECEIVED",
+                                  fileUrl: fileUrl
+                                };
+                                const updatedDocs = [...(viewingClient.documents || []), newDoc];
+                                const updated = { ...viewingClient, documents: updatedDocs, documentCount: updatedDocs.length };
+                                updateClient(updated);
+                                setViewingClient(updated);
+                                toast.success(`Uploaded "${file.name}" to client profile!`);
                               };
-                              const updatedDocs = [...(viewingClient.documents || []), newDoc];
-                              const updated = { ...viewingClient, documents: updatedDocs, documentCount: updatedDocs.length };
-                              updateClient(updated);
-                              setViewingClient(updated);
-                              toast.success(`Uploaded "${file.name}" to client profile!`);
+                              reader.onerror = () => {
+                                toast.error("Failed to read file content");
+                              };
+                              reader.readAsDataURL(file);
                             }
                           }}
                         />
@@ -1263,6 +1320,71 @@ export default function ClientsPage() {
             <div style={{ padding: "14px 24px", borderTop: "1px solid #E2E8F0", display: "flex", justifyContent: "flex-end" }}>
               <button className="btn-slds btn-slds-secondary" onClick={() => setViewingClient(null)}>
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Portal Credential Modal */}
+      {editCredModal.open && editCredModal.cred && (
+        <div className="modal-overlay" onClick={() => setEditCredModal({ open: false, cred: null })}>
+          <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">Edit {editCredModal.cred.portalName} Credentials</div>
+              <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px" }} onClick={() => setEditCredModal({ open: false, cred: null })}>✕</button>
+            </div>
+            <div className="modal-body" style={{ display: "grid", gap: 14 }}>
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 700 }}>Portal Name *</label>
+                <input
+                  className="form-input"
+                  value={editCredForm.portalName}
+                  onChange={e => setEditCredForm(f => ({ ...f, portalName: e.target.value }))}
+                  placeholder="e.g. GST Portal, Income Tax Portal"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 700 }}>User ID / Username *</label>
+                <input
+                  className="form-input"
+                  value={editCredForm.portalId}
+                  onChange={e => setEditCredForm(f => ({ ...f, portalId: e.target.value }))}
+                  placeholder="e.g. 27ABCDE1234F1Z5 or ABCDE1234F"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 700 }}>Password *</label>
+                <input
+                  className="form-input"
+                  value={editCredForm.password}
+                  onChange={e => setEditCredForm(f => ({ ...f, password: e.target.value }))}
+                  placeholder="Enter portal login password"
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-slds btn-slds-secondary" onClick={() => setEditCredModal({ open: false, cred: null })}>Cancel</button>
+              <button
+                className="btn-slds btn-slds-primary"
+                onClick={() => {
+                  if (!editCredForm.portalName || !editCredForm.portalId) {
+                    toast.error("Portal Name and User ID are required");
+                    return;
+                  }
+                  const updatedCreds = (viewingClient?.portalCredentials || []).map(c =>
+                    c.id === editCredModal.cred?.id
+                      ? { ...c, portalName: editCredForm.portalName, portalId: editCredForm.portalId, password: editCredForm.password }
+                      : c
+                  );
+                  const updatedClient = { ...viewingClient!, portalCredentials: updatedCreds };
+                  updateClient(updatedClient);
+                  setViewingClient(updatedClient);
+                  setEditCredModal({ open: false, cred: null });
+                  toast.success(`Updated credentials for ${editCredForm.portalName}!`);
+                }}
+              >
+                Save Changes
               </button>
             </div>
           </div>
