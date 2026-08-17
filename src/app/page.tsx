@@ -13,9 +13,11 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 
+import { useRouter } from "next/navigation";
 import PaymentAndDeliveryCell from "@/components/PaymentAndDeliveryCell";
 
 export default function Dashboard() {
+  const router = useRouter();
   const { clients, services, subServices, assignedServices, invoices, selectedFY } = useAppStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
@@ -153,7 +155,12 @@ export default function Dashboard() {
 
       {/* KPI Stats Grid */}
       <div className="stat-grid-slds">
-        <div className="kpi-card-slds">
+        <div
+          className="kpi-card-slds"
+          style={{ cursor: "pointer", transition: "transform 0.15s, box-shadow 0.15s" }}
+          onClick={() => router.push("/clients")}
+          title="Click to view Client Directory"
+        >
           <div className="kpi-header">
             <span className="kpi-title">Total Active Clients</span>
             <div className="kpi-icon-wrapper blue">
@@ -167,7 +174,12 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="kpi-card-slds">
+        <div
+          className="kpi-card-slds"
+          style={{ cursor: "pointer", transition: "transform 0.15s, box-shadow 0.15s" }}
+          onClick={() => router.push("/services")}
+          title="Click to view Packages & Services"
+        >
           <div className="kpi-header">
             <span className="kpi-title">Active Package Services</span>
             <div className="kpi-icon-wrapper purple">
@@ -181,7 +193,12 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="kpi-card-slds">
+        <div
+          className="kpi-card-slds"
+          style={{ cursor: "pointer", transition: "transform 0.15s, box-shadow 0.15s" }}
+          onClick={() => router.push("/banking")}
+          title="Click to view Financial Ledger & Banking"
+        >
           <div className="kpi-header">
             <span className="kpi-title">Total Amount Billed</span>
             <div className="kpi-icon-wrapper emerald">
@@ -195,7 +212,12 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="kpi-card-slds">
+        <div
+          className="kpi-card-slds"
+          style={{ cursor: "pointer", transition: "transform 0.15s, box-shadow 0.15s" }}
+          onClick={() => router.push("/banking")}
+          title="Click to view Collections Ledger"
+        >
           <div className="kpi-header">
             <span className="kpi-title">Amount Received</span>
             <div className="kpi-icon-wrapper amber">
@@ -209,7 +231,12 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="kpi-card-slds">
+        <div
+          className="kpi-card-slds"
+          style={{ cursor: "pointer", transition: "transform 0.15s, box-shadow 0.15s" }}
+          onClick={() => router.push("/banking")}
+          title="Click to view Pending Outstanding Accounts"
+        >
           <div className="kpi-header">
             <span className="kpi-title">Pending Balance</span>
             <div className="kpi-icon-wrapper rose">

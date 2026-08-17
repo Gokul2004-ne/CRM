@@ -123,3 +123,16 @@ export function numberToWords(num: number): string {
   const mainPart = Math.floor(num);
   return `INR ${inWords(mainPart)} Rupees Only.`;
 }
+
+export function validatePAN(pan: string): boolean {
+  if (!pan) return false;
+  const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+  return panRegex.test(pan.trim().toUpperCase());
+}
+
+export function validateGSTIN(gstin: string): boolean {
+  if (!gstin) return false;
+  const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+  return gstinRegex.test(gstin.trim().toUpperCase());
+}
+

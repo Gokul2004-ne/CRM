@@ -216,10 +216,13 @@ export default function PackagesPage() {
                 <label className="form-label" style={{ fontWeight: 700 }}>Select Package Type *</label>
                 <select
                   className="form-select"
+                  value={form.name || ""}
                   onChange={e => {
                     const preset = PACKAGE_TYPES.find(p => p.name === e.target.value);
                     if (preset) {
-                      setForm(f => ({ ...f, name: preset.name, price: f.price || preset.defaultPrice }));
+                      setForm(f => ({ ...f, name: preset.name, price: preset.defaultPrice }));
+                    } else {
+                      setForm(f => ({ ...f, name: e.target.value }));
                     }
                   }}
                 >
@@ -253,7 +256,7 @@ export default function PackagesPage() {
                         borderColor: form.name === pt.name ? "#2563EB" : "#CBD5E1",
                         color: form.name === pt.name ? "#1D4ED8" : "#475569"
                       }}
-                      onClick={() => setForm(f => ({ ...f, name: pt.name, price: f.price || pt.defaultPrice }))}
+                      onClick={() => setForm(f => ({ ...f, name: pt.name, price: pt.defaultPrice }))}
                     >
                       {pt.name}
                     </button>

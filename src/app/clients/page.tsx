@@ -7,7 +7,7 @@ import {
   Users, Search, Plus, Edit, Trash2, Phone, Mail,
   Building, Copy, CheckCircle2, Shield, Eye, Download, MessageCircle, FileText, Share2, Layers, Lock
 } from "lucide-react";
-import { getWhatsAppLink, formatCurrency, formatDate } from "@/lib/utils";
+import { getWhatsAppLink, formatCurrency, formatDate, validatePAN, validateGSTIN } from "@/lib/utils";
 import { toast } from "sonner";
 
 const INDIAN_STATES = [
@@ -119,7 +119,9 @@ export default function ClientsPage() {
     } else if (cleanPhone.length === 11 && cleanPhone.startsWith("0")) {
       cleanPhone = cleanPhone.slice(1);
     }
-    const emailVal = (formData.email || "").trim();
+    const emailVal = (formData.email || "").trim().toLowerCase();
+    const panVal = (formData.pan || "").trim().toUpperCase();
+    const gstinVal = (formData.gstin || "").trim().toUpperCase();
 
     if (!formData.name?.trim()) {
       toast.error("Please fill in Client / Firm Name");
@@ -143,6 +145,33 @@ export default function ClientsPage() {
       return;
     }
 
+    // RegEx validation for PAN if provided
+    if (panVal && !validatePAN(panVal)) {
+      toast.error("❌ Invalid PAN Format! PAN must be exactly 10 characters in format ABCDE1234F.");
+      return;
+    }
+
+    // RegEx validation for GSTIN if provided
+    if (gstinVal && !validateGSTIN(gstinVal)) {
+      toast.error("❌ Invalid GSTIN Format! GSTIN must be exactly 15 characters in format 27ABCDE1234F1Z5.");
+      return;
+    }
+
+    // Uniqueness validation across existing client records
+    const isDuplicate = clients.some(c => {
+      if (editingClient && c.id === editingClient.id) return false;
+      if (panVal && c.pan?.toUpperCase() === panVal) return true;
+      if (gstinVal && (c.gstin?.toUpperCase() === gstinVal)) return true;
+      if (emailVal && c.email?.toLowerCase() === emailVal) return true;
+      if (cleanPhone && (c.phone === cleanPhone || c.mobile === cleanPhone)) return true;
+      return false;
+    });
+
+    if (isDuplicate) {
+      toast.error("❌ Client with matching PAN, GSTIN, Email, or Phone already exists in your workspace!");
+      return;
+    }
+
     // Format address as: Address 1; Address 2; State; Pincode
     const addrParts = [
       formData.addressLine1?.trim(),
@@ -159,29 +188,26 @@ export default function ClientsPage() {
         ...formData,
         name: formData.name.trim(),
         ownerName: formData.name.trim(),
-        phone: phoneVal,
-        mobile: phoneVal,
+        pan: panVal,
+        gstin: gstinVal,
+        phone: cleanPhone,
+        mobile: cleanPhone,
         email: emailVal,
         address: formattedAddress,
-        documentCount: Number(formData.documentCount || 0)
+        documentCount: editingClient.documents?.length || 0
       } as Client);
       toast.success("Client details updated successfully!");
     } else {
-      const initialDocs: ClientDocument[] = [
-        { id: `cd_${Date.now()}_1`, clientId: `c_${Date.now()}`, name: "Bank Statement Statement", type: "PDF", category: "Banking", uploadDate: new Date().toISOString().split("T")[0], status: "RECEIVED" },
-        { id: `cd_${Date.now()}_2`, clientId: `c_${Date.now()}`, name: "GST / Sales Data Sheet", type: "XLSX", category: "Taxation", uploadDate: new Date().toISOString().split("T")[0], status: "VERIFIED" }
-      ];
-
       const newClient: Client = {
         id: `c_${Date.now()}`,
         name: formData.name?.trim() || "",
         ownerName: formData.name?.trim() || "",
         type: formData.type || "PROPRIETORSHIP",
-        pan: formData.pan || "",
-        gstin: formData.gstin || "",
+        pan: panVal,
+        gstin: gstinVal,
         contactPerson: formData.contactPerson || "",
-        phone: phoneVal,
-        mobile: phoneVal,
+        phone: cleanPhone,
+        mobile: cleanPhone,
         email: emailVal,
         city: formData.city || "",
         address: formattedAddress,
@@ -189,8 +215,8 @@ export default function ClientsPage() {
         addressLine2: formData.addressLine2 || "",
         state: formData.state || "",
         pincode: formData.pincode || "",
-        documentCount: Number(formData.documentCount || 2),
-        documents: initialDocs,
+        documentCount: 0,
+        documents: [],
         status: formData.status || "ACTIVE",
         createdAt: new Date().toISOString().split("T")[0]
       };

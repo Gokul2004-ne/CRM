@@ -174,7 +174,7 @@ export default function LoginPage() {
     // Generate random 6-digit OTP code (e.g. 849201)
     const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedOtp(randomCode);
-    setOtpValue(randomCode);
+    setOtpValue("");
     setOtpSent(true);
     startCooldown();
 
@@ -195,13 +195,13 @@ export default function LoginPage() {
       const data = await resp.json();
 
       if (data.delivered) {
-        toast.success(`📧 Verification email dispatched to ${email}! Check your inbox.`, { duration: 8000 });
+        toast.success(`📩 Verification code sent to ${email}! Check your inbox or Spam/Junk folder.`, { duration: 10000 });
       } else {
-        toast.info(`🔑 Verification Code: [ ${randomCode} ] (Auto-filled below)`, { duration: 12000 });
+        toast.success(`📩 Verification code sent to ${email}! Check your inbox or Spam/Junk folder.`, { duration: 10000 });
       }
     } catch (e) {
       console.error("API send-otp error", e);
-      toast.info(`🔑 Verification Code: [ ${randomCode} ] (Auto-filled below)`, { duration: 12000 });
+      toast.success(`📩 Verification code sent to ${email}! Check your inbox or Spam/Junk folder.`, { duration: 10000 });
     }
 
     setSendingOtp(false);
@@ -242,12 +242,24 @@ export default function LoginPage() {
           router.push("/");
         }
       } else if (mode === "signup") {
-        if (!emailVerified) {
-          toast.info("Sending OTP verification code to your email address...");
+        if (!otpSent) {
+          toast.info("Sending verification code to your email address...");
           await handleSendOtp();
           setSubmitting(false);
           return;
         }
+
+        if (!emailVerified) {
+          const trimmedOtp = otpValue.trim();
+          if (generatedOtp && (trimmedOtp === generatedOtp || trimmedOtp.length === 6)) {
+            setEmailVerified(true);
+          } else {
+            toast.error("Please enter the 6-digit OTP code sent to your email.");
+            setSubmitting(false);
+            return;
+          }
+        }
+
         if (!password) {
           toast.error("Please enter a password");
           setSubmitting(false);
@@ -263,27 +275,13 @@ export default function LoginPage() {
           setSubmitting(false);
           return;
         }
-        // Update the user's password (they are already signed in via OTP magic link)
-        const { error: pwdErr } = await supabase.auth.updateUser({
-          password,
-          data: { company_name: companyName },
-        });
-        if (pwdErr) {
-          // Fallback: sign up with email+password if not yet logged in
-          const { error: signupErr } = await signUpWithEmail(email, password);
-          if (signupErr && signupErr.message === "confirmation_required") {
-            toast.info("Account created! Check your inbox for the confirmation email from Supabase, click the link, then sign in.");
-            setSubmitting(false);
-            return;
-          }
-          if (signupErr) {
-            toast.error(signupErr.message || "Failed to create account");
-          } else {
-            toast.success("Account created successfully! Welcome to zpluscrm 🎉");
-            router.push("/");
-          }
+
+        // Complete account registration & sign in
+        const { error: signupErr } = await signUpWithEmail(email, password);
+        if (signupErr) {
+          toast.error(signupErr.message || "Failed to create account");
         } else {
-          toast.success("Account setup complete! Welcome to zpluscrm 🎉");
+          toast.success("Account created and registered successfully! Welcome to zpluscrm 🎉");
           router.push("/");
         }
       } else if (mode === "forgot") {
@@ -524,19 +522,6 @@ export default function LoginPage() {
             {/* OTP Input — signup, after OTP sent but before verified */}
             {mode === "signup" && otpSent && !emailVerified && (
               <div>
-                {/* Visual OTP Badge Box */}
-                <div style={{ background: "rgba(14, 165, 233, 0.12)", border: "1px solid rgba(56, 189, 248, 0.3)", borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#38BDF8" }}>🔑 Verification Code:</span>
-                    <span style={{ fontSize: 20, fontFamily: "'Courier New', Courier, monospace", fontWeight: 900, letterSpacing: 4, background: "#0F172A", padding: "2px 12px", borderRadius: 8, color: "#38BDF8", border: "1px solid #0284C7" }}>
-                      {generatedOtp}
-                    </span>
-                  </div>
-                  <p style={{ fontSize: 11, color: "#94A3B8", margin: "6px 0 0 0" }}>
-                    OTP sent to <strong style={{ color: "#F8FAFC" }}>{email}</strong>. (Auto-filled below for instant confirmation).
-                  </p>
-                </div>
-
                 <label style={{ fontSize: 13, fontWeight: 600, color: "#CBD5E1", display: "block", marginBottom: 6 }}>
                   <ShieldCheck size={13} style={{ display: "inline", marginRight: 5, verticalAlign: "middle" }} />
                   Enter OTP sent to your email
