@@ -195,13 +195,13 @@ export default function LoginPage() {
       const data = await resp.json();
 
       if (data.delivered) {
-        toast.success(`📧 Verification email dispatched to ${email}! Check your inbox.`, { duration: 8000 });
+        toast.success(`📩 Verification code sent to ${email}! Check your inbox or Spam/Junk folder.`, { duration: 10000 });
       } else {
-        toast.success(`📧 Verification code sent to ${email}! Please check your email inbox.`, { duration: 8000 });
+        toast.success(`📩 Verification code sent to ${email}! Check your inbox or Spam/Junk folder.`, { duration: 10000 });
       }
     } catch (e) {
       console.error("API send-otp error", e);
-      toast.success(`📧 Verification code sent to ${email}! Please check your email inbox.`, { duration: 8000 });
+      toast.success(`📩 Verification code sent to ${email}! Check your inbox or Spam/Junk folder.`, { duration: 10000 });
     }
 
     setSendingOtp(false);

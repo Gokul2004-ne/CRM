@@ -71,7 +71,7 @@ const getClientKey = (c: Client) => {
   const detail = (c.mobile || c.phone || c.email || c.pan || c.panNo || c.gstin || c.gstNo || '').toLowerCase().trim();
   return name ? `${name}_${detail}` : '';
 };
-const getServiceKey = (s: Service) => (s.name || '').toLowerCase().trim();
+const getServiceKey = (s: Service) => `${(s.id || '').trim()}_${(s.name || '').toLowerCase().trim()}_${s.price || 0}`;
 const getSubServiceKey = (ss: SubService) => `${(ss.serviceId || '').trim()}_${(ss.name || '').toLowerCase().trim()}`;
 const getRequiredDocKey = (rd: RequiredDoc) => `${(rd.subServiceId || '').trim()}_${(rd.name || '').toLowerCase().trim()}`;
 const getAssignedServiceKey = (a: AssignedService) => `${(a.clientId || '').trim()}_${(a.serviceId || '').trim()}_${(a.financialYear || '').trim()}_${(a.dueDate || '').trim()}`;
@@ -396,30 +396,49 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   // Clients Sync
   addClient: (c) => {
+    // Auto-provision initial portal credentials if missing
+    const panId = (c.pan || c.panNo || "").trim();
+    const gstId = (c.gstNo || c.gstin || "").trim();
+    const portalCredentials = (c.portalCredentials && c.portalCredentials.length > 0)
+      ? c.portalCredentials
+      : [
+          { id: `cred_gst_${Date.now()}`, portalName: "GST Portal", portalId: gstId || "Not Set", password: c.gstPortalPassword || "TempPass@123" },
+          { id: `cred_it_${Date.now()}`, portalName: "Income Tax Portal", portalId: panId || "Not Set", password: "TempPass@123" }
+        ];
+
+    const preparedClient: Client = {
+      ...c,
+      documents: c.documents || [],
+      documentCount: c.documents?.length || 0,
+      portalCredentials,
+    };
+
+    // Cloud-First Execution: Await/Trigger Supabase write, then commit to local state
+    syncClientToSupabase(preparedClient);
+
     set((s) => {
-      const key = getClientKey(c);
-      if (s.clients.some(x => x.id === c.id || (key && getClientKey(x) === key))) return s;
-      const next = [...s.clients, c];
+      const key = getClientKey(preparedClient);
+      if (s.clients.some(x => x.id === preparedClient.id || (key && getClientKey(x) === key))) return s;
+      const next = [...s.clients, preparedClient];
       saveToLocal("clients", next);
       return { clients: next };
     });
-    syncClientToSupabase(c);
   },
   updateClient: (c) => {
+    syncClientToSupabase(c);
     set((s) => {
       const next = s.clients.map(x => x.id === c.id ? c : x);
       saveToLocal("clients", next);
       return { clients: next };
     });
-    syncClientToSupabase(c);
   },
   deleteClient: (id) => {
+    removeClientFromSupabase(id);
     set((s) => {
       const next = s.clients.filter(x => x.id !== id);
       saveToLocal("clients", next);
       return { clients: next };
     });
-    removeClientFromSupabase(id);
   },
 
   // Services Sync (Packages)

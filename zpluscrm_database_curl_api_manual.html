@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>zpluscrm - Supabase REST API & cURL Command Reference Manual</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 16mm 14mm 16mm 14mm;
+      @bottom-right {
+        content: counter(page);
+      }
+    }
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+      color: #0F172A;
+      background-color: #FFFFFF;
+      line-height: 1.5;
+      font-size: 12.5px;
+      margin: 0;
+      padding: 0;
+    }
+    
+    /* Cover Header */
+    .cover-header {
+      background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+      color: #FFFFFF;
+      padding: 28px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+    .cover-header h1 {
+      font-size: 26px;
+      font-weight: 900;
+      margin: 0 0 6px 0;
+      letter-spacing: -0.5px;
+    }
+    .cover-header h1 span {
+      color: #54B400;
+    }
+    .cover-header p {
+      font-size: 13.5px;
+      color: #94A3B8;
+      margin: 0;
+    }
+    .cover-meta {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid #334155;
+      display: flex;
+      justify-content: space-between;
+      font-size: 11.5px;
+      color: #CBD5E1;
+    }
+
+    h2 {
+      font-size: 16px;
+      font-weight: 800;
+      color: #0F172A;
+      border-bottom: 2px solid #0176D3;
+      padding-bottom: 5px;
+      margin-top: 24px;
+      margin-bottom: 10px;
+      page-break-after: avoid;
+    }
+    h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1E293B;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      page-break-after: avoid;
+    }
+
+    p, li {
+      color: #334155;
+    }
+
+    /* Key Variable Callout */
+    .key-box {
+      background-color: #0F172A;
+      color: #F8FAFC;
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 11px;
+      margin: 14px 0;
+      line-height: 1.6;
+      page-break-inside: avoid;
+    }
+    .key-box .var-name {
+      color: #38BDF8;
+      font-weight: bold;
+    }
+    .key-box .var-val {
+      color: #A7F3D0;
+    }
+
+    /* Code Blocks */
+    code {
+      font-family: Consolas, Monaco, 'Andale Mono', monospace;
+      background-color: #F1F5F9;
+      color: #0F172A;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    pre {
+      background-color: #020617;
+      color: #E2E8F0;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid #1E293B;
+      font-family: Consolas, Monaco, 'Andale Mono', monospace;
+      font-size: 10.5px;
+      line-height: 1.4;
+      overflow-x: auto;
+      page-break-inside: avoid;
+      margin: 8px 0 16px 0;
+    }
+    pre code {
+      background-color: transparent;
+      color: inherit;
+      padding: 0;
+    }
+    .comment { color: #64748B; font-style: italic; }
+    .method { color: #38BDF8; font-weight: bold; }
+    .url { color: #FCD34D; }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 11px;
+      page-break-inside: avoid;
+    }
+    th {
+      background-color: #0F172A;
+      color: #FFFFFF;
+      font-weight: 700;
+      text-align: left;
+      padding: 7px 10px;
+      border: 1px solid #0F172A;
+    }
+    td {
+      padding: 6px 10px;
+      border: 1px solid #E2E8F0;
+      vertical-align: top;
+    }
+    tr:nth-child(even) {
+      background-color: #F8FAFC;
+    }
+
+    .callout {
+      background-color: #EFF6FF;
+      border-left: 4px solid #0176D3;
+      padding: 10px 14px;
+      margin: 12px 0;
+      border-radius: 0 6px 6px 0;
+      page-break-inside: avoid;
+    }
+    .callout-title {
+      font-weight: 700;
+      color: #1E40AF;
+      margin-bottom: 2px;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Cover Header -->
+  <div class="cover-header">
+    <h1>zplus<span>crm</span></h1>
+    <p>Database REST API & cURL Command Reference Manual</p>
+    <div class="cover-meta">
+      <span><strong>Project ID:</strong> dwtsntjkysxlqluouhbr</span>
+      <span><strong>Protocol:</strong> HTTPS REST / PostgREST</span>
+      <span><strong>Generated Date:</strong> August 2026</span>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-title">📌 Overview & Prerequisites</div>
+    <p style="margin:0;">This manual provides complete, ready-to-run <strong>cURL commands</strong> for querying, creating, updating, and deleting records across all 13 Supabase PostgreSQL database tables and local Next.js API routes for <strong>zpluscrm</strong>.</p>
+  </div>
+
+  <h2>1. Global Project Authentication Credentials</h2>
+  <div class="key-box">
+<span class="var-name">SUPABASE_URL</span>="<span class="var-val">https://dwtsntjkysxlqluouhbr.supabase.co</span>"
+<span class="var-name">SUPABASE_KEY</span>="<span class="var-val">eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3dHNudGpreXN4bHFsdW91aGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4NjU4NTgsImV4cCI6MjEwMDQ0MTg1OH0.SPFdmR18c7CUNTXoUn-1pftYd9GY5hH65nEuZDJlCpg</span>"
+  </div>
+
+  <!-- Table Section 1 -->
+  <h2>2. Client Directory & Compliance Master Tables</h2>
+
+  <h3>A. Table: <code>clients</code> (Client Directory Master)</h3>
+
+  <p><strong>1. Fetch All Clients (SELECT *):</strong></p>
+  <pre><code><span class="comment"># GET all client records</span>
+curl -X <span class="method">GET</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/clients?select=*</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY"</code></pre>
+
+  <p><strong>2. Insert New Client (POST):</strong></p>
+  <pre><code><span class="comment"># Create new Private Limited Client</span>
+curl -X <span class="method">POST</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/clients</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d '{
+    "id": "c_curl_101",
+    "name": "Apex Global Technologies",
+    "type": "PRIVATE_LIMITED",
+    "mobile": "9876543210",
+    "email": "contact@apexglobal.com",
+    "pan": "ABCDE1234F",
+    "gstin": "27ABCDE1234F1Z5",
+    "city": "Mumbai",
+    "user_id": "usr_harsha_g_c"
+  }'</code></pre>
+
+  <p><strong>3. Update Client Record (PATCH):</strong></p>
+  <pre><code><span class="comment"># Update Client phone & city by ID</span>
+curl -X <span class="method">PATCH</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/clients?id=eq.c_curl_101</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mobile": "9988776655",
+    "city": "Pune"
+  }'</code></pre>
+
+  <p><strong>4. Delete Client Record (DELETE):</strong></p>
+  <pre><code><span class="comment"># Delete Client by ID</span>
+curl -X <span class="method">DELETE</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/clients?id=eq.c_curl_101</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY"</code></pre>
+
+  <!-- Page Break -->
+  <div class="page-break"></div>
+
+  <h3>B. Table: <code>services</code> (Package Master)</h3>
+  <pre><code><span class="comment"># GET all billing packages</span>
+curl -X <span class="method">GET</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/services?select=*</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY"
+
+<span class="comment"># POST create package</span>
+curl -X <span class="method">POST</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/services</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "s_curl_101",
+    "name": "Corporate GST & IT Suite",
+    "price": 15000,
+    "recurrence": "MONTHLY",
+    "user_id": "usr_harsha_g_c"
+  }'</code></pre>
+
+  <h3>C. Table: <code>sub_services</code> (Child Compliance Tasks)</h3>
+  <pre><code><span class="comment"># GET sub-services under a parent package</span>
+curl -X <span class="method">GET</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/sub_services?service_id=eq.s_curl_101</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY"</code></pre>
+
+  <h3>D. Table: <code>required_docs</code> (Compliance Checklists)</h3>
+  <pre><code><span class="comment"># GET mandatory documents for filing</span>
+curl -X <span class="method">GET</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/required_docs?is_mandatory=eq.true</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY"</code></pre>
+
+  <h3>E. Table: <code>assigned_services</code> (Client Assignments)</h3>
+  <pre><code><span class="comment"># GET client compliance assignments for FY 2025-26</span>
+curl -X <span class="method">GET</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/assigned_services?financial_year=eq.2025-26</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY"</code></pre>
+
+  <h2>3. Financial Invoicing & Banking Ledger Tables</h2>
+
+  <h3>A. Table: <code>invoices</code> (Tax Invoices Engine)</h3>
+  <pre><code><span class="comment"># POST Create Tax Invoice</span>
+curl -X <span class="method">POST</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/invoices</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d '{
+    "id": "inv_curl_201",
+    "type": "INVOICE",
+    "invoice_number": "INV/2026-9901",
+    "date": "2026-08-14",
+    "financial_year": "2026-27",
+    "client_name": "Apex Global Technologies",
+    "subtotal": 15000,
+    "gst_rate": 18,
+    "gst_amount": 2700,
+    "total": 17700,
+    "amount_received": 10000,
+    "balance_due": 7700,
+    "status": "SENT",
+    "user_id": "usr_harsha_g_c"
+  }'</code></pre>
+
+  <h3>B. Table: <code>banking_entries</code> (Payment Reconciliation Ledger)</h3>
+  <pre><code><span class="comment"># GET all payment ledger records</span>
+curl -X <span class="method">GET</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/banking_entries?select=*</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY"
+
+<span class="comment"># PATCH update Amount Received in Banking</span>
+curl -X <span class="method">PATCH</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/banking_entries?id=eq.b_inv_inv_curl_201</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount_received": 17700,
+    "amount_pending": 0,
+    "payment_status": "PAID"
+  }'</code></pre>
+
+  <!-- Page Break -->
+  <div class="page-break"></div>
+  <h2>4. Operations, Renewals & Settings Tables</h2>
+
+  <h3>A. Table: <code>leads</code> (Sales Pipeline)</h3>
+  <pre><code><span class="comment"># POST Log New Sales Lead</span>
+curl -X <span class="method">POST</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/leads</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "lead_curl_301",
+    "name": "Starlight Technologies",
+    "mobile": "9811223344",
+    "source": "WhatsApp Business",
+    "status": "LEAD",
+    "user_id": "usr_harsha_g_c"
+  }'</code></pre>
+
+  <h3>B. Table: <code>renewals</code> & <code>one_time_services</code></h3>
+  <pre><code><span class="comment"># GET Annual Renewals</span>
+curl -X <span class="method">GET</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/renewals?select=*</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY"
+
+<span class="comment"># GET One-Time Services</span>
+curl -X <span class="method">GET</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/one_time_services?select=*</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY"</code></pre>
+
+  <h3>C. Table: <code>drafts</code> & <code>collaborations</code></h3>
+  <pre><code><span class="comment"># GET Document Drafts</span>
+curl -X <span class="method">GET</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/drafts?select=*</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY"
+
+<span class="comment"># GET Collaborations</span>
+curl -X <span class="method">GET</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/collaborations?select=*</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY"</code></pre>
+
+  <h3>D. Table: <code>user_settings</code> (Firm Settings & Digital Signature)</h3>
+  <pre><code><span class="comment"># GET User Settings & Signature</span>
+curl -X <span class="method">GET</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/user_settings?user_id=eq.usr_harsha_g_c</span>" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY"</code></pre>
+
+  <h2>5. Next.js Server API Endpoints</h2>
+
+  <h3>A. Endpoint: <code>POST /api/send-otp</code> (OTP Verification Dispatcher)</h3>
+  <pre><code><span class="comment"># Dispatch OTP Code via local dev / server route</span>
+curl -X <span class="method">POST</span> "<span class="url">http://localhost:3000/api/send-otp</span>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "code": "849201",
+    "name": "Harsha"
+  }'</code></pre>
+
+  <div style="margin-top: 36px; border-top: 1px solid #E2E8F0; padding-top: 14px; font-size: 11px; color: #64748B; text-align: center;">
+    <p>© 2026 zpluscrm • Database REST API Reference Manual. All rights reserved.</p>
+  </div>
+
+</body>
+</html>
