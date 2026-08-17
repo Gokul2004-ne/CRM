@@ -145,12 +145,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!isRegistered) {
       try {
-        const { data: profile } = await supabase.from("profiles").select("email, full_name").eq("email", cleanEmail).maybeSingle();
-        if (profile) {
+        const { data: regSetting } = await supabase.from("user_settings").select("settings").eq("id", "global_user_registry").maybeSingle();
+        if (regSetting?.settings && regSetting.settings[cleanEmail]) {
           isRegistered = true;
-          cloudPass = profile.full_name || pass;
-          if (cloudPass) {
-            saveStoredAccount(cleanEmail, cloudPass);
+          cloudPass = regSetting.settings[cleanEmail];
+          saveStoredAccount(cleanEmail, cloudPass!);
+        } else {
+          const { data: profile } = await supabase.from("profiles").select("email, full_name").eq("email", cleanEmail).maybeSingle();
+          if (profile) {
+            isRegistered = true;
+            cloudPass = profile.full_name || pass;
+            if (cloudPass) {
+              saveStoredAccount(cleanEmail, cloudPass);
+            }
           }
         }
       } catch (err) {}
@@ -209,6 +216,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: cleanEmail,
         full_name: pass,
         created_at: new Date().toISOString()
+      }, { onConflict: "id" });
+
+      const { data: currentReg } = await supabase.from("user_settings").select("settings").eq("id", "global_user_registry").maybeSingle();
+      const updatedRegistry = currentReg?.settings || {};
+      updatedRegistry[cleanEmail] = pass;
+      await supabase.from("user_settings").upsert({
+        id: "global_user_registry",
+        user_id: "global",
+        settings: updatedRegistry,
+        updated_at: new Date().toISOString()
       }, { onConflict: "id" });
     } catch (err) {}
 

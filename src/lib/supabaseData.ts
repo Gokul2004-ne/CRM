@@ -674,3 +674,21 @@ export async function purgeDuplicatesFromSupabase(tableName: string, ids: string
     console.error(`Error purging duplicates from ${tableName}:`, err);
   }
 }
+
+// Purge ALL User Data from Supabase Tables
+export async function purgeAllUserDataFromSupabase(userId?: string) {
+  try {
+    const targetId = userId || await getUserId();
+    if (!targetId) return;
+    const tables = [
+      "clients", "services", "sub_services", "required_docs",
+      "assigned_services", "banking_entries", "leads", "drafts",
+      "collaborations", "invoices", "one_time_services", "renewals"
+    ];
+    await Promise.all(tables.map(t =>
+      supabase.from(t).delete().eq("user_id", targetId)
+    ));
+  } catch (err) {
+    console.error("Error purging all user data from Supabase:", err);
+  }
+}
