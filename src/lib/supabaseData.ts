@@ -3,6 +3,7 @@ import {
   Client, Service, SubService, RequiredDoc,
   AssignedService, BankingEntry, Lead, DocumentDraft, Collaboration
 } from "./types";
+import { ensureUUID } from "./utils";
 
 // Get user ID from mock localStorage session (fallback for non-Supabase auth)
 function getMockSessionUserId(): string | undefined {
@@ -319,8 +320,9 @@ async function getUserId(): Promise<string | undefined> {
 // Clients Sync
 export async function syncClientToSupabase(c: Client) {
   const userId = await getUserId();
-  await supabase.from("clients").upsert({
-    id: c.id,
+  const dbId = ensureUUID(c.id);
+  const { error } = await supabase.from("clients").upsert({
+    id: dbId,
     user_id: userId,
     name: c.name,
     owner_name: c.ownerName,
@@ -345,17 +347,22 @@ export async function syncClientToSupabase(c: Client) {
     notes: c.notes,
     created_at: c.createdAt || new Date().toISOString(),
   });
+  if (error) {
+    console.error("Supabase syncClientToSupabase error:", error);
+  }
 }
 
 export async function removeClientFromSupabase(id: string) {
-  await supabase.from("clients").delete().eq("id", id);
+  const dbId = ensureUUID(id);
+  await supabase.from("clients").delete().eq("id", dbId);
 }
 
 // Services Sync
 export async function syncServiceToSupabase(s: Service) {
   const userId = await getUserId();
-  await supabase.from("services").upsert({
-    id: s.id,
+  const dbId = ensureUUID(s.id);
+  const { error } = await supabase.from("services").upsert({
+    id: dbId,
     user_id: userId,
     name: s.name,
     due_date: s.dueDate,
@@ -363,56 +370,71 @@ export async function syncServiceToSupabase(s: Service) {
     recurrence: s.recurrence,
     applicable_months: s.applicableMonths,
   });
+  if (error) {
+    console.error("Supabase syncServiceToSupabase error:", error);
+  }
 }
 
 export async function removeServiceFromSupabase(id: string) {
-  await supabase.from("services").delete().eq("id", id);
+  const dbId = ensureUUID(id);
+  await supabase.from("services").delete().eq("id", dbId);
 }
 
 // SubServices Sync
 export async function syncSubServiceToSupabase(ss: SubService) {
   const userId = await getUserId();
-  await supabase.from("sub_services").upsert({
-    id: ss.id,
+  const dbId = ensureUUID(ss.id);
+  const { error } = await supabase.from("sub_services").upsert({
+    id: dbId,
     user_id: userId,
-    service_id: ss.serviceId,
+    service_id: ss.serviceId ? ensureUUID(ss.serviceId) : null,
     name: ss.name,
     due_date: ss.dueDate || null,
     due_date_day: ss.dueDateDay || null,
     applicable_months: ss.applicableMonths || [],
     recurrence: ss.recurrence || "MONTHLY",
   });
+  if (error) {
+    console.error("Supabase syncSubServiceToSupabase error:", error);
+  }
 }
 
 export async function removeSubServiceFromSupabase(id: string) {
-  await supabase.from("sub_services").delete().eq("id", id);
+  const dbId = ensureUUID(id);
+  await supabase.from("sub_services").delete().eq("id", dbId);
 }
 
 // RequiredDocs Sync
 export async function syncRequiredDocToSupabase(rd: RequiredDoc) {
   const userId = await getUserId();
-  await supabase.from("required_docs").upsert({
-    id: rd.id,
+  const dbId = ensureUUID(rd.id);
+  const { error } = await supabase.from("required_docs").upsert({
+    id: dbId,
     user_id: userId,
-    sub_service_id: rd.subServiceId,
+    sub_service_id: rd.subServiceId ? ensureUUID(rd.subServiceId) : null,
     name: rd.name,
     is_mandatory: rd.isMandatory,
   });
+  if (error) {
+    console.error("Supabase syncRequiredDocToSupabase error:", error);
+  }
 }
 
 export async function removeRequiredDocFromSupabase(id: string) {
-  await supabase.from("required_docs").delete().eq("id", id);
+  const dbId = ensureUUID(id);
+  await supabase.from("required_docs").delete().eq("id", dbId);
 }
 
 // AssignedServices Sync
 export async function syncAssignedServiceToSupabase(a: AssignedService) {
   const userId = await getUserId();
-  await supabase.from("assigned_services").upsert({
-    id: a.id,
+  const dbId = ensureUUID(a.id);
+  const { error } = await supabase.from("assigned_services").upsert({
+    id: dbId,
     user_id: userId,
-    client_id: a.clientId,
-    service_id: a.serviceId,
-    sub_service_ids: a.subServiceIds,
+    client_id: a.clientId ? ensureUUID(a.clientId) : null,
+    service_id: a.serviceId ? ensureUUID(a.serviceId) : null,
+    sub_service_ids: a.subServiceIds || [],
     financial_year: a.financialYear,
     amount_billed: a.amountBilled,
     amount_received: a.amountReceived,
@@ -423,76 +445,96 @@ export async function syncAssignedServiceToSupabase(a: AssignedService) {
     status: a.status || "PENDING",
     due_date: a.dueDate,
   });
+  if (error) {
+    console.error("Supabase syncAssignedServiceToSupabase error:", error);
+  }
 }
 
 export async function removeAssignedServiceFromSupabase(id: string) {
-  await supabase.from("assigned_services").delete().eq("id", id);
+  const dbId = ensureUUID(id);
+  await supabase.from("assigned_services").delete().eq("id", dbId);
 }
 
 // BankingEntries Sync
 export async function syncBankingEntryToSupabase(b: BankingEntry) {
   const userId = await getUserId();
-  await supabase.from("banking_entries").upsert({
-    id: b.id,
+  const dbId = ensureUUID(b.id);
+  const { error } = await supabase.from("banking_entries").upsert({
+    id: dbId,
     user_id: userId,
     financial_year: b.financialYear,
-    client_id: b.clientId,
-    service_id: b.serviceId,
-    sub_service_id: b.subServiceId,
+    client_id: b.clientId ? ensureUUID(b.clientId) : null,
+    service_id: b.serviceId ? ensureUUID(b.serviceId) : null,
+    sub_service_id: b.subServiceId ? ensureUUID(b.subServiceId) : null,
     amount_billed: b.amountBilled,
     amount_received: b.amountReceived,
     amount_pending: b.amountPending,
     remark: b.remark,
   });
+  if (error) {
+    console.error("Supabase syncBankingEntryToSupabase error:", error);
+  }
 }
 
 export async function removeBankingEntryFromSupabase(id: string) {
-  await supabase.from("banking_entries").delete().eq("id", id);
+  const dbId = ensureUUID(id);
+  await supabase.from("banking_entries").delete().eq("id", dbId);
 }
 
 // Leads Sync
 export async function syncLeadToSupabase(l: Lead) {
   const userId = await getUserId();
-  await supabase.from("leads").upsert({
-    id: l.id,
+  const dbId = ensureUUID(l.id);
+  const { error } = await supabase.from("leads").upsert({
+    id: dbId,
     user_id: userId,
     name: l.name,
     mobile: l.mobile,
     phone: l.phone,
     source: l.source,
     status: l.status,
-    converted_client_id: l.convertedClientId,
+    converted_client_id: l.convertedClientId ? ensureUUID(l.convertedClientId) : null,
     notes: l.notes,
     created_at: l.createdAt || new Date().toISOString(),
   });
+  if (error) {
+    console.error("Supabase syncLeadToSupabase error:", error);
+  }
 }
 
 export async function removeLeadFromSupabase(id: string) {
-  await supabase.from("leads").delete().eq("id", id);
+  const dbId = ensureUUID(id);
+  await supabase.from("leads").delete().eq("id", dbId);
 }
 
 // Drafts Sync
 export async function syncDraftToSupabase(d: DocumentDraft) {
   const userId = await getUserId();
-  await supabase.from("drafts").upsert({
-    id: d.id,
+  const dbId = ensureUUID(d.id);
+  const { error } = await supabase.from("drafts").upsert({
+    id: dbId,
     user_id: userId,
     title: d.title,
     content: d.content,
     updated_at: d.updatedAt || new Date().toISOString(),
   });
+  if (error) {
+    console.error("Supabase syncDraftToSupabase error:", error);
+  }
 }
 
 export async function removeDraftFromSupabase(id: string) {
-  await supabase.from("drafts").delete().eq("id", id);
+  const dbId = ensureUUID(id);
+  await supabase.from("drafts").delete().eq("id", dbId);
 }
 
 // Collaborations Sync
 export async function syncCollaborationToSupabase(c: Collaboration) {
   try {
     const userId = await getUserId();
-    await supabase.from("collaborations").upsert({
-      id: c.id,
+    const dbId = ensureUUID(c.id);
+    const { error } = await supabase.from("collaborations").upsert({
+      id: dbId,
       user_id: userId,
       name: c.name,
       number: c.number,
@@ -501,6 +543,7 @@ export async function syncCollaborationToSupabase(c: Collaboration) {
       notes: c.notes,
       created_at: c.createdAt || new Date().toISOString(),
     });
+    if (error) console.error("Supabase syncCollaborationToSupabase error:", error);
   } catch (err) {
     console.error("Error syncing collaboration to Supabase:", err);
   }
@@ -508,7 +551,8 @@ export async function syncCollaborationToSupabase(c: Collaboration) {
 
 export async function removeCollaborationFromSupabase(id: string) {
   try {
-    await supabase.from("collaborations").delete().eq("id", id);
+    const dbId = ensureUUID(id);
+    await supabase.from("collaborations").delete().eq("id", dbId);
   } catch (err) {
     console.error("Error removing collaboration from Supabase:", err);
   }
@@ -518,14 +562,15 @@ export async function removeCollaborationFromSupabase(id: string) {
 export async function syncInvoiceToSupabase(inv: any) {
   try {
     const userId = await getUserId();
-    await supabase.from("invoices").upsert({
-      id: inv.id,
+    const dbId = ensureUUID(inv.id);
+    const { error } = await supabase.from("invoices").upsert({
+      id: dbId,
       user_id: userId,
       type: inv.type,
       invoice_number: inv.invoiceNumber,
       date: inv.date,
       financial_year: inv.financialYear,
-      client_id: inv.clientId,
+      client_id: inv.clientId ? ensureUUID(inv.clientId) : null,
       client_name: inv.clientName,
       items: inv.items,
       subtotal: inv.subtotal,
@@ -538,6 +583,7 @@ export async function syncInvoiceToSupabase(inv: any) {
       status: inv.status,
       created_at: inv.createdAt || new Date().toISOString(),
     });
+    if (error) console.error("Supabase syncInvoiceToSupabase error:", error);
   } catch (err) {
     console.error("Error syncing invoice to Supabase:", err);
   }
@@ -545,7 +591,8 @@ export async function syncInvoiceToSupabase(inv: any) {
 
 export async function removeInvoiceFromSupabase(id: string) {
   try {
-    await supabase.from("invoices").delete().eq("id", id);
+    const dbId = ensureUUID(id);
+    await supabase.from("invoices").delete().eq("id", dbId);
   } catch (err) {
     console.error("Error removing invoice from Supabase:", err);
   }
@@ -555,8 +602,9 @@ export async function removeInvoiceFromSupabase(id: string) {
 export async function syncOneTimeServiceToSupabase(ots: any) {
   try {
     const userId = await getUserId();
-    await supabase.from("one_time_services").upsert({
-      id: ots.id,
+    const dbId = ensureUUID(ots.id);
+    const { error } = await supabase.from("one_time_services").upsert({
+      id: dbId,
       user_id: userId,
       client_name: ots.clientName,
       service_name: ots.serviceName,
@@ -565,6 +613,7 @@ export async function syncOneTimeServiceToSupabase(ots: any) {
       notes: ots.notes,
       created_at: ots.createdAt || new Date().toISOString(),
     });
+    if (error) console.error("Supabase syncOneTimeServiceToSupabase error:", error);
   } catch (err) {
     console.error("Error syncing one-time service to Supabase:", err);
   }
@@ -572,7 +621,8 @@ export async function syncOneTimeServiceToSupabase(ots: any) {
 
 export async function removeOneTimeServiceFromSupabase(id: string) {
   try {
-    await supabase.from("one_time_services").delete().eq("id", id);
+    const dbId = ensureUUID(id);
+    await supabase.from("one_time_services").delete().eq("id", dbId);
   } catch (err) {
     console.error("Error removing one-time service from Supabase:", err);
   }
@@ -582,8 +632,9 @@ export async function removeOneTimeServiceFromSupabase(id: string) {
 export async function syncRenewalToSupabase(rn: any) {
   try {
     const userId = await getUserId();
-    await supabase.from("renewals").upsert({
-      id: rn.id,
+    const dbId = ensureUUID(rn.id);
+    const { error } = await supabase.from("renewals").upsert({
+      id: dbId,
       user_id: userId,
       client_name: rn.clientName,
       service_name: rn.serviceName,
@@ -597,6 +648,7 @@ export async function syncRenewalToSupabase(rn: any) {
       notes: rn.notes,
       created_at: rn.createdAt || new Date().toISOString(),
     });
+    if (error) console.error("Supabase syncRenewalToSupabase error:", error);
   } catch (err) {
     console.error("Error syncing renewal to Supabase:", err);
   }
@@ -604,7 +656,8 @@ export async function syncRenewalToSupabase(rn: any) {
 
 export async function removeRenewalFromSupabase(id: string) {
   try {
-    await supabase.from("renewals").delete().eq("id", id);
+    const dbId = ensureUUID(id);
+    await supabase.from("renewals").delete().eq("id", dbId);
   } catch (err) {
     console.error("Error removing renewal from Supabase:", err);
   }
