@@ -30,7 +30,8 @@ import {
   removeOneTimeServiceFromSupabase,
   syncRenewalToSupabase,
   removeRenewalFromSupabase,
-  purgeDuplicatesFromSupabase
+  purgeDuplicatesFromSupabase,
+  purgeAllUserDataFromSupabase
 } from "./supabaseData";
 
 function deduplicateItems<T extends { id: string }>(
@@ -246,21 +247,37 @@ export const useAppStore = create<AppState>()((set, get) => ({
   sidebarCollapsed: false,
   isLoadingSupabase: false,
 
-  resetStore: () => set({
-    clients: [],
-    services: [],
-    subServices: [],
-    requiredDocs: [],
-    assignedServices: [],
-    bankingEntries: [],
-    leads: [],
-    drafts: [],
-    collaborations: [],
-    invoices: [],
-    oneTimeServices: [],
-    renewals: [],
-    isLoadingSupabase: false,
-  }),
+  resetStore: () => {
+    purgeAllUserDataFromSupabase();
+    saveToLocal("clients", []);
+    saveToLocal("services", []);
+    saveToLocal("subServices", []);
+    saveToLocal("requiredDocs", []);
+    saveToLocal("assignedServices", []);
+    saveToLocal("bankingEntries", []);
+    saveToLocal("leads", []);
+    saveToLocal("drafts", []);
+    saveToLocal("collaborations", []);
+    saveToLocal("invoices", []);
+    saveToLocal("oneTimeServices", []);
+    saveToLocal("renewals", []);
+
+    set({
+      clients: [],
+      services: [],
+      subServices: [],
+      requiredDocs: [],
+      assignedServices: [],
+      bankingEntries: [],
+      leads: [],
+      drafts: [],
+      collaborations: [],
+      invoices: [],
+      oneTimeServices: [],
+      renewals: [],
+      isLoadingSupabase: false,
+    });
+  },
 
   loadSupabaseData: async () => {
     set({ isLoadingSupabase: true });
