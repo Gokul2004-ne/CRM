@@ -288,18 +288,18 @@ export const useAppStore = create<AppState>()((set, get) => ({
       } catch {}
     }
 
-    const rawClients = data ? [...data.clients, ...localClients] : localClients;
-    const rawServices = data ? [...data.services, ...localServices] : localServices;
-    const rawSubServices = data ? [...data.subServices, ...localSubServices] : localSubServices;
-    const rawRequiredDocs = data ? [...data.requiredDocs, ...localRequiredDocs] : localRequiredDocs;
-    const rawAssigned = data ? [...data.assignedServices, ...localAssigned] : localAssigned;
-    const rawBanking = data ? [...data.bankingEntries, ...localBanking] : localBanking;
-    const rawLeads = data ? [...data.leads, ...localLeads] : localLeads;
-    const rawDrafts = data ? [...data.drafts, ...localDrafts] : localDrafts;
-    const rawCollabs = data ? [...data.collaborations, ...localCollabs] : localCollabs;
-    const rawInvoices = data ? [...(data.invoices || []), ...localInvoices] : localInvoices;
-    const rawOneTime = data ? [...(data.oneTimeServices || []), ...localOneTime] : localOneTime;
-    const rawRenewals = data ? [...(data.renewals || []), ...localRenewals] : localRenewals;
+    const rawClients = data ? data.clients : localClients;
+    const rawServices = data ? data.services : localServices;
+    const rawSubServices = data ? data.subServices : localSubServices;
+    const rawRequiredDocs = data ? data.requiredDocs : localRequiredDocs;
+    const rawAssigned = data ? data.assignedServices : localAssigned;
+    const rawBanking = data ? data.bankingEntries : localBanking;
+    const rawLeads = data ? data.leads : localLeads;
+    const rawDrafts = data ? data.drafts : localDrafts;
+    const rawCollabs = data ? data.collaborations : localCollabs;
+    const rawInvoices = data ? (data.invoices || []) : localInvoices;
+    const rawOneTime = data ? (data.oneTimeServices || []) : localOneTime;
+    const rawRenewals = data ? (data.renewals || []) : localRenewals;
 
     const clientsRes = deduplicateItems(rawClients, getClientKey);
     const servicesRes = deduplicateItems(rawServices, getServiceKey);
