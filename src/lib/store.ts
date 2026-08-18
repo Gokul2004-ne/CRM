@@ -932,25 +932,27 @@ export const useAppStore = create<AppState>()((set, get) => ({
   addRenewal: (rn) => {
     const rnFixed = { ...rn, id: ensureUUID(rn.id) };
     set((s) => {
-      const key = `${(rnFixed.clientName || '').toLowerCase()}_${(rnFixed.serviceName || '').toLowerCase()}`;
-      if ((s.renewals || []).some(x => x.id === rnFixed.id || (key && `${(x.clientName || '').toLowerCase()}_${(x.serviceName || '').toLowerCase()}` === key))) return s;
-      const next = [rnFixed, ...(s.renewals || [])];
+      const existing = s.renewals || [];
+      const filtered = existing.filter(x => x.id !== rnFixed.id);
+      const next = [rnFixed, ...filtered];
       saveToLocal("renewals", next);
       return { renewals: next };
     });
     syncRenewalToSupabase(rnFixed);
   },
   updateRenewal: (rn) => {
+    const rnFixed = { ...rn, id: ensureUUID(rn.id) };
     set((s) => {
-      const next = (s.renewals || []).map(x => x.id === rn.id ? rn : x);
+      const next = (s.renewals || []).map(x => x.id === rnFixed.id ? rnFixed : x);
       saveToLocal("renewals", next);
       return { renewals: next };
     });
-    syncRenewalToSupabase(rn);
+    syncRenewalToSupabase(rnFixed);
   },
   deleteRenewal: (id) => {
+    const targetId = ensureUUID(id);
     set((s) => {
-      const next = (s.renewals || []).filter(x => x.id !== id);
+      const next = (s.renewals || []).filter(x => x.id !== id && x.id !== targetId);
       saveToLocal("renewals", next);
       return { renewals: next };
     });

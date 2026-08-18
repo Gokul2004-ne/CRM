@@ -7,7 +7,7 @@ import {
   Users, Search, Plus, Edit, Pencil, Trash2, Phone, Mail,
   Building, Copy, CheckCircle2, Shield, Eye, EyeOff, Download, MessageCircle, FileText, Share2, Layers, Lock
 } from "lucide-react";
-import { getWhatsAppLink, formatCurrency, formatDate, validatePAN, validateGSTIN } from "@/lib/utils";
+import { getWhatsAppLink, formatCurrency, formatDate, validatePAN, validateGSTIN, validatePhone, validateEmail } from "@/lib/utils";
 import { toast } from "sonner";
 
 const INDIAN_STATES = [
@@ -137,15 +137,15 @@ export default function ClientsPage() {
       return;
     }
 
-    // Strict 10-digit mobile number validation
-    if (cleanPhone.length !== 10 || !/^[6-9]\d{9}$/.test(cleanPhone)) {
-      toast.error("Invalid Mobile Number! Please enter a valid 10-digit Indian mobile number (e.g. 9876543210).");
+    // Strict 10–12 digit numeric phone number validation
+    if (!validatePhone(phoneVal)) {
+      toast.error("❌ Invalid Mobile Number! Please enter a valid 10-digit Indian mobile number (only digits allowed, e.g. 9876543210).");
       return;
     }
 
     // Strict Email validation if provided
-    if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
-      toast.error("Invalid Email Address! Please enter a valid email address (e.g. client@company.com).");
+    if (emailVal && !validateEmail(emailVal)) {
+      toast.error("❌ Invalid Email Address! Please enter a valid email address (e.g. client@company.com).");
       return;
     }
 
@@ -161,21 +161,6 @@ export default function ClientsPage() {
       return;
     }
 
-    // Uniqueness validation across existing client records
-    const isDuplicate = clients.some(c => {
-      if (editingClient && c.id === editingClient.id) return false;
-      if (panVal && c.pan?.toUpperCase() === panVal) return true;
-      if (gstinVal && (c.gstin?.toUpperCase() === gstinVal)) return true;
-      if (emailVal && c.email?.toLowerCase() === emailVal) return true;
-      if (cleanPhone && (c.phone === cleanPhone || c.mobile === cleanPhone)) return true;
-      return false;
-    });
-
-    if (isDuplicate) {
-      toast.error("❌ Client with matching PAN, GSTIN, Email, or Phone already exists in your workspace!");
-      return;
-    }
-
     // Format address as: Address 1; Address 2; State; Pincode
     const addrParts = [
       formData.addressLine1?.trim(),
@@ -185,6 +170,22 @@ export default function ClientsPage() {
     ].filter(Boolean);
 
     const formattedAddress = addrParts.join("; ");
+
+    // Uniqueness validation across existing client records
+    const isDuplicate = clients.some(c => {
+      if (editingClient && c.id === editingClient.id) return false;
+      if (panVal && c.pan?.toUpperCase() === panVal) return true;
+      if (gstinVal && (c.gstin?.toUpperCase() === gstinVal)) return true;
+      if (emailVal && c.email?.toLowerCase() === emailVal) return true;
+      if (cleanPhone && (c.phone === cleanPhone || c.mobile === cleanPhone)) return true;
+      if (formattedAddress && c.address && c.address.trim().toLowerCase() === formattedAddress.trim().toLowerCase()) return true;
+      return false;
+    });
+
+    if (isDuplicate) {
+      toast.error("❌ Client with matching PAN, GSTIN, Email, Phone, or Client Address already exists in your workspace!");
+      return;
+    }
 
     if (editingClient) {
       updateClient({
@@ -932,8 +933,8 @@ export default function ClientsPage() {
                           {((viewingClient.portalCredentials && viewingClient.portalCredentials.length > 0)
                             ? viewingClient.portalCredentials
                             : [
-                                { id: "c1", portalName: "GST Portal", portalId: viewingClient.gstPortalId || "Not Set", password: viewingClient.gstPortalPassword || "Not Set" },
-                                { id: "c2", portalName: "Income Tax Portal", portalId: viewingClient.pan ? `${viewingClient.pan}` : "Not Set", password: "••••••••" }
+                                { id: "c1", portalName: "GST Portal", portalId: viewingClient.gstPortalId || viewingClient.gstin || viewingClient.gstNo || "Not Set", password: viewingClient.gstPortalPassword || "••••••••" },
+                                { id: "c2", portalName: "Income Tax Portal", portalId: viewingClient.pan || viewingClient.panNo || "Not Set", password: "••••••••" }
                               ]
                           ).map((cred) => (
                             <tr key={cred.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
