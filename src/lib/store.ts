@@ -305,18 +305,54 @@ export const useAppStore = create<AppState>()((set, get) => ({
       } catch {}
     }
 
-    const rawClients = data ? data.clients : localClients;
-    const rawServices = data ? data.services : localServices;
-    const rawSubServices = data ? data.subServices : localSubServices;
-    const rawRequiredDocs = data ? data.requiredDocs : localRequiredDocs;
-    const rawAssigned = data ? data.assignedServices : localAssigned;
-    const rawBanking = data ? data.bankingEntries : localBanking;
-    const rawLeads = data ? data.leads : localLeads;
-    const rawDrafts = data ? data.drafts : localDrafts;
-    const rawCollabs = data ? data.collaborations : localCollabs;
-    const rawInvoices = data ? (data.invoices || []) : localInvoices;
-    const rawOneTime = data ? (data.oneTimeServices || []) : localOneTime;
-    const rawRenewals = data ? (data.renewals || []) : localRenewals;
+    // MERGE STRATEGY: Combine cloud data + local-only records.
+    // Local records not found in cloud are preserved (they may not have synced yet)
+    // and will be re-uploaded to Supabase further below.
+    function mergeCloudLocal<T extends { id: string }>(
+      cloudItems: T[],
+      localItems: T[],
+      getKey: (item: T) => string
+    ): { merged: T[]; localOnly: T[] } {
+      const cloudIds = new Set(cloudItems.map(i => i.id));
+      const cloudKeys = new Set(cloudItems.map(i => getKey(i)).filter(Boolean));
+      const localOnly = localItems.filter(item => {
+        if (!item || !item.id) return false;
+        if (cloudIds.has(item.id)) return false;
+        const key = getKey(item);
+        if (key && cloudKeys.has(key)) return false;
+        return true;
+      });
+      return { merged: [...cloudItems, ...localOnly], localOnly };
+    }
+
+    const useCloud = data !== null;
+    const cloudClients = useCloud ? data!.clients : [];
+    const cloudServices = useCloud ? data!.services : [];
+    const cloudSubServices = useCloud ? data!.subServices : [];
+    const cloudRequiredDocs = useCloud ? data!.requiredDocs : [];
+    const cloudAssigned = useCloud ? data!.assignedServices : [];
+    const cloudBanking = useCloud ? data!.bankingEntries : [];
+    const cloudLeads = useCloud ? data!.leads : [];
+    const cloudDrafts = useCloud ? data!.drafts : [];
+    const cloudCollabs = useCloud ? data!.collaborations : [];
+    const cloudInvoices = useCloud ? (data!.invoices || []) : [];
+    const cloudOneTime = useCloud ? (data!.oneTimeServices || []) : [];
+    const cloudRenewals = useCloud ? (data!.renewals || []) : [];
+
+    const renewalKey = (rn: any) => `${(rn.clientName || '').toLowerCase()}_${(rn.serviceName || '').toLowerCase()}`;
+
+    const { merged: rawClients, localOnly: loClients } = useCloud ? mergeCloudLocal(cloudClients, localClients, getClientKey) : { merged: localClients, localOnly: [] };
+    const { merged: rawServices, localOnly: loServices } = useCloud ? mergeCloudLocal(cloudServices, localServices, getServiceKey) : { merged: localServices, localOnly: [] };
+    const { merged: rawSubServices, localOnly: loSubServices } = useCloud ? mergeCloudLocal(cloudSubServices, localSubServices, getSubServiceKey) : { merged: localSubServices, localOnly: [] };
+    const { merged: rawRequiredDocs, localOnly: loRequiredDocs } = useCloud ? mergeCloudLocal(cloudRequiredDocs, localRequiredDocs, getRequiredDocKey) : { merged: localRequiredDocs, localOnly: [] };
+    const { merged: rawAssigned, localOnly: loAssigned } = useCloud ? mergeCloudLocal(cloudAssigned, localAssigned, getAssignedServiceKey) : { merged: localAssigned, localOnly: [] };
+    const { merged: rawBanking, localOnly: loBanking } = useCloud ? mergeCloudLocal(cloudBanking, localBanking, getBankingEntryKey) : { merged: localBanking, localOnly: [] };
+    const { merged: rawLeads, localOnly: loLeads } = useCloud ? mergeCloudLocal(cloudLeads, localLeads, getLeadKey) : { merged: localLeads, localOnly: [] };
+    const { merged: rawDrafts, localOnly: loDrafts } = useCloud ? mergeCloudLocal(cloudDrafts, localDrafts, getDraftKey) : { merged: localDrafts, localOnly: [] };
+    const { merged: rawCollabs, localOnly: loCollabs } = useCloud ? mergeCloudLocal(cloudCollabs, localCollabs, getCollabKey) : { merged: localCollabs, localOnly: [] };
+    const { merged: rawInvoices, localOnly: loInvoices } = useCloud ? mergeCloudLocal(cloudInvoices, localInvoices, getInvoiceKey) : { merged: localInvoices, localOnly: [] };
+    const { merged: rawOneTime, localOnly: loOneTime } = useCloud ? mergeCloudLocal(cloudOneTime, localOneTime, getOneTimeKey) : { merged: localOneTime, localOnly: [] };
+    const { merged: rawRenewals, localOnly: loRenewals } = useCloud ? mergeCloudLocal(cloudRenewals, localRenewals, renewalKey) : { merged: localRenewals, localOnly: [] };
 
     const clientsRes = deduplicateItems(rawClients, getClientKey);
     const servicesRes = deduplicateItems(rawServices, getServiceKey);
@@ -329,7 +365,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const collabsRes = deduplicateItems(rawCollabs, getCollabKey);
     const invoicesRes = deduplicateItems(rawInvoices, getInvoiceKey);
     const oneTimeRes = deduplicateItems(rawOneTime, getOneTimeKey);
-    const renewalsRes = deduplicateItems(rawRenewals, (rn: any) => `${(rn.clientName || '').toLowerCase()}_${(rn.serviceName || '').toLowerCase()}`);
+    const renewalsRes = deduplicateItems(rawRenewals, renewalKey);
 
     // Auto-derive missing banking entries ONLY from Tax Invoices (assigned services do NOT create banking entries)
     const existingBankingIds = new Set(bankingRes.unique.map(b => b.id));
@@ -386,6 +422,22 @@ export const useAppStore = create<AppState>()((set, get) => ({
     saveToLocal("invoices", invoicesRes.unique);
     saveToLocal("oneTimeServices", oneTimeRes.unique);
     saveToLocal("renewals", renewalsRes.unique);
+
+    // Re-upload local-only records that were missing from Supabase (missed sync)
+    if (useCloud) {
+      loClients.forEach(c => syncClientToSupabase(c));
+      loServices.forEach(s => syncServiceToSupabase(s));
+      loSubServices.forEach(ss => syncSubServiceToSupabase(ss));
+      loRequiredDocs.forEach(d => syncRequiredDocToSupabase(d));
+      loAssigned.forEach(a => syncAssignedServiceToSupabase(a));
+      loBanking.forEach(b => syncBankingEntryToSupabase(b));
+      loLeads.forEach(l => syncLeadToSupabase(l));
+      loDrafts.forEach(d => syncDraftToSupabase(d));
+      loCollabs.forEach(c => syncCollaborationToSupabase(c));
+      loInvoices.forEach(inv => syncInvoiceToSupabase(inv));
+      loOneTime.forEach(ots => syncOneTimeServiceToSupabase(ots));
+      loRenewals.forEach(rn => syncRenewalToSupabase(rn));
+    }
 
     // Sync clean data & purge duplicate IDs from Supabase
     if (clientsRes.duplicateIds.length) purgeDuplicatesFromSupabase("clients", clientsRes.duplicateIds);
