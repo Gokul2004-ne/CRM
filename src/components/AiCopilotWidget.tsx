@@ -18,6 +18,38 @@ interface Message {
   actionData?: any;
 }
 
+function FormattedMessageText({ text }: { text: string }) {
+  if (!text) return null;
+
+  // Clean unescaped literal raw backslashes/quotes
+  const sanitized = text.replace(/\\n/g, "\n").replace(/\\"/g, '"');
+  const lines = sanitized.split("\n");
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      {lines.map((line, lIdx) => {
+        if (!line.trim()) return <div key={lIdx} style={{ height: 2 }} />;
+
+        const parts = line.split(/(\*\*[^*]+\*\*)/g);
+        const renderedParts = parts.map((part, pIdx) => {
+          if (part.startsWith("**") && part.endsWith("**")) {
+            return <strong key={pIdx} style={{ fontWeight: 800, color: "inherit" }}>{part.slice(2, -2)}</strong>;
+          }
+          return <span key={pIdx}>{part}</span>;
+        });
+
+        const isBullet = line.trim().startsWith("•") || line.trim().startsWith("-");
+
+        return (
+          <div key={lIdx} style={{ paddingLeft: isBullet ? 6 : 0, lineHeight: "1.45" }}>
+            {renderedParts}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AiCopilotWidget() {
   const { clients, invoices, assignedServices, oneTimeServices, renewals, services } = useAppStore();
 
@@ -152,44 +184,44 @@ Select a prompt below for automated AI execution!`;
   return (
     <>
       {/* ─── FLOATING TRIGGER BUTTON ─── */}
-      <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 999 }}>
+      <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 100 }}>
         {!isOpen ? (
           <button
             onClick={() => setIsOpen(true)}
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              padding: "12px 20px",
+              gap: 8,
+              padding: "10px 16px",
               borderRadius: 30,
               background: "linear-gradient(135deg, #0F172A 0%, #4F46E5 100%)",
               color: "white",
-              border: "2px solid rgba(255,255,255,0.2)",
+              border: "1px solid rgba(255,255,255,0.2)",
               cursor: "pointer",
-              boxShadow: "0 10px 30px rgba(79, 70, 229, 0.45)",
+              boxShadow: "0 8px 24px rgba(79, 70, 229, 0.35)",
               fontWeight: 800,
-              fontSize: 13,
-              transition: "all 0.25s ease",
+              fontSize: 12.5,
+              transition: "all 0.2s ease",
             }}
           >
             <div style={{ position: "relative" }}>
-              <Bot size={20} color="#38BDF8" />
-              <span style={{ position: "absolute", top: -2, right: -2, width: 8, height: 8, background: "#10B981", borderRadius: "50%", border: "2px solid #0F172A" }} />
+              <Bot size={18} color="#38BDF8" />
+              <span style={{ position: "absolute", top: -2, right: -2, width: 7, height: 7, background: "#10B981", borderRadius: "50%", border: "2px solid #0F172A" }} />
             </div>
             <span>zplus AI Copilot</span>
-            <Sparkles size={15} color="#F59E0B" />
+            <Sparkles size={14} color="#F59E0B" />
           </button>
         ) : (
           /* ─── AI CHAT PANEL POPUP ─── */
           <div
             style={{
-              width: 380,
-              maxWidth: "92vw",
-              height: 520,
-              maxHeight: "80vh",
+              width: 350,
+              maxWidth: "90vw",
+              height: 460,
+              maxHeight: "75vh",
               background: "#FFFFFF",
-              borderRadius: 20,
-              boxShadow: "0 20px 50px rgba(15, 23, 42, 0.35)",
+              borderRadius: 16,
+              boxShadow: "0 16px 40px rgba(15, 23, 42, 0.3)",
               border: "1px solid #CBD5E1",
               display: "flex",
               flexDirection: "column",
@@ -198,74 +230,74 @@ Select a prompt below for automated AI execution!`;
             }}
           >
             {/* AI Panel Header */}
-            <div style={{ padding: "16px 20px", background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ padding: 8, background: "rgba(56, 189, 248, 0.15)", borderRadius: 12, border: "1px solid rgba(56, 189, 248, 0.3)" }}>
-                  <Bot size={20} color="#38BDF8" />
+            <div style={{ padding: "14px 16px", background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ padding: 6, background: "rgba(56, 189, 248, 0.15)", borderRadius: 10, border: "1px solid rgba(56, 189, 248, 0.3)" }}>
+                  <Bot size={18} color="#38BDF8" />
                 </div>
                 <div>
-                  <div style={{ fontWeight: 900, fontSize: 15, display: "flex", alignItems: "center", gap: 6 }}>
-                    zplus AI Copilot <span style={{ fontSize: 9, background: "#4F46E5", padding: "1px 6px", borderRadius: 8, textTransform: "uppercase" }}>MNC AI v4.0</span>
+                  <div style={{ fontWeight: 900, fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
+                    zplus AI Copilot <span style={{ fontSize: 9, background: "#4F46E5", padding: "1px 5px", borderRadius: 6, textTransform: "uppercase" }}>MNC AI v4.0</span>
                   </div>
-                  <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>Practice Intelligence Engine</div>
+                  <div style={{ fontSize: 10.5, color: "#94A3B8", marginTop: 1 }}>Practice Intelligence Engine</div>
                 </div>
               </div>
 
               <button
                 onClick={() => setIsOpen(false)}
-                style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "white", padding: 6, borderRadius: 8, cursor: "pointer" }}
+                style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "white", padding: 5, borderRadius: 6, cursor: "pointer" }}
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             </div>
 
             {/* Quick Prompt Pills */}
-            <div style={{ padding: "10px 14px", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0", display: "flex", gap: 6, overflowX: "auto", whiteSpace: "nowrap" }}>
+            <div style={{ padding: "8px 12px", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0", display: "flex", gap: 6, overflowX: "auto", whiteSpace: "nowrap" }}>
               <button
                 onClick={() => handleSendPrompt("Practice Health Audit")}
-                style={{ padding: "4px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, background: "#EEF2FF", color: "#4F46E5", border: "1px solid #C7D2FE", cursor: "pointer" }}
+                style={{ padding: "4px 8px", borderRadius: 12, fontSize: 10.5, fontWeight: 700, background: "#EEF2FF", color: "#4F46E5", border: "1px solid #C7D2FE", cursor: "pointer" }}
               >
                 📊 Health Audit
               </button>
               <button
                 onClick={() => handleSendPrompt("High Risk Overdue Clients")}
-                style={{ padding: "4px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", cursor: "pointer" }}
+                style={{ padding: "4px 8px", borderRadius: 12, fontSize: 10.5, fontWeight: 700, background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", cursor: "pointer" }}
               >
                 🚨 Risk Radar
               </button>
               <button
                 onClick={() => handleSendPrompt("Revenue Forecast")}
-                style={{ padding: "4px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, background: "#F0FDF4", color: "#059669", border: "1px solid #BBF7D0", cursor: "pointer" }}
+                style={{ padding: "4px 8px", borderRadius: 12, fontSize: 10.5, fontWeight: 700, background: "#F0FDF4", color: "#059669", border: "1px solid #BBF7D0", cursor: "pointer" }}
               >
                 💰 Revenue Forecast
               </button>
               <button
                 onClick={() => handleSendPrompt("Generate WhatsApp Reminder")}
-                style={{ padding: "4px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, background: "#ECFDF5", color: "#047857", border: "1px solid #A7F3D0", cursor: "pointer" }}
+                style={{ padding: "4px 8px", borderRadius: 12, fontSize: 10.5, fontWeight: 700, background: "#ECFDF5", color: "#047857", border: "1px solid #A7F3D0", cursor: "pointer" }}
               >
                 📱 WhatsApp Draft
               </button>
             </div>
 
             {/* Chat Body */}
-            <div style={{ flex: 1, padding: 16, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, background: "#FAFBFD" }}>
+            <div style={{ flex: 1, padding: 14, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, background: "#FAFBFD" }}>
               {messages.map(msg => (
                 <div
                   key={msg.id}
                   style={{
                     alignSelf: msg.sender === "user" ? "flex-end" : "flex-start",
-                    maxWidth: "85%",
+                    maxWidth: "88%",
                     background: msg.sender === "user" ? "#4F46E5" : "#FFFFFF",
                     color: msg.sender === "user" ? "white" : "#0F172A",
-                    padding: "10px 14px",
-                    borderRadius: msg.sender === "user" ? "16px 16px 2px 16px" : "16px 16px 16px 2px",
+                    padding: "9px 12px",
+                    borderRadius: msg.sender === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px",
                     boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
                     border: msg.sender === "ai" ? "1px solid #E2E8F0" : "none",
-                    fontSize: 12.5,
-                    lineHeight: "1.5",
+                    fontSize: 12,
+                    lineHeight: "1.45",
                   }}
                 >
-                  <div style={{ whiteSpace: "pre-line" }}>{msg.text}</div>
+                  <FormattedMessageText text={msg.text} />
 
                   {/* Dynamic Action Buttons */}
                   {msg.actionType === "whatsapp" && msg.actionData && (
@@ -282,16 +314,16 @@ Select a prompt below for automated AI execution!`;
                     </div>
                   )}
 
-                  <div style={{ fontSize: 9.5, opacity: 0.6, marginTop: 4, textAlign: "right" }}>{msg.timestamp}</div>
+                  <div style={{ fontSize: 9, opacity: 0.6, marginTop: 4, textAlign: "right" }}>{msg.timestamp}</div>
                 </div>
               ))}
             </div>
 
             {/* Chat Input Bar */}
-            <div style={{ padding: 12, background: "#FFFFFF", borderTop: "1px solid #E2E8F0", display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ padding: 10, background: "#FFFFFF", borderTop: "1px solid #E2E8F0", display: "flex", gap: 6, alignItems: "center" }}>
               <input
                 className="command-palette-input"
-                style={{ flex: 1, padding: "8px 12px", fontSize: 12, borderRadius: 20, border: "1px solid #CBD5E1" }}
+                style={{ flex: 1, padding: "7px 12px", fontSize: 12, borderRadius: 18, border: "1px solid #CBD5E1" }}
                 placeholder="Ask AI anything about your practice..."
                 value={inputQuery}
                 onChange={e => setInputQuery(e.target.value)}
@@ -299,9 +331,9 @@ Select a prompt below for automated AI execution!`;
               />
               <button
                 onClick={() => handleSendPrompt()}
-                style={{ background: "#4F46E5", border: "none", color: "white", padding: 8, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                style={{ background: "#4F46E5", border: "none", color: "white", padding: 7, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
               >
-                <Send size={15} />
+                <Send size={14} />
               </button>
             </div>
           </div>

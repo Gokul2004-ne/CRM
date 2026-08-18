@@ -105,10 +105,15 @@ export default function ServicesPage() {
   const [serviceInput, setServiceInput] = useState("");
 
   const filtered = useMemo(() =>
-    subServices.filter(ss =>
-      (filterPackage === "all" || ss.serviceId === filterPackage) &&
-      ss.name.toLowerCase().includes(search.toLowerCase())
-    ), [subServices, search, filterPackage]);
+    subServices.filter(ss => {
+      const parentSvc = services.find(s => s.id === ss.serviceId);
+      const matchesPkg = filterPackage === "all" || ss.serviceId === filterPackage;
+      const query = search.toLowerCase().trim();
+      const matchesSearch = !query ||
+                            ss.name.toLowerCase().includes(query) ||
+                            (parentSvc?.name || "").toLowerCase().includes(query);
+      return matchesPkg && matchesSearch;
+    }), [subServices, services, search, filterPackage]);
 
   const openAdd = () => {
     setForm(empty());
@@ -156,14 +161,18 @@ export default function ServicesPage() {
     };
 
     setSelectedRows(prev => {
-      if (prev.length === 1 && !prev[0].name.trim()) {
-        return [{
-          ...prev[0],
+      // Look for an existing empty slot first
+      const emptyIdx = prev.findIndex(r => !r.name.trim());
+      if (emptyIdx !== -1) {
+        const copy = [...prev];
+        copy[emptyIdx] = {
+          ...copy[emptyIdx],
           name: suggestedName,
           recurrence: preset.recurrence,
           dueDateDay: preset.dueDateDay,
           applicableMonths: preset.applicableMonths
-        }];
+        };
+        return copy;
       }
       return [...prev, {
         id: `row_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -181,12 +190,24 @@ export default function ServicesPage() {
       return;
     }
 
+    const existingPkgSubs = subServices.filter(ss => ss.serviceId === form.serviceId);
+
     if (modal.editing) {
       const row = selectedRows[0];
       if (!row || !row.name.trim()) {
         toast.error("Service name is required");
         return;
       }
+      if (!row.applicableMonths || row.applicableMonths.length === 0) {
+        toast.error("⚠️ Recurrence error: Please select at least one applicable month!");
+        return;
+      }
+      const isDup = existingPkgSubs.some(ss => ss.id !== modal.editing?.id && ss.name.toLowerCase().trim() === row.name.toLowerCase().trim());
+      if (isDup) {
+        toast.error(`❌ Duplicate service: "${row.name.trim()}" already exists in this package!`);
+        return;
+      }
+
       const serviceData: SubService = {
         ...form,
         name: row.name.trim(),
@@ -201,7 +222,6 @@ export default function ServicesPage() {
       updateSubService(serviceData);
       toast.success("Service updated successfully!");
     } else {
-      // Filter valid rows with non-empty service name
       const validRows = selectedRows.filter(r => r.name.trim().length > 0);
 
       if (validRows.length === 0) {
@@ -209,18 +229,42 @@ export default function ServicesPage() {
         return;
       }
 
-      const newSubServices: SubService[] = validRows.map((r, i) => ({
-        id: `ss_${Date.now()}_${i}`,
-        serviceId: form.serviceId,
-        name: r.name.trim(),
-        serviceIds: [form.serviceId],
-        clientId: form.clientId,
-        clientName: form.clientName || clients.find(c => c.id === form.clientId)?.name || "",
-        recurrence: r.recurrence || "MONTHLY",
-        applicableMonths: r.applicableMonths || [...ALL_MONTHS],
-        dueDateDay: r.dueDateDay || 15,
-        dueDate: r.dueDate || ""
-      }));
+      // Validate month selections
+      const invalidMonthsRow = validRows.find(r => !r.applicableMonths || r.applicableMonths.length === 0);
+      if (invalidMonthsRow) {
+        toast.error(`⚠️ Recurrence error on "${invalidMonthsRow.name}": Please select at least one month!`);
+        return;
+      }
+
+      const duplicates: string[] = [];
+      const newSubServices: SubService[] = [];
+
+      validRows.forEach((r, i) => {
+        const nameClean = r.name.trim();
+        const exists = existingPkgSubs.some(ss => ss.name.toLowerCase().trim() === nameClean.toLowerCase()) ||
+                       newSubServices.some(ns => ns.name.toLowerCase().trim() === nameClean.toLowerCase());
+        if (exists) {
+          duplicates.push(nameClean);
+        } else {
+          newSubServices.push({
+            id: `ss_${Date.now()}_${i}`,
+            serviceId: form.serviceId,
+            name: nameClean,
+            serviceIds: [form.serviceId],
+            clientId: form.clientId,
+            clientName: form.clientName || clients.find(c => c.id === form.clientId)?.name || "",
+            recurrence: r.recurrence || "MONTHLY",
+            applicableMonths: r.applicableMonths || [...ALL_MONTHS],
+            dueDateDay: r.dueDateDay || 15,
+            dueDate: r.dueDate || ""
+          });
+        }
+      });
+
+      if (duplicates.length > 0) {
+        toast.error(`❌ Duplicate service(s) skipped: ${duplicates.join(", ")}`);
+        if (newSubServices.length === 0) return;
+      }
 
       if (addSubServicesBatch) {
         addSubServicesBatch(newSubServices);

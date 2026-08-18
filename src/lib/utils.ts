@@ -136,6 +136,27 @@ export function validateGSTIN(gstin: string): boolean {
   return gstinRegex.test(gstin.trim().toUpperCase());
 }
 
+export function validatePhone(phone: string): boolean {
+  if (!phone) return false;
+  const trimmed = phone.trim();
+  // Reject if raw string contains any non-digit/non-phone character (e.g., letters)
+  if (/[^\d\s\+\-\(\)]/.test(trimmed)) return false;
+  let digitsOnly = trimmed.replace(/\D/g, "");
+  if (digitsOnly.length === 12 && digitsOnly.startsWith("91")) {
+    digitsOnly = digitsOnly.slice(2);
+  } else if (digitsOnly.length === 11 && digitsOnly.startsWith("0")) {
+    digitsOnly = digitsOnly.slice(1);
+  }
+  return digitsOnly.length === 10 && /^[6-9]\d{9}$/.test(digitsOnly);
+}
+
+export function validateEmail(email: string): boolean {
+  if (!email) return false;
+  const clean = email.trim().toLowerCase();
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return emailRegex.test(clean);
+}
+
 export function generateUUID(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();

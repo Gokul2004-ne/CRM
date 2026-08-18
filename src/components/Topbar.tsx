@@ -23,6 +23,7 @@ export default function Topbar({ title, subtitle, onOpenSearch }: TopbarProps) {
   const [isAppLauncherOpen, setIsAppLauncherOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const fyOptions = getFYOptions();
 
   return (
@@ -131,11 +132,51 @@ export default function Topbar({ title, subtitle, onOpenSearch }: TopbarProps) {
             <StickyNote size={17} />
           </button>
 
-          {/* Notification Button */}
-          <button className="icon-btn-slds" title="Notifications">
-            <Bell size={17} />
-            <span className="notification-dot"></span>
-          </button>
+          {/* Notification Button & Popover */}
+          <div style={{ position: "relative" }}>
+            <button
+              className="icon-btn-slds"
+              title="Notifications"
+              onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+            >
+              <Bell size={17} />
+              <span className="notification-dot"></span>
+            </button>
+
+            {isNotificationsOpen && (
+              <div style={{
+                position: "absolute",
+                top: 42,
+                right: 0,
+                width: 280,
+                background: "white",
+                borderRadius: 12,
+                boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+                border: "1px solid #CBD5E1",
+                zIndex: 60,
+                padding: 12
+              }}>
+                <div style={{ fontWeight: 800, fontSize: 13, color: "#0F172A", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Notifications & Alerts</span>
+                  <span style={{ fontSize: 10, background: "#EFF6FF", color: "#1D4ED8", padding: "2px 6px", borderRadius: 8 }}>3 New</span>
+                </div>
+                <div style={{ display: "grid", gap: 8, fontSize: 12 }}>
+                  <Link href="/due-dates" onClick={() => setIsNotificationsOpen(false)} style={{ textDecoration: "none", color: "#334155", padding: "6px 8px", background: "#F8FAFC", borderRadius: 6, display: "block" }}>
+                    <div style={{ fontWeight: 700, color: "#DC2626" }}>⚠️ Overdue Filing Deadlines</div>
+                    <div style={{ fontSize: 11, color: "#64748B" }}>GSTR-3B filings pending for 2 clients</div>
+                  </Link>
+                  <Link href="/renewals" onClick={() => setIsNotificationsOpen(false)} style={{ textDecoration: "none", color: "#334155", padding: "6px 8px", background: "#F8FAFC", borderRadius: 6, display: "block" }}>
+                    <div style={{ fontWeight: 700, color: "#D97706" }}>🔄 Upcoming Service Renewals</div>
+                    <div style={{ fontSize: 11, color: "#64748B" }}>Trademark registration renewal due in 7 days</div>
+                  </Link>
+                  <Link href="/leads" onClick={() => setIsNotificationsOpen(false)} style={{ textDecoration: "none", color: "#334155", padding: "6px 8px", background: "#F8FAFC", borderRadius: 6, display: "block" }}>
+                    <div style={{ fontWeight: 700, color: "#059669" }}>💬 New Sales Inquiry</div>
+                    <div style={{ fontSize: 11, color: "#64748B" }}>WhatsApp lead received from Starlight Tech</div>
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* User Profile / Auth Button */}
           <div style={{ position: "relative" }}>
@@ -239,18 +280,30 @@ export default function Topbar({ title, subtitle, onOpenSearch }: TopbarProps) {
               zpluscrm Apps & Modules
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-              <div style={{ textAlign: "center", padding: 8, background: "#1E293B", borderRadius: 10, cursor: "pointer" }}>
+              <Link
+                href="/"
+                onClick={() => setIsAppLauncherOpen(false)}
+                style={{ textAlign: "center", padding: 8, background: "#1E293B", borderRadius: 10, cursor: "pointer", textDecoration: "none", color: "white" }}
+              >
                 <div style={{ fontSize: 20 }}>📊</div>
                 <div style={{ fontSize: 11, fontWeight: 600, marginTop: 4 }}>CRM Hub</div>
-              </div>
-              <div style={{ textAlign: "center", padding: 8, background: "#1E293B", borderRadius: 10, cursor: "pointer" }}>
+              </Link>
+              <Link
+                href="/banking"
+                onClick={() => setIsAppLauncherOpen(false)}
+                style={{ textAlign: "center", padding: 8, background: "#1E293B", borderRadius: 10, cursor: "pointer", textDecoration: "none", color: "white" }}
+              >
                 <div style={{ fontSize: 20 }}>💰</div>
                 <div style={{ fontSize: 11, fontWeight: 600, marginTop: 4 }}>Billing</div>
-              </div>
-              <div style={{ textAlign: "center", padding: 8, background: "#1E293B", borderRadius: 10, cursor: "pointer" }}>
+              </Link>
+              <Link
+                href="/required-docs"
+                onClick={() => setIsAppLauncherOpen(false)}
+                style={{ textAlign: "center", padding: 8, background: "#1E293B", borderRadius: 10, cursor: "pointer", textDecoration: "none", color: "white" }}
+              >
                 <div style={{ fontSize: 20 }}>📂</div>
                 <div style={{ fontSize: 11, fontWeight: 600, marginTop: 4 }}>Docs</div>
-              </div>
+              </Link>
             </div>
           </div>
         </div>

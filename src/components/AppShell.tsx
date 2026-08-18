@@ -146,9 +146,27 @@ export default function AppShell({ children, title, subtitle }: AppShellProps) {
       window.addEventListener("focus", handleFocus);
       document.addEventListener("visibilitychange", handleFocus);
 
+      // Realtime DB subscription for instant multi-device / cross-session sync
+      const channel = supabase
+        .channel("public_crm_changes")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public" },
+          () => {
+            loadSupabaseData();
+          }
+        )
+        .subscribe();
+
+      const interval = setInterval(() => {
+        loadSupabaseData();
+      }, 15000);
+
       return () => {
         window.removeEventListener("focus", handleFocus);
         document.removeEventListener("visibilitychange", handleFocus);
+        supabase.removeChannel(channel);
+        clearInterval(interval);
       };
     }
   }, [user, loadSupabaseData]);

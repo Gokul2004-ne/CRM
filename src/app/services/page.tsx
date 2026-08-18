@@ -213,22 +213,20 @@ export default function PackagesPage() {
             <div className="modal-body" style={{ display: "grid", gap: 16 }}>
               {/* Package Type Preset Selection */}
               <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 700 }}>Select Package Type *</label>
+                <label className="form-label" style={{ fontWeight: 700 }}>Select Package Type Preset (Optional)</label>
                 <select
                   className="form-select"
-                  value={form.name || ""}
+                  value=""
                   onChange={e => {
                     const preset = PACKAGE_TYPES.find(p => p.name === e.target.value);
                     if (preset) {
                       setForm(f => ({ ...f, name: preset.name, price: preset.defaultPrice }));
-                    } else {
-                      setForm(f => ({ ...f, name: e.target.value }));
                     }
                   }}
                 >
-                  <option value="">-- Select from package types --</option>
+                  <option value="">-- Choose a package template --</option>
                   {PACKAGE_TYPES.map(pt => (
-                    <option key={pt.name} value={pt.name}>{pt.name}</option>
+                    <option key={pt.name} value={pt.name}>{pt.name} (₹{pt.defaultPrice.toLocaleString('en-IN')})</option>
                   ))}
                 </select>
               </div>
@@ -264,16 +262,16 @@ export default function PackagesPage() {
                 </div>
               </div>
               <div className="form-group">
-                <label className="form-label">Package Amount (₹) *</label>
+                <label className="form-label" style={{ fontWeight: 700 }}>Package Amount (₹) *</label>
                 <input
                   className="form-input"
                   type="number"
-                  value={form.price || ""}
+                  value={form.price === 0 ? "" : form.price}
                   onChange={e => {
                     const val = e.target.value;
-                    setForm(f => ({ ...f, price: val === "" ? 0 : Number(val) }));
+                    setForm(f => ({ ...f, price: val === "" ? 0 : Math.max(0, Number(val)) }));
                   }}
-                  placeholder="Enter amount e.g. 5000"
+                  placeholder="Enter package price e.g. 5000"
                 />
               </div>
             </div>
