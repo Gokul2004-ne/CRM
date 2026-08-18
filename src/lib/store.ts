@@ -69,8 +69,8 @@ function deduplicateItems<T extends { id: string }>(
 
 const getClientKey = (c: Client) => {
   const name = (c.name || '').toLowerCase().trim();
-  const detail = (c.mobile || c.phone || c.email || c.pan || c.panNo || c.gstin || c.gstNo || '').toLowerCase().trim();
-  return name ? `${name}_${detail}` : '';
+  const detail = (c.pan || c.panNo || c.gstin || c.gstNo || c.email || '').toLowerCase().trim();
+  return detail ? `${name}_${detail}` : name;
 };
 const getServiceKey = (s: Service) => (s.name || '').toLowerCase().trim();
 const getSubServiceKey = (ss: SubService) => (ss.name || '').toLowerCase().trim();
@@ -503,9 +503,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
     });
   },
   deleteClient: (id) => {
-    removeClientFromSupabase(id);
+    const target = useAppStore.getState().clients.find(c => c.id === id);
+    const targetName = target?.name;
+    removeClientFromSupabase(id, targetName);
     set((s) => {
-      const next = s.clients.filter(x => x.id !== id);
+      const next = s.clients.filter(x => {
+        if (x.id === id) return false;
+        if (targetName && x.name?.toLowerCase().trim() === targetName.toLowerCase().trim()) return false;
+        return true;
+      });
       saveToLocal("clients", next);
       return { clients: next };
     });
@@ -532,12 +538,18 @@ export const useAppStore = create<AppState>()((set, get) => ({
     syncServiceToSupabase(sv);
   },
   deleteService: (id) => {
+    const target = useAppStore.getState().services.find(s => s.id === id);
+    const targetName = target?.name;
+    removeServiceFromSupabase(id, targetName);
     set((s) => {
-      const next = s.services.filter(x => x.id !== id);
+      const next = s.services.filter(x => {
+        if (x.id === id) return false;
+        if (targetName && x.name?.toLowerCase().trim() === targetName.toLowerCase().trim()) return false;
+        return true;
+      });
       saveToLocal("services", next);
       return { services: next };
     });
-    removeServiceFromSupabase(id);
   },
 
   // SubServices Sync (Services)
@@ -575,12 +587,18 @@ export const useAppStore = create<AppState>()((set, get) => ({
     syncSubServiceToSupabase(ss);
   },
   deleteSubService: (id) => {
+    const target = useAppStore.getState().subServices.find(ss => ss.id === id);
+    const targetName = target?.name;
+    removeSubServiceFromSupabase(id, targetName);
     set((s) => {
-      const next = s.subServices.filter(x => x.id !== id);
+      const next = s.subServices.filter(x => {
+        if (x.id === id) return false;
+        if (targetName && x.name?.toLowerCase().trim() === targetName.toLowerCase().trim()) return false;
+        return true;
+      });
       saveToLocal("subServices", next);
       return { subServices: next };
     });
-    removeSubServiceFromSupabase(id);
   },
 
   // Required Docs Sync
@@ -604,12 +622,18 @@ export const useAppStore = create<AppState>()((set, get) => ({
     syncRequiredDocToSupabase(d);
   },
   deleteRequiredDoc: (id) => {
+    const target = useAppStore.getState().requiredDocs.find(d => d.id === id);
+    const targetName = target?.name;
+    removeRequiredDocFromSupabase(id, targetName);
     set((s) => {
-      const next = s.requiredDocs.filter(x => x.id !== id);
+      const next = s.requiredDocs.filter(x => {
+        if (x.id === id) return false;
+        if (targetName && x.name?.toLowerCase().trim() === targetName.toLowerCase().trim()) return false;
+        return true;
+      });
       saveToLocal("requiredDocs", next);
       return { requiredDocs: next };
     });
-    removeRequiredDocFromSupabase(id);
   },
 
   // Assigned Services Sync
@@ -715,12 +739,18 @@ export const useAppStore = create<AppState>()((set, get) => ({
     syncLeadToSupabase(l);
   },
   deleteLead: (id) => {
+    const target = useAppStore.getState().leads.find(l => l.id === id);
+    const targetName = target?.name;
+    removeLeadFromSupabase(id, targetName);
     set((s) => {
-      const next = s.leads.filter(x => x.id !== id);
+      const next = s.leads.filter(x => {
+        if (x.id === id) return false;
+        if (targetName && x.name?.toLowerCase().trim() === targetName.toLowerCase().trim()) return false;
+        return true;
+      });
       saveToLocal("leads", next);
       return { leads: next };
     });
-    removeLeadFromSupabase(id);
   },
   convertLead: (leadId, clientId) => {
     set((s) => {
@@ -778,12 +808,18 @@ export const useAppStore = create<AppState>()((set, get) => ({
     syncCollaborationToSupabase(c);
   },
   deleteCollaboration: (id) => {
+    const target = useAppStore.getState().collaborations.find(c => c.id === id);
+    const targetName = target?.name;
+    removeCollaborationFromSupabase(id, targetName);
     set((s) => {
-      const next = s.collaborations.filter(x => x.id !== id);
+      const next = s.collaborations.filter(x => {
+        if (x.id === id) return false;
+        if (targetName && x.name?.toLowerCase().trim() === targetName.toLowerCase().trim()) return false;
+        return true;
+      });
       saveToLocal("collaborations", next);
       return { collaborations: next };
     });
-    removeCollaborationFromSupabase(id);
   },
 
   // Invoices Sync
