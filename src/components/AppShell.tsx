@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import GlobalSearchModal from "@/components/GlobalSearchModal";
