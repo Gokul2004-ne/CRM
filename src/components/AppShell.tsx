@@ -139,6 +139,17 @@ export default function AppShell({ children, title, subtitle }: AppShellProps) {
   useEffect(() => {
     if (user) {
       loadSupabaseData();
+
+      const handleFocus = () => {
+        loadSupabaseData();
+      };
+      window.addEventListener("focus", handleFocus);
+      document.addEventListener("visibilitychange", handleFocus);
+
+      return () => {
+        window.removeEventListener("focus", handleFocus);
+        document.removeEventListener("visibilitychange", handleFocus);
+      };
     }
   }, [user, loadSupabaseData]);
 

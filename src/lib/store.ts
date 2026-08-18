@@ -248,7 +248,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   isLoadingSupabase: false,
 
   resetStore: () => {
-    purgeAllUserDataFromSupabase();
+    // Reset local cache & state without deleting cloud database records
     saveToLocal("clients", []);
     saveToLocal("services", []);
     saveToLocal("subServices", []);

@@ -53,7 +53,7 @@ function checkIsSaivarala(user: any, mockUserId?: string): boolean {
 export async function fetchAllCRMData() {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    let userId = user?.id || getMockSessionUserId();
+    let userId = await getUserId();
 
     const isSaivarala = checkIsSaivarala(user, userId);
     const targetSaivaralaId = "usr_saivarala33_gmail_com";
@@ -300,15 +300,39 @@ export async function syncUserSettingsToSupabase(settings: any) {
 
 
 
-async function getUserId(): Promise<string | undefined> {
+function getEmailFromSession(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const rawSession = localStorage.getItem("zpluscrm_active_session");
+    if (rawSession) {
+      const parsed = JSON.parse(rawSession);
+      const email = parsed?.user?.email || parsed?.email;
+      if (email) return String(email).toLowerCase().trim();
+    }
+  } catch {}
+  return undefined;
+}
+
+export async function getUserId(): Promise<string | undefined> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
+    const email = user?.email?.toLowerCase().trim() || getEmailFromSession();
     const mockId = getMockSessionUserId();
+
     if (checkIsSaivarala(user, mockId)) {
       return "usr_saivarala33_gmail_com";
     }
-    return user?.id || mockId;
+
+    if (email) {
+      return "usr_" + email.replace(/[^a-z0-9]/gi, "_");
+    }
+
+    return user?.id ? String(user.id).replace(/[^a-zA-Z0-9_]/g, "_") : mockId;
   } catch {
+    const email = getEmailFromSession();
+    if (email) {
+      return "usr_" + email.replace(/[^a-z0-9]/gi, "_");
+    }
     const mockId = getMockSessionUserId();
     if (checkIsSaivarala(null, mockId)) {
       return "usr_saivarala33_gmail_com";
