@@ -3,7 +3,7 @@ import {
   Client, Service, SubService, RequiredDoc,
   AssignedService, BankingEntry, Lead, DocumentDraft, Collaboration, Invoice, OneTimeService, RenewalItem
 } from "./types";
-import { getCurrentFY } from "./utils";
+import { getCurrentFY, ensureUUID } from "./utils";
 import {
   fetchAllCRMData,
   syncClientToSupabase,
@@ -72,9 +72,9 @@ const getClientKey = (c: Client) => {
   const detail = (c.mobile || c.phone || c.email || c.pan || c.panNo || c.gstin || c.gstNo || '').toLowerCase().trim();
   return name ? `${name}_${detail}` : '';
 };
-const getServiceKey = (s: Service) => `${(s.id || '').trim()}_${(s.name || '').toLowerCase().trim()}_${s.price || 0}`;
-const getSubServiceKey = (ss: SubService) => `${(ss.serviceId || '').trim()}_${(ss.name || '').toLowerCase().trim()}`;
-const getRequiredDocKey = (rd: RequiredDoc) => `${(rd.subServiceId || '').trim()}_${(rd.name || '').toLowerCase().trim()}`;
+const getServiceKey = (s: Service) => (s.name || '').toLowerCase().trim();
+const getSubServiceKey = (ss: SubService) => (ss.name || '').toLowerCase().trim();
+const getRequiredDocKey = (rd: RequiredDoc) => (rd.name || '').toLowerCase().trim();
 const getAssignedServiceKey = (a: AssignedService) => `${(a.clientId || '').trim()}_${(a.serviceId || '').trim()}_${(a.financialYear || '').trim()}_${(a.dueDate || '').trim()}`;
 const getBankingEntryKey = (b: BankingEntry) => `${(b.clientId || '').trim()}_${(b.serviceId || '').trim()}_${(b.financialYear || '').trim()}_${b.amountBilled || 0}_${b.amountReceived || 0}`;
 const getLeadKey = (l: Lead) => {
@@ -477,6 +477,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
     const preparedClient: Client = {
       ...c,
+      id: ensureUUID(c.id),
       documents: c.documents || [],
       documentCount: c.documents?.length || 0,
       portalCredentials,
@@ -512,14 +513,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   // Services Sync (Packages)
   addService: (sv) => {
+    const svFixed: Service = { ...sv, id: ensureUUID(sv.id) };
     set((s) => {
-      const key = getServiceKey(sv);
-      if (s.services.some(x => x.id === sv.id || (key && getServiceKey(x) === key))) return s;
-      const next = [...s.services, sv];
+      const key = getServiceKey(svFixed);
+      if (s.services.some(x => x.id === svFixed.id || (key && getServiceKey(x) === key))) return s;
+      const next = [...s.services, svFixed];
       saveToLocal("services", next);
       return { services: next };
     });
-    syncServiceToSupabase(sv);
+    syncServiceToSupabase(svFixed);
   },
   updateService: (sv) => {
     set((s) => {
@@ -540,18 +542,20 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   // SubServices Sync (Services)
   addSubService: (ss) => {
+    const ssFixed: SubService = { ...ss, id: ensureUUID(ss.id) };
     set((s) => {
-      const key = getSubServiceKey(ss);
-      if (s.subServices.some(x => x.id === ss.id || (key && getSubServiceKey(x) === key))) return s;
-      const next = [...s.subServices, ss];
+      const key = getSubServiceKey(ssFixed);
+      if (s.subServices.some(x => x.id === ssFixed.id || (key && getSubServiceKey(x) === key))) return s;
+      const next = [...s.subServices, ssFixed];
       saveToLocal("subServices", next);
       return { subServices: next };
     });
-    syncSubServiceToSupabase(ss);
+    syncSubServiceToSupabase(ssFixed);
   },
   addSubServicesBatch: (ssList) => {
+    const fixedBatch = ssList.map(ss => ({ ...ss, id: ensureUUID(ss.id) }));
     set((s) => {
-      const uniqueBatch = ssList.filter(ss => {
+      const uniqueBatch = fixedBatch.filter(ss => {
         const key = getSubServiceKey(ss);
         return !s.subServices.some(x => x.id === ss.id || (key && getSubServiceKey(x) === key));
       });
@@ -560,7 +564,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("subServices", next);
       return { subServices: next };
     });
-    ssList.forEach(ss => syncSubServiceToSupabase(ss));
+    fixedBatch.forEach(ss => syncSubServiceToSupabase(ss));
   },
   updateSubService: (ss) => {
     set((s) => {
@@ -581,12 +585,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   // Required Docs Sync
   addRequiredDoc: (d) => {
+    const dFixed: RequiredDoc = { ...d, id: ensureUUID(d.id) };
     set((s) => {
-      const next = [...s.requiredDocs, d];
+      const key = getRequiredDocKey(dFixed);
+      if (s.requiredDocs.some(x => x.id === dFixed.id || (key && getRequiredDocKey(x) === key))) return s;
+      const next = [...s.requiredDocs, dFixed];
       saveToLocal("requiredDocs", next);
       return { requiredDocs: next };
     });
-    syncRequiredDocToSupabase(d);
+    syncRequiredDocToSupabase(dFixed);
   },
   updateRequiredDoc: (d) => {
     set((s) => {
@@ -607,12 +614,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   // Assigned Services Sync
   addAssignedService: (a) => {
+    const aFixed: AssignedService = { ...a, id: ensureUUID(a.id) };
     set((s) => {
-      const nextAssigned = [...s.assignedServices, a];
+      const key = getAssignedServiceKey(aFixed);
+      if (s.assignedServices.some(x => x.id === aFixed.id || (key && getAssignedServiceKey(x) === key))) return s;
+      const nextAssigned = [...s.assignedServices, aFixed];
       saveToLocal("assignedServices", nextAssigned);
       return { assignedServices: nextAssigned };
     });
-    syncAssignedServiceToSupabase(a);
+    syncAssignedServiceToSupabase(aFixed);
   },
   updateAssignedService: (a) => {
     set((s) => {
@@ -855,12 +865,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   // Actions - One Time Services
   addOneTimeService: (ots) => {
+    const otsFixed = { ...ots, id: ensureUUID(ots.id) };
     set((s) => {
-      const next = [ots, ...s.oneTimeServices];
+      const key = getOneTimeKey(otsFixed);
+      if (s.oneTimeServices.some(x => x.id === otsFixed.id || (key && getOneTimeKey(x) === key))) return s;
+      const next = [otsFixed, ...s.oneTimeServices];
       saveToLocal("oneTimeServices", next);
       return { oneTimeServices: next };
     });
-    syncOneTimeServiceToSupabase(ots);
+    syncOneTimeServiceToSupabase(otsFixed);
   },
   updateOneTimeService: (ots) => {
     set((s) => {
@@ -881,12 +894,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   // Actions - Renewals
   addRenewal: (rn) => {
+    const rnFixed = { ...rn, id: ensureUUID(rn.id) };
     set((s) => {
-      const next = [rn, ...(s.renewals || [])];
+      const key = `${(rnFixed.clientName || '').toLowerCase()}_${(rnFixed.serviceName || '').toLowerCase()}`;
+      if ((s.renewals || []).some(x => x.id === rnFixed.id || (key && `${(x.clientName || '').toLowerCase()}_${(x.serviceName || '').toLowerCase()}` === key))) return s;
+      const next = [rnFixed, ...(s.renewals || [])];
       saveToLocal("renewals", next);
       return { renewals: next };
     });
-    syncRenewalToSupabase(rn);
+    syncRenewalToSupabase(rnFixed);
   },
   updateRenewal: (rn) => {
     set((s) => {
