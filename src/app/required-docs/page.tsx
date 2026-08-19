@@ -233,7 +233,20 @@ export default function RequiredDocsPage() {
                           <button className="btn-slds btn-slds-secondary" style={{ padding: "5px 8px" }} onClick={() => openEdit(d)} title="Edit">
                             <Pencil size={13} />
                           </button>
-                          <button className="btn-slds btn-slds-secondary" style={{ padding: "5px 8px", color: "#DC2626", borderColor: "#FCA5A5" }} onClick={() => { deleteRequiredDoc(d.id); toast.success("Deleted"); }} title="Delete">
+                          <button
+                            className="btn-slds btn-slds-secondary"
+                            style={{ padding: "5px 8px", color: "#DC2626", borderColor: "#FCA5A5" }}
+                            onClick={async () => {
+                              try {
+                                await deleteRequiredDoc(d.id);
+                                toast.success(`Deleted document "${d.name}"`);
+                              } catch (err) {
+                                console.error(err);
+                                toast.error("Failed to delete entry from database. Please try again.");
+                              }
+                            }}
+                            title="Delete"
+                          >
                             <Trash2 size={13} />
                           </button>
                         </div>

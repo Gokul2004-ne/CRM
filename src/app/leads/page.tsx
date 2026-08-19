@@ -440,9 +440,14 @@ export default function LeadsPage() {
                           <button
                             className="btn-slds"
                             style={{ padding: "4px 8px", fontSize: 11, background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", fontWeight: 600 }}
-                            onClick={() => {
-                              deleteLead(lead.id);
-                              toast.success(`Lead "${lead.name}" deleted.`);
+                            onClick={async () => {
+                              try {
+                                await deleteLead(lead.id);
+                                toast.success(`Lead "${lead.name}" deleted.`);
+                              } catch (err) {
+                                console.error(err);
+                                toast.error("Failed to delete entry from database. Please try again.");
+                              }
                             }}
                             title="Delete Lead"
                           >

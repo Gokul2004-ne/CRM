@@ -442,9 +442,14 @@ export default function RenewalsPage() {
                           className="icon-btn-slds"
                           style={{ padding: 6, borderRadius: 8, background: "#FEE2E2" }}
                           title="Delete Renewal"
-                          onClick={() => {
-                            deleteRenewal(rn.id);
-                            toast.success(`Deleted renewal record for "${rn.clientName}"`);
+                          onClick={async () => {
+                            try {
+                              await deleteRenewal(rn.id);
+                              toast.success(`Deleted renewal record for "${rn.clientName}"`);
+                            } catch (err) {
+                              console.error(err);
+                              toast.error("Failed to delete entry from database. Please try again.");
+                            }
                           }}
                         >
                           <Trash2 size={15} color="#DC2626" />

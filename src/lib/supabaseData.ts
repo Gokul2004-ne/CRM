@@ -444,33 +444,23 @@ export async function removeClientFromSupabase(id: string, name?: string) {
     const userId = await getUserId();
     const dbId = ensureUUID(id);
 
-    if (userId) {
-      // 1. Delete parent client row FIRST so any concurrent fetchAllCRMData immediately sees zero rows
-      await supabase.from("clients").delete().eq("id", dbId).eq("user_id", userId);
-      if (id && id !== dbId) {
-        await supabase.from("clients").delete().eq("id", id).eq("user_id", userId);
-      }
-      // 2. Purge linked child records
-      await Promise.all([
-        supabase.from("assigned_services").delete().eq("client_id", dbId).eq("user_id", userId),
-        supabase.from("banking_entries").delete().eq("client_id", dbId).eq("user_id", userId),
-        supabase.from("invoices").delete().eq("client_id", dbId).eq("user_id", userId),
-        supabase.from("drafts").delete().eq("client_id", dbId).eq("user_id", userId),
-      ]);
-    } else {
-      await supabase.from("clients").delete().eq("id", dbId);
-      if (id && id !== dbId) {
-        await supabase.from("clients").delete().eq("id", id);
-      }
-      await Promise.all([
-        supabase.from("assigned_services").delete().eq("client_id", dbId),
-        supabase.from("banking_entries").delete().eq("client_id", dbId),
-        supabase.from("invoices").delete().eq("client_id", dbId),
-        supabase.from("drafts").delete().eq("client_id", dbId),
-      ]);
+    // 1. Delete parent client row FIRST so any concurrent fetchAllCRMData immediately sees zero rows
+    const { error } = await supabase.from("clients").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    if (error) {
+      console.error("Error deleting client from Supabase:", error);
+      throw error;
     }
+    // 2. Purge linked child records
+    await Promise.all([
+      supabase.from("assigned_services").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`).eq("user_id", userId),
+      supabase.from("banking_entries").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`).eq("user_id", userId),
+      supabase.from("invoices").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`).eq("user_id", userId),
+      supabase.from("drafts").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`).eq("user_id", userId),
+    ]);
+    return { success: true };
   } catch (err) {
     console.error("Error removing client from Supabase:", err);
+    throw err;
   }
 }
 
@@ -496,13 +486,17 @@ export async function syncServiceToSupabase(s: Service) {
 
 export async function removeServiceFromSupabase(id: string, name?: string) {
   try {
+    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    if (id && id !== dbId) {
-      await supabase.from("services").delete().eq("id", id);
+    const { error } = await supabase.from("services").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    if (error) {
+      console.error("Error removing service from Supabase:", error);
+      throw error;
     }
-    await supabase.from("services").delete().eq("id", dbId);
+    return { success: true };
   } catch (err) {
     console.error("Error removing service from Supabase:", err);
+    throw err;
   }
 }
 
@@ -536,13 +530,17 @@ export async function syncSubServiceToSupabase(ss: SubService) {
 
 export async function removeSubServiceFromSupabase(id: string, name?: string) {
   try {
+    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    if (id && id !== dbId) {
-      await supabase.from("sub_services").delete().eq("id", id);
+    const { error } = await supabase.from("sub_services").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    if (error) {
+      console.error("Error removing sub-service from Supabase:", error);
+      throw error;
     }
-    await supabase.from("sub_services").delete().eq("id", dbId);
+    return { success: true };
   } catch (err) {
     console.error("Error removing sub-service from Supabase:", err);
+    throw err;
   }
 }
 
@@ -567,13 +565,17 @@ export async function syncRequiredDocToSupabase(rd: RequiredDoc) {
 
 export async function removeRequiredDocFromSupabase(id: string, name?: string) {
   try {
+    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    if (id && id !== dbId) {
-      await supabase.from("required_docs").delete().eq("id", id);
+    const { error } = await supabase.from("required_docs").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    if (error) {
+      console.error("Error removing required doc from Supabase:", error);
+      throw error;
     }
-    await supabase.from("required_docs").delete().eq("id", dbId);
+    return { success: true };
   } catch (err) {
     console.error("Error removing required doc from Supabase:", err);
+    throw err;
   }
 }
 
@@ -604,13 +606,17 @@ export async function syncAssignedServiceToSupabase(a: AssignedService) {
 
 export async function removeAssignedServiceFromSupabase(id: string) {
   try {
+    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    if (id && id !== dbId) {
-      await supabase.from("assigned_services").delete().eq("id", id);
+    const { error } = await supabase.from("assigned_services").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    if (error) {
+      console.error("Error removing assigned service from Supabase:", error);
+      throw error;
     }
-    await supabase.from("assigned_services").delete().eq("id", dbId);
+    return { success: true };
   } catch (err) {
     console.error("Error removing assigned service from Supabase:", err);
+    throw err;
   }
 }
 
@@ -638,13 +644,17 @@ export async function syncBankingEntryToSupabase(b: BankingEntry) {
 
 export async function removeBankingEntryFromSupabase(id: string) {
   try {
+    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    if (id && id !== dbId) {
-      await supabase.from("banking_entries").delete().eq("id", id);
+    const { error } = await supabase.from("banking_entries").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    if (error) {
+      console.error("Error removing banking entry from Supabase:", error);
+      throw error;
     }
-    await supabase.from("banking_entries").delete().eq("id", dbId);
+    return { success: true };
   } catch (err) {
     console.error("Error removing banking entry from Supabase:", err);
+    throw err;
   }
 }
 
@@ -679,19 +689,15 @@ export async function removeLeadFromSupabase(id: string, name?: string) {
   try {
     const userId = await getUserId();
     const dbId = ensureUUID(id);
-    if (userId) {
-      if (id && id !== dbId) {
-        await supabase.from("leads").delete().eq("id", id).eq("user_id", userId);
-      }
-      await supabase.from("leads").delete().eq("id", dbId).eq("user_id", userId);
-    } else {
-      if (id && id !== dbId) {
-        await supabase.from("leads").delete().eq("id", id);
-      }
-      await supabase.from("leads").delete().eq("id", dbId);
+    const { error } = await supabase.from("leads").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    if (error) {
+      console.error("Error removing lead from Supabase:", error);
+      throw error;
     }
+    return { success: true };
   } catch (err) {
     console.error("Error removing lead from Supabase:", err);
+    throw err;
   }
 }
 
@@ -717,13 +723,17 @@ export async function syncDraftToSupabase(d: DocumentDraft) {
 
 export async function removeDraftFromSupabase(id: string) {
   try {
+    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    if (id && id !== dbId) {
-      await supabase.from("drafts").delete().eq("id", id);
+    const { error } = await supabase.from("drafts").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    if (error) {
+      console.error("Error removing draft from Supabase:", error);
+      throw error;
     }
-    await supabase.from("drafts").delete().eq("id", dbId);
+    return { success: true };
   } catch (err) {
     console.error("Error removing draft from Supabase:", err);
+    throw err;
   }
 }
 
@@ -752,19 +762,15 @@ export async function removeCollaborationFromSupabase(id: string, name?: string)
   try {
     const userId = await getUserId();
     const dbId = ensureUUID(id);
-    if (userId) {
-      if (id && id !== dbId) {
-        await supabase.from("collaborations").delete().eq("id", id).eq("user_id", userId);
-      }
-      await supabase.from("collaborations").delete().eq("id", dbId).eq("user_id", userId);
-    } else {
-      if (id && id !== dbId) {
-        await supabase.from("collaborations").delete().eq("id", id);
-      }
-      await supabase.from("collaborations").delete().eq("id", dbId);
+    const { error } = await supabase.from("collaborations").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    if (error) {
+      console.error("Error removing collaboration from Supabase:", error);
+      throw error;
     }
+    return { success: true };
   } catch (err) {
     console.error("Error removing collaboration from Supabase:", err);
+    throw err;
   }
 }
 
@@ -801,13 +807,17 @@ export async function syncInvoiceToSupabase(inv: any) {
 
 export async function removeInvoiceFromSupabase(id: string) {
   try {
+    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    if (id && id !== dbId) {
-      await supabase.from("invoices").delete().eq("id", id);
+    const { error } = await supabase.from("invoices").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    if (error) {
+      console.error("Error removing invoice from Supabase:", error);
+      throw error;
     }
-    await supabase.from("invoices").delete().eq("id", dbId);
+    return { success: true };
   } catch (err) {
     console.error("Error removing invoice from Supabase:", err);
+    throw err;
   }
 }
 
@@ -834,13 +844,17 @@ export async function syncOneTimeServiceToSupabase(ots: any) {
 
 export async function removeOneTimeServiceFromSupabase(id: string) {
   try {
+    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    if (id && id !== dbId) {
-      await supabase.from("one_time_services").delete().eq("id", id);
+    const { error } = await supabase.from("one_time_services").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    if (error) {
+      console.error("Error removing one-time service from Supabase:", error);
+      throw error;
     }
-    await supabase.from("one_time_services").delete().eq("id", dbId);
+    return { success: true };
   } catch (err) {
     console.error("Error removing one-time service from Supabase:", err);
+    throw err;
   }
 }
 
@@ -872,13 +886,17 @@ export async function syncRenewalToSupabase(rn: any) {
 
 export async function removeRenewalFromSupabase(id: string) {
   try {
+    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    if (id && id !== dbId) {
-      await supabase.from("renewals").delete().eq("id", id);
+    const { error } = await supabase.from("renewals").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    if (error) {
+      console.error("Error removing renewal from Supabase:", error);
+      throw error;
     }
-    await supabase.from("renewals").delete().eq("id", dbId);
+    return { success: true };
   } catch (err) {
     console.error("Error removing renewal from Supabase:", err);
+    throw err;
   }
 }
 

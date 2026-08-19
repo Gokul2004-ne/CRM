@@ -108,9 +108,14 @@ export default function CollaborationsPage() {
     setModal({ open: false, editing: false });
   };
 
-  const handleDelete = (id: string, name: string) => {
-    deleteCollaboration(id);
-    toast.success(`Collaboration with "${name}" deleted.`);
+  const handleDelete = async (id: string, name: string) => {
+    try {
+      await deleteCollaboration(id);
+      toast.success(`Collaboration with "${name}" deleted.`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete entry from database. Please try again.");
+    }
   };
 
   return (
