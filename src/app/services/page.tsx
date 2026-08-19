@@ -4,7 +4,7 @@ import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
 import { Service } from "@/lib/types";
 import { Plus, Pencil, Trash2, Search, IndianRupee, Package } from "lucide-react";
-import { formatCurrency, ALL_MONTHS } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 
 const PACKAGE_TYPES = [
@@ -21,6 +21,7 @@ const PACKAGE_TYPES = [
 const emptyService = (): Service => ({
   id: "", name: "", price: 0, recurrence: "MONTHLY", applicableMonths: [], dueDate: ""
 });
+
 
 export default function PackagesPage() {
   const { services, addService, updateService, deleteService } = useAppStore();
@@ -39,13 +40,7 @@ export default function PackagesPage() {
       toast.error("Package name is required");
       return;
     }
-    if (!form.applicableMonths || form.applicableMonths.length === 0) {
-      toast.error("Please select at least one month before saving this service.");
-      return;
-    }
-    const months = form.applicableMonths;
-    const computedRecurrence = months.length === 12 ? "MONTHLY" : months.length === 4 ? "QUARTERLY" : months.length === 1 ? "ANNUALLY" : "CUSTOM";
-    const payload: Service = { ...form, recurrence: computedRecurrence };
+    const payload: Service = { ...form };
     if (modal.editing) { updateService(payload); toast.success("Package updated"); }
     else { addService({ ...payload, id: `s${Date.now()}` }); toast.success("Package added"); }
     setModal({ open: false, editing: null });
@@ -296,105 +291,7 @@ export default function PackagesPage() {
                 />
               </div>
 
-              {/* Applicable Months Selection (Mandatory) */}
-              <div
-                style={{
-                  width: "100%",
-                  padding: 12,
-                  background: (form.applicableMonths || []).length === 0 ? "#FEF2F2" : "#F8FAFC",
-                  borderRadius: 8,
-                  border: (form.applicableMonths || []).length === 0 ? "1.5px solid #EF4444" : "1px solid #CBD5E1",
-                  transition: "all 0.2s ease"
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: (form.applicableMonths || []).length === 0 ? "#DC2626" : "#0F172A" }}>
-                    🗓️ Select Applicable Months <span style={{ color: "#DC2626" }}>*</span>
-                  </span>
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      className="btn-slds btn-slds-secondary"
-                      style={{ padding: "2px 6px", fontSize: 10, fontWeight: 600 }}
-                      onClick={() => setForm(f => ({ ...f, applicableMonths: [...ALL_MONTHS] }))}
-                      title="Select all 12 calendar months"
-                    >
-                      Monthly (All 12)
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-slds btn-slds-secondary"
-                      style={{ padding: "2px 6px", fontSize: 10, fontWeight: 600 }}
-                      onClick={() => setForm(f => ({ ...f, applicableMonths: ["June", "September", "December", "March"] }))}
-                      title="Select quarterly compliance months"
-                    >
-                      Quarterly (4 Mo)
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-slds btn-slds-secondary"
-                      style={{ padding: "2px 6px", fontSize: 10, fontWeight: 600 }}
-                      onClick={() => setForm(f => ({ ...f, applicableMonths: ["July"] }))}
-                      title="Select annual compliance month"
-                    >
-                      Annual (1 Mo)
-                    </button>
-                    {(form.applicableMonths || []).length > 0 && (
-                      <button
-                        type="button"
-                        className="btn-slds btn-slds-secondary"
-                        style={{ padding: "2px 6px", fontSize: 10, fontWeight: 600, color: "#DC2626", borderColor: "#FCA5A5" }}
-                        onClick={() => setForm(f => ({ ...f, applicableMonths: [] }))}
-                        title="Clear all month selections"
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
-                  {ALL_MONTHS.map(m => {
-                    const isChecked = (form.applicableMonths || []).includes(m);
-                    return (
-                      <label
-                        key={m}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 5,
-                          fontSize: 11,
-                          fontWeight: isChecked ? 700 : 500,
-                          color: isChecked ? "#1D4ED8" : "#475569",
-                          padding: "5px 8px",
-                          background: isChecked ? "#EFF6FF" : "#FFFFFF",
-                          border: isChecked ? "1px solid #93C5FD" : "1px solid #E2E8F0",
-                          borderRadius: 6,
-                          cursor: "pointer",
-                          userSelect: "none"
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={e => {
-                            const current = form.applicableMonths || [];
-                            const next = e.target.checked
-                              ? [...current, m]
-                              : current.filter(x => x !== m);
-                            setForm(f => ({ ...f, applicableMonths: next }));
-                          }}
-                        />
-                        <span>{m.substring(0, 3)}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-                {(form.applicableMonths || []).length === 0 && (
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
-                    ⚠️ Please select at least one month before saving this service.
-                  </div>
-                )}
-              </div>
+
             </div>
             <div className="modal-footer">
               <button className="btn-slds btn-slds-secondary" onClick={() => setModal({ open: false, editing: null })}>Cancel</button>

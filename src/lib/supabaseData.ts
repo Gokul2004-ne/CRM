@@ -455,12 +455,8 @@ export async function removeClientFromSupabase(id: string, name?: string) {
   }
 }
 
-// Services Sync
+// Services Sync (Packages)
 export async function syncServiceToSupabase(s: Service) {
-  if (!s.applicableMonths || s.applicableMonths.length === 0) {
-    console.warn("syncServiceToSupabase blocked: At least one month must be selected for the service");
-    return;
-  }
   const userId = await getUserId();
   const dbId = ensureUUID(s.id);
   const months = s.applicableMonths || [];
