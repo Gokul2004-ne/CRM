@@ -76,7 +76,13 @@ const getServiceKey = (s: Service) => s.id;
 const getSubServiceKey = (ss: SubService) => `${(ss.serviceId || (ss.serviceIds && ss.serviceIds[0]) || '').trim()}_${(ss.name || '').toLowerCase().trim()}`;
 const getRequiredDocKey = (rd: RequiredDoc) => `${(rd.subServiceId || '').trim()}_${(rd.name || '').toLowerCase().trim()}`;
 const getAssignedServiceKey = (a: AssignedService) => `${(a.clientId || '').trim()}_${(a.serviceId || '').trim()}_${(a.financialYear || '').trim()}_${(a.dueDate || '').trim()}`;
-const getBankingEntryKey = (b: BankingEntry) => b.id || `${(b.clientId || '').trim()}_${(b.serviceId || '').trim()}_${(b.financialYear || '').trim()}_${b.amountBilled || 0}_${b.amountReceived || 0}`;
+const getBankingEntryKey = (b: BankingEntry) => {
+  if (b.remark && b.remark.includes("#")) {
+    const match = b.remark.match(/#([^\s]+)/);
+    if (match) return `inv_${match[1].toLowerCase().trim()}`;
+  }
+  return b.id;
+};
 const getLeadKey = (l: Lead) => {
   const name = (l.name || '').toLowerCase().trim();
   const contact = (l.mobile || l.phone || l.email || '').toLowerCase().trim();
@@ -577,38 +583,50 @@ export const useAppStore = create<AppState>()((set, get) => ({
     await syncBankingEntryToSupabase(b);
   },
   updateBankingEntry: async (b) => {
+    const bFixed: BankingEntry = { ...b, id: ensureUUID(b.id) };
+    let invoiceToSync: Invoice | null = null;
     set((s) => {
       const updatedAssigned = s.assignedServices.map(a => {
-        if (a.id === b.id.replace(/^b-/, "") || (a.clientId === b.clientId && a.serviceId === b.serviceId && a.financialYear === b.financialYear)) {
+        if (a.id === bFixed.id.replace(/^b-/, "") || (a.clientId === bFixed.clientId && a.serviceId === bFixed.serviceId && a.financialYear === bFixed.financialYear)) {
           return {
             ...a,
-            amountReceived: b.amountReceived,
-            amountPending: b.amountPending
+            amountReceived: bFixed.amountReceived,
+            amountPending: bFixed.amountPending
           };
         }
         return a;
       });
 
-      const invoiceId = b.id.startsWith("b_inv_") ? b.id.replace("b_inv_", "") : null;
-      const updatedInvoices = invoiceId ? s.invoices.map(inv => {
-        if (inv.id === invoiceId) {
-          const rcv = b.amountReceived;
-          const total = inv.total || b.amountBilled;
+      const invoiceNumberMatch = bFixed.remark?.match(/#([^\s]+)/);
+      const invNumber = invoiceNumberMatch ? invoiceNumberMatch[1] : null;
+
+      const updatedInvoices = s.invoices.map(inv => {
+        const matches = (invNumber && inv.invoiceNumber?.toLowerCase().trim() === invNumber.toLowerCase().trim()) ||
+          ensureUUID(`binv_${ensureUUID(inv.id)}`) === bFixed.id;
+        
+        if (matches) {
+          const rcv = Number(bFixed.amountReceived || 0);
+          const total = inv.total || Number(bFixed.amountBilled || 0);
           const bal = Math.max(0, total - rcv);
-          const status = rcv >= total && total > 0 ? "PAID" as const : inv.status;
-          return { ...inv, amountReceived: rcv, balanceDue: bal, status };
+          const status = rcv >= total && total > 0 ? "PAID" as const : rcv > 0 ? "SENT" as const : inv.status;
+          const updatedInv: Invoice = { ...inv, amountReceived: rcv, balanceDue: bal, status };
+          invoiceToSync = updatedInv;
+          return updatedInv;
         }
         return inv;
-      }) : s.invoices;
+      });
 
-      const nextBanking = s.bankingEntries.map(x => x.id === b.id ? b : x);
+      const nextBanking = s.bankingEntries.map(x => (x.id === bFixed.id || ensureUUID(x.id) === bFixed.id) ? bFixed : x);
       return {
         bankingEntries: nextBanking,
         assignedServices: updatedAssigned,
         invoices: updatedInvoices
       };
     });
-    await syncBankingEntryToSupabase(b);
+    await syncBankingEntryToSupabase(bFixed);
+    if (invoiceToSync) {
+      await syncInvoiceToSupabase(invoiceToSync);
+    }
   },
   deleteBankingEntry: async (id) => {
     set((s) => {
@@ -706,81 +724,94 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   addInvoice: async (inv) => {
+    const invFixed: Invoice = { ...inv, id: ensureUUID(inv.id) };
     let bEntryToSync: BankingEntry | null = null;
     set((s) => {
-      const next = [inv, ...s.invoices];
+      const next = [invFixed, ...s.invoices.filter(x => x.id !== invFixed.id && ensureUUID(x.id) !== invFixed.id)];
 
-      if (inv.type !== "PROFORMA" && inv.clientId) {
-        const rcv = inv.amountReceived || (inv.status === "PAID" ? inv.total : 0);
-        const billed = inv.total || 0;
+      if (invFixed.type !== "PROFORMA" && invFixed.clientId) {
+        const rcv = Number(invFixed.amountReceived || (invFixed.status === "PAID" ? invFixed.total : 0));
+        const billed = Number(invFixed.total || 0);
         if (billed > 0 || rcv > 0) {
+          const bEntryId = ensureUUID(`binv_${invFixed.id}`);
           const bEntry: BankingEntry = {
-            id: `b_inv_${inv.id}`,
-            financialYear: inv.financialYear || s.selectedFY || getCurrentFY(),
-            clientId: inv.clientId,
-            serviceId: s.services[0]?.id || "s1",
+            id: bEntryId,
+            financialYear: invFixed.financialYear || s.selectedFY || getCurrentFY(),
+            clientId: invFixed.clientId,
+            serviceId: s.services[0]?.id || "00000000-0000-0000-0000-000000000000",
             amountBilled: billed,
             amountReceived: rcv,
             amountPending: Math.max(0, billed - rcv),
-            paymentStatus: rcv >= billed ? "PAID" : rcv > 0 ? "PARTIAL" : "PENDING",
-            remark: `${inv.type} #${inv.invoiceNumber} payment record`
+            paymentStatus: rcv >= billed && billed > 0 ? "PAID" : rcv > 0 ? "PARTIAL" : "PENDING",
+            remark: `${invFixed.type} #${invFixed.invoiceNumber} payment record`
           };
           bEntryToSync = bEntry;
-          const nextBanking = [...s.bankingEntries.filter(b => b.id !== bEntry.id), bEntry];
+          const nextBanking = [...s.bankingEntries.filter(b => b.id !== bEntryId && ensureUUID(b.id) !== bEntryId && !b.remark?.includes(`#${invFixed.invoiceNumber} `)), bEntry];
           return { invoices: next, bankingEntries: nextBanking };
         }
       }
 
       return { invoices: next };
     });
-    await syncInvoiceToSupabase(inv);
+    await syncInvoiceToSupabase(invFixed);
     if (bEntryToSync) {
       await syncBankingEntryToSupabase(bEntryToSync);
     }
   },
   updateInvoice: async (inv) => {
+    const invFixed: Invoice = { ...inv, id: ensureUUID(inv.id) };
     let bEntryToSync: BankingEntry | null = null;
     set((s) => {
-      const next = s.invoices.map(x => x.id === inv.id ? inv : x);
+      const next = s.invoices.map(x => (x.id === invFixed.id || ensureUUID(x.id) === invFixed.id) ? invFixed : x);
 
-      if (inv.type !== "PROFORMA" && inv.clientId) {
-        const rcv = inv.amountReceived || (inv.status === "PAID" ? inv.total : 0);
-        const billed = inv.total || 0;
+      if (invFixed.type !== "PROFORMA" && invFixed.clientId) {
+        const rcv = Number(invFixed.amountReceived || (invFixed.status === "PAID" ? invFixed.total : 0));
+        const billed = Number(invFixed.total || 0);
+        const bEntryId = ensureUUID(`binv_${invFixed.id}`);
         const bEntry: BankingEntry = {
-          id: `b_inv_${inv.id}`,
-          financialYear: inv.financialYear || s.selectedFY || getCurrentFY(),
-          clientId: inv.clientId,
-          serviceId: s.services[0]?.id || "s1",
+          id: bEntryId,
+          financialYear: invFixed.financialYear || s.selectedFY || getCurrentFY(),
+          clientId: invFixed.clientId,
+          serviceId: s.services[0]?.id || "00000000-0000-0000-0000-000000000000",
           amountBilled: billed,
           amountReceived: rcv,
           amountPending: Math.max(0, billed - rcv),
-          paymentStatus: rcv >= billed ? "PAID" : rcv > 0 ? "PARTIAL" : "PENDING",
-          remark: `${inv.type} #${inv.invoiceNumber} payment record`
+          paymentStatus: rcv >= billed && billed > 0 ? "PAID" : rcv > 0 ? "PARTIAL" : "PENDING",
+          remark: `${invFixed.type} #${invFixed.invoiceNumber} payment record`
         };
         bEntryToSync = bEntry;
-        const nextBanking = [...s.bankingEntries.filter(b => b.id !== bEntry.id), bEntry];
+        const exists = s.bankingEntries.some(b => b.id === bEntryId || ensureUUID(b.id) === bEntryId || b.remark?.includes(`#${invFixed.invoiceNumber} `));
+        const nextBanking = exists
+          ? s.bankingEntries.map(b => (b.id === bEntryId || ensureUUID(b.id) === bEntryId || b.remark?.includes(`#${invFixed.invoiceNumber} `)) ? bEntry : b)
+          : [...s.bankingEntries, bEntry];
         return { invoices: next, bankingEntries: nextBanking };
       }
 
       return { invoices: next };
     });
-    await syncInvoiceToSupabase(inv);
+    await syncInvoiceToSupabase(invFixed);
     if (bEntryToSync) {
       await syncBankingEntryToSupabase(bEntryToSync);
     }
   },
   deleteInvoice: async (id) => {
     const dbId = ensureUUID(id);
-    const targetBankingId = `b_inv_${id}`;
-    const targetBankingDbId = `b_inv_${dbId}`;
+    const bEntryId = ensureUUID(`binv_${dbId}`);
+    const targetInvoice = useAppStore.getState().invoices.find(inv => inv.id === id || ensureUUID(inv.id) === dbId);
+    const invNumber = targetInvoice?.invoiceNumber;
     set((s) => ({
       invoices: s.invoices.filter(x => x.id !== id && ensureUUID(x.id) !== dbId),
-      bankingEntries: s.bankingEntries.filter(b => b.id !== targetBankingId && b.id !== targetBankingDbId && b.id !== id && b.id !== dbId),
+      bankingEntries: s.bankingEntries.filter(b =>
+        b.id !== id &&
+        b.id !== dbId &&
+        b.id !== bEntryId &&
+        ensureUUID(b.id) !== bEntryId &&
+        (!invNumber || !b.remark?.includes(`#${invNumber} `))
+      ),
     }));
     await Promise.all([
       removeInvoiceFromSupabase(id),
-      removeBankingEntryFromSupabase(targetBankingId),
-      removeBankingEntryFromSupabase(targetBankingDbId)
+      removeBankingEntryFromSupabase(bEntryId),
     ]);
   },
 

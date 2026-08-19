@@ -2,7 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState, useMemo, useRef } from "react";
-import { formatCurrency, formatDate, getCurrentFY, getFYOptions, numberToWords, ensureUUID } from "@/lib/utils";
+import { formatCurrency, formatDate, getCurrentFY, getFYOptions, numberToWords, ensureUUID, generateUUID } from "@/lib/utils";
 import { Invoice, InvoiceItem, InvoiceType } from "@/lib/types";
 import {
   Plus, Printer, Eye, X, IndianRupee, FileText, Filter, CheckCircle2,
@@ -135,7 +135,7 @@ export default function InvoicePage() {
 
     const invoiceRecord: Invoice = {
       ...(form as Invoice),
-      id: form.id || `inv_${Date.now()}`,
+      id: form.id || generateUUID(),
       clientName: clientObj?.name || "Client",
       subtotal,
       gstAmount,
