@@ -14,7 +14,7 @@ const getServiceKey = (s: Service) => (s.name || '').toLowerCase().trim();
 const getSubServiceKey = (ss: SubService) => `${(ss.serviceId || '').trim()}_${(ss.name || '').toLowerCase().trim()}`;
 const getRequiredDocKey = (rd: RequiredDoc) => `${(rd.subServiceId || '').trim()}_${(rd.name || '').toLowerCase().trim()}`;
 const getAssignedServiceKey = (a: AssignedService) => `${(a.clientId || '').trim()}_${(a.serviceId || '').trim()}_${(a.financialYear || '').trim()}_${(a.dueDate || '').trim()}`;
-const getBankingEntryKey = (b: BankingEntry) => `${(b.clientId || '').trim()}_${(b.serviceId || '').trim()}_${(b.financialYear || '').trim()}_${b.amountBilled || 0}_${b.amountReceived || 0}`;
+const getBankingEntryKey = (b: BankingEntry) => b.id || `${(b.clientId || '').trim()}_${(b.serviceId || '').trim()}_${(b.financialYear || '').trim()}_${b.amountBilled || 0}_${b.amountReceived || 0}`;
 const getLeadKey = (l: Lead) => {
   const name = (l.name || '').toLowerCase().trim();
   const contact = (l.mobile || l.phone || '').toLowerCase().trim();
@@ -107,7 +107,7 @@ export async function runStoreTests() {
 
   // 6. Banking Entry Key Generation
   const bankA = { id: "b1", clientId: "c1", serviceId: "s1", financialYear: "2025-26", amountBilled: 5000, amountReceived: 2000 } as BankingEntry;
-  assert(getBankingEntryKey(bankA) === "c1_s1_2025-26_5000_2000", "getBankingEntryKey generates unique billing key");
+  assert(getBankingEntryKey(bankA) === "b1", "getBankingEntryKey generates unique billing key");
 
   // 7. Lead & Collaboration Key Generation
   const leadA = { id: "l1", name: "John Doe", mobile: "9988776655" } as Lead;

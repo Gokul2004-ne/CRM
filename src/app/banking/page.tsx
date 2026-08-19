@@ -2,7 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, ensureUUID } from "@/lib/utils";
 import { Pencil, Check, X, Download, Search, CheckCircle2, Clock, AlertCircle, IndianRupee } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,8 +27,8 @@ export default function BankingPage() {
 
     // Apply search filter
     return list.filter(b => {
-      const client = clients.find(c => c.id === b.clientId);
-      const service = services.find(s => s.id === b.serviceId);
+      const client = clients.find(c => c.id === b.clientId || (b.clientId && ensureUUID(c.id) === ensureUUID(b.clientId)));
+      const service = services.find(s => s.id === b.serviceId || (b.serviceId && ensureUUID(s.id) === ensureUUID(b.serviceId)));
       const q = search.toLowerCase();
       return (client?.name || "").toLowerCase().includes(q) || (service?.name || "").toLowerCase().includes(q);
     });
