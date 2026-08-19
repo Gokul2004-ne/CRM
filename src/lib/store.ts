@@ -356,32 +356,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const oneTimeRes = deduplicateItems(rawOneTime, getOneTimeKey);
     const renewalsRes = deduplicateItems(rawRenewals, renewalKey);
 
-    // Auto-derive missing banking entries ONLY from Tax Invoices (assigned services do NOT create banking entries)
-    const existingBankingIds = new Set(bankingRes.unique.map(b => b.id));
-    const derivedBanking: BankingEntry[] = [];
 
-    invoicesRes.unique.forEach((inv) => {
-      if (inv.type !== "PROFORMA" && inv.clientId) {
-        const invBId = `b_inv_${inv.id}`;
-        if (!existingBankingIds.has(invBId)) {
-          const rcv = inv.amountReceived || (inv.status === "PAID" ? inv.total : 0);
-          const billed = inv.total || 0;
-          derivedBanking.push({
-            id: invBId,
-            financialYear: inv.financialYear || getCurrentFY(),
-            clientId: inv.clientId,
-            serviceId: servicesRes.unique[0]?.id || "s1",
-            amountBilled: billed,
-            amountReceived: rcv,
-            amountPending: Math.max(0, billed - rcv),
-            paymentStatus: rcv >= billed && billed > 0 ? "PAID" : rcv > 0 ? "PARTIAL" : "PENDING",
-            remark: `${inv.type} #${inv.invoiceNumber} payment record`
-          });
-        }
-      }
-    });
+    const finalBanking = deduplicateItems(bankingRes.unique, getBankingEntryKey).unique;
 
-    const finalBanking = deduplicateItems([...bankingRes.unique, ...derivedBanking], getBankingEntryKey).unique;
 
     set({
       clients: clientsRes.unique,
