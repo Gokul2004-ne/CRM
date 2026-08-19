@@ -148,13 +148,17 @@ export default function AppShell({ children, title, subtitle }: AppShellProps) {
       document.addEventListener("visibilitychange", handleFocus);
 
       // Realtime DB subscription for instant multi-device / cross-session sync
+      let debounceTimeout: NodeJS.Timeout | null = null;
       const channel = supabase
         .channel("public_crm_changes")
         .on(
           "postgres_changes",
           { event: "*", schema: "public" },
           () => {
-            loadSupabaseData();
+            if (debounceTimeout) clearTimeout(debounceTimeout);
+            debounceTimeout = setTimeout(() => {
+              loadSupabaseData();
+            }, 300);
           }
         )
         .subscribe();

@@ -464,8 +464,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
       return { clients: finalClients };
     });
   },
-  deleteClient: (id) => {
-    removeClientFromSupabase(id);
+  deleteClient: async (id) => {
+    // 1. Instantly update local store and user-scoped localStorage
     set((s) => {
       const next = s.clients.filter(x => {
         if (x.id === id) return false;
@@ -475,6 +475,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("clients", next);
       return { clients: next };
     });
+    // 2. Await cloud removal from Supabase
+    await removeClientFromSupabase(id);
   },
 
   // Services Sync (Packages)
