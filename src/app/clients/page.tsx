@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { Client, ClientDocument, PortalCredential } from "@/lib/types";
@@ -7,7 +7,7 @@ import {
   Users, Search, Plus, Edit, Pencil, Trash2, Phone, Mail,
   Building, Copy, CheckCircle2, Shield, Eye, EyeOff, Download, MessageCircle, FileText, Share2, Layers, Lock
 } from "lucide-react";
-import { getWhatsAppLink, formatCurrency, formatDate, validatePAN, validateGSTIN, validatePhone, validateEmail } from "@/lib/utils";
+import { getWhatsAppLink, formatCurrency, formatDate, validatePAN, validateGSTIN, validatePhone, validateEmail, ensureUUID } from "@/lib/utils";
 import { toast } from "sonner";
 
 const INDIAN_STATES = [
@@ -20,7 +20,7 @@ const INDIAN_STATES = [
 ];
 
 export default function ClientsPage() {
-  const { clients, services, subServices, requiredDocs, assignedServices, invoices, oneTimeServices, addClient, updateClient, deleteClient } = useAppStore();
+  const { clients, collaborations, services, subServices, requiredDocs, assignedServices, invoices, oneTimeServices, addClient, updateClient, deleteClient } = useAppStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<string>("ALL");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -49,6 +49,20 @@ export default function ClientsPage() {
     status: "ACTIVE"
   });
 
+  // Keep viewingClient synchronized with live clients store
+  useEffect(() => {
+    if (viewingClient) {
+      const match = clients.find(c =>
+        c.id === viewingClient.id ||
+        (viewingClient.id && ensureUUID(c.id) === ensureUUID(viewingClient.id)) ||
+        (c.name && viewingClient.name && c.name.toLowerCase().trim() === viewingClient.name.toLowerCase().trim())
+      );
+      if (match) {
+        setViewingClient(match);
+      }
+    }
+  }, [clients]);
+
   const handleOpenAdd = () => {
     setEditingClient(null);
     setFormData({
@@ -56,6 +70,7 @@ export default function ClientsPage() {
       type: "PROPRIETORSHIP",
       pan: "",
       gstin: "",
+      password: "",
       contactPerson: "",
       phone: "",
       email: "",
@@ -99,6 +114,7 @@ export default function ClientsPage() {
 
     setFormData({
       ...client,
+      password: "",
       phone: client.phone || client.mobile || "",
       addressLine1: a1,
       addressLine2: a2,
@@ -171,19 +187,35 @@ export default function ClientsPage() {
 
     const formattedAddress = addrParts.join("; ");
 
-    // Uniqueness validation across existing client records
-    const isDuplicate = clients.some(c => {
-      if (editingClient && c.id === editingClient.id) return false;
-      if (panVal && c.pan?.toUpperCase() === panVal) return true;
-      if (gstinVal && (c.gstin?.toUpperCase() === gstinVal)) return true;
-      if (emailVal && c.email?.toLowerCase() === emailVal) return true;
-      if (cleanPhone && (c.phone === cleanPhone || c.mobile === cleanPhone)) return true;
-      if (formattedAddress && c.address && c.address.trim().toLowerCase() === formattedAddress.trim().toLowerCase()) return true;
-      return false;
-    });
+    // Strict uniqueness validation across primary identifiers (Phone, Email, PAN, GSTIN)
+    // Note: Multiple clients / branch offices are allowed to share the same physical address
+    const existingPhone = clients.find(c => (!editingClient || c.id !== editingClient.id) && cleanPhone && (c.phone === cleanPhone || c.mobile === cleanPhone));
+    if (existingPhone) {
+      toast.error("❌ Client already exists with this Phone Number.");
+      return;
+    }
 
-    if (isDuplicate) {
-      toast.error("❌ Client with matching PAN, GSTIN, Email, Phone, or Client Address already exists in your workspace!");
+    const existingEmail = clients.find(c => (!editingClient || c.id !== editingClient.id) && emailVal && c.email?.trim().toLowerCase() === emailVal.toLowerCase());
+    if (existingEmail) {
+      toast.error(`❌ Email already used! "${emailVal}" is already registered to client "${existingEmail.name}".`);
+      return;
+    }
+
+    const existingCollabEmail = (collaborations || []).find(collab => emailVal && collab.email?.trim().toLowerCase() === emailVal.toLowerCase());
+    if (existingCollabEmail) {
+      toast.error(`❌ Email already used! "${emailVal}" is already registered to collaboration partner "${existingCollabEmail.name}".`);
+      return;
+    }
+
+    const existingPan = clients.find(c => (!editingClient || c.id !== editingClient.id) && panVal && ((c.pan && c.pan.trim().toUpperCase() === panVal) || (c.panNo && c.panNo.trim().toUpperCase() === panVal)));
+    if (existingPan) {
+      toast.error("❌ Client already exists with this PAN Number.");
+      return;
+    }
+
+    const existingGstin = clients.find(c => (!editingClient || c.id !== editingClient.id) && gstinVal && ((c.gstin && c.gstin.trim().toUpperCase() === gstinVal) || (c.gstNo && c.gstNo.trim().toUpperCase() === gstinVal)));
+    if (existingGstin) {
+      toast.error("❌ Client already exists with this GST Number (GSTIN).");
       return;
     }
 
@@ -203,7 +235,7 @@ export default function ClientsPage() {
       } as Client);
       toast.success("Client details updated successfully!");
     } else {
-      const initPass = (formData.password && formData.password.trim()) ? formData.password.trim() : "TempPass@123";
+      const initPass = (formData.password && formData.password.trim()) ? formData.password.trim() : "";
       const initialCreds: PortalCredential[] = [
         { id: `cred_gst_${Date.now()}`, portalName: "GST Portal", portalId: gstinVal || "Not Set", password: initPass },
         { id: `cred_it_${Date.now()}`, portalName: "Income Tax Portal", portalId: panVal || "Not Set", password: initPass }
@@ -312,7 +344,7 @@ export default function ClientsPage() {
                 <th>Contact Info & Email</th>
                 <th>Documents</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th style={{ width: 170, minWidth: 170, textAlign: "center" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -362,11 +394,11 @@ export default function ClientsPage() {
                           {client.status || "ACTIVE"}
                         </span>
                       </td>
-                      <td>
-                        <div style={{ display: "flex", gap: 6 }}>
+                      <td style={{ width: 170, minWidth: 170, whiteSpace: "nowrap" }}>
+                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                           <button
                             className="btn-slds btn-slds-primary"
-                            style={{ padding: "4px 10px", fontSize: 11 }}
+                            style={{ padding: "4px 8px", fontSize: 11 }}
                             onClick={() => handleOpenView(client)}
                             title="View Full Client Profile & Documents"
                           >
@@ -378,7 +410,7 @@ export default function ClientsPage() {
                             target="_blank"
                             rel="noreferrer"
                             className="btn-slds btn-slds-success"
-                            style={{ padding: "4px 10px", fontSize: 11 }}
+                            style={{ padding: "4px 8px", fontSize: 11 }}
                             title="Send WhatsApp Message"
                           >
                             <MessageCircle size={13} />
@@ -393,12 +425,16 @@ export default function ClientsPage() {
                             <Edit size={13} />
                           </button>
                           <button
-                            className="btn-slds btn-slds-secondary"
-                            style={{ padding: "4px 8px", fontSize: 11, color: "#DC2626" }}
-                            onClick={() => {
-                              if (confirm(`Delete client ${client.name}?`)) {
-                                deleteClient(client.id);
-                                toast.success("Client deleted.");
+                            className="btn-slds"
+                            style={{ padding: "4px 8px", fontSize: 11, color: "#DC2626", borderColor: "#FCA5A5", background: "#FEF2F2" }}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                await deleteClient(client.id);
+                                toast.success(`Deleted client "${client.name}"`);
+                              } catch (err) {
+                                console.error(err);
+                                toast.error("Failed to delete client");
                               }
                             }}
                             title="Delete Client"
@@ -433,7 +469,7 @@ export default function ClientsPage() {
               <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 8px" }} onClick={() => setIsModalOpen(false)}>✕</button>
             </div>
 
-            <form onSubmit={handleSubmit} style={{ padding: 24, display: "grid", gap: 16, overflowY: "auto", maxHeight: "calc(85vh - 65px)" }}>
+            <form onSubmit={handleSubmit} autoComplete="off" style={{ padding: 24, display: "grid", gap: 16, overflowY: "auto", maxHeight: "calc(85vh - 65px)" }}>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>
                   Client / Firm Name *
@@ -621,31 +657,71 @@ export default function ClientsPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "#1E293B", display: "block", marginBottom: 4 }}>
-                  <Lock size={13} style={{ display: "inline", marginRight: 5, verticalAlign: "middle", color: "#2563EB" }} />
-                  Create Temporary Password (Optional)
-                </label>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#1E293B", display: "flex", alignItems: "center", gap: 5 }}>
+                    <Lock size={13} style={{ color: "#2563EB" }} />
+                    Create Temporary Password (Optional)
+                  </label>
+                  {formData.password && (
+                    <button
+                      type="button"
+                      style={{ background: "none", border: "none", color: "#DC2626", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: 0 }}
+                      onClick={() => setFormData({ ...formData, password: "" })}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
                 <input
                   type="password"
+                  name="temp_portal_password_field"
                   className="command-palette-input"
                   style={{ borderRadius: 8, border: "1px solid #CBD5E1", padding: 10, fontSize: 14 }}
-                  placeholder="Initial password for portal credentials (e.g. Pass@123)"
+                  placeholder="Leave empty or enter password..."
                   value={formData.password || ""}
                   onChange={e => setFormData({ ...formData, password: e.target.value })}
+                  autoComplete="new-password"
                 />
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
-                <button
-                  type="button"
-                  className="btn-slds btn-slds-secondary"
-                  onClick={() => setIsModalOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn-slds btn-slds-primary">
-                  {editingClient ? "Save Changes" : "Create Client"}
-                </button>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 10 }}>
+                {editingClient ? (
+                  <button
+                    type="button"
+                    className="btn-slds"
+                    style={{
+                      background: "#FEF2F2",
+                      color: "#DC2626",
+                      border: "1px solid #FCA5A5",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6
+                    }}
+                    onClick={async () => {
+                      const clientName = editingClient.name;
+                      const clientId = editingClient.id;
+                      setIsModalOpen(false);
+                      setEditingClient(null);
+                      await deleteClient(clientId);
+                      toast.success(`Deleted client "${clientName}"`);
+                    }}
+                  >
+                    <Trash2 size={13} color="#DC2626" />
+                    <span>Delete Client</span>
+                  </button>
+                ) : <div />}
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    type="button"
+                    className="btn-slds btn-slds-secondary"
+                    onClick={() => setIsModalOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn-slds btn-slds-primary">
+                    {editingClient ? "Save Changes" : "Create Client"}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -674,13 +750,39 @@ export default function ClientsPage() {
                     <span>City: {viewingClient.city || "Mumbai"}</span>
                   </div>
                 </div>
-                <button
-                  className="btn-slds btn-slds-secondary"
-                  style={{ background: "rgba(255,255,255,0.15)", color: "white", border: "none" }}
-                  onClick={() => setViewingClient(null)}
-                >
-                  ✕
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <button
+                    className="btn-slds"
+                    style={{
+                      background: "rgba(220, 38, 38, 0.2)",
+                      color: "#FCA5A5",
+                      border: "1px solid rgba(220, 38, 38, 0.4)",
+                      fontSize: 12,
+                      padding: "6px 12px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6
+                    }}
+                    onClick={async () => {
+                      const clientName = viewingClient.name;
+                      const clientId = viewingClient.id;
+                      setViewingClient(null);
+                      await deleteClient(clientId);
+                      toast.success(`Deleted client "${clientName}"`);
+                    }}
+                    title="Delete this client"
+                  >
+                    <Trash2 size={13} />
+                    <span>Delete Client</span>
+                  </button>
+                  <button
+                    className="btn-slds btn-slds-secondary"
+                    style={{ background: "rgba(255,255,255,0.15)", color: "white", border: "none" }}
+                    onClick={() => setViewingClient(null)}
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
 
               {/* Navigation Tabs */}
@@ -930,80 +1032,137 @@ export default function ClientsPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {((viewingClient.portalCredentials && viewingClient.portalCredentials.length > 0)
-                            ? viewingClient.portalCredentials
-                            : [
-                                { id: "c1", portalName: "GST Portal", portalId: viewingClient.gstPortalId || viewingClient.gstin || viewingClient.gstNo || "Not Set", password: viewingClient.gstPortalPassword || "••••••••" },
-                                { id: "c2", portalName: "Income Tax Portal", portalId: viewingClient.pan || viewingClient.panNo || "Not Set", password: "••••••••" }
-                              ]
-                          ).map((cred) => (
-                            <tr key={cred.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                              <td style={{ padding: "8px 12px", fontWeight: 700, color: "#0F172A" }}>
-                                🌐 {cred.portalName}
-                              </td>
-                              <td style={{ padding: "8px 12px", fontFamily: "monospace", color: "#1E293B", fontWeight: 600 }}>
-                                {cred.portalId}
-                                <button
-                                  type="button"
-                                  style={{ background: "none", border: "none", cursor: "pointer", marginLeft: 6, color: "#0176D3" }}
-                                  onClick={() => { navigator.clipboard.writeText(cred.portalId); toast.success(`Copied User ID for ${cred.portalName}`); }}
-                                  title="Copy User ID"
-                                >
-                                  📋
-                                </button>
-                              </td>
-                              <td style={{ padding: "8px 12px", fontFamily: "monospace", color: "#1E293B", fontWeight: 600 }}>
-                                {visiblePasswords[cred.id] ? cred.password : "••••••••"}
-                                <button
-                                  type="button"
-                                  style={{ background: "none", border: "none", cursor: "pointer", marginLeft: 6, color: "#475569" }}
-                                  onClick={() => setVisiblePasswords(prev => ({ ...prev, [cred.id]: !prev[cred.id] }))}
-                                  title={visiblePasswords[cred.id] ? "Hide Password" : "Show Password"}
-                                >
-                                  {visiblePasswords[cred.id] ? <EyeOff size={13} /> : <Eye size={13} />}
-                                </button>
-                                <button
-                                  type="button"
-                                  style={{ background: "none", border: "none", cursor: "pointer", marginLeft: 4, color: "#0176D3" }}
-                                  onClick={() => { navigator.clipboard.writeText(cred.password); toast.success(`Copied Password for ${cred.portalName}`); }}
-                                  title="Copy Password"
-                                >
-                                  <Copy size={13} />
-                                </button>
-                              </td>
-                              <td style={{ padding: "8px 12px", textAlign: "center" }}>
-                                <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
-                                  <button
-                                    className="btn-slds btn-slds-secondary"
-                                    style={{ padding: "3px 8px", fontSize: 11 }}
-                                    onClick={() => {
-                                      setEditCredForm({ portalName: cred.portalName, portalId: cred.portalId, password: cred.password });
-                                      setEditCredModal({ open: true, cred });
-                                    }}
-                                    title="Edit Credentials"
-                                  >
-                                    <Pencil size={11} /> Edit
-                                  </button>
-                                  <button
-                                    className="btn-slds btn-slds-secondary"
-                                    style={{ padding: "3px 6px", fontSize: 11, color: "#DC2626", borderColor: "#FCA5A5" }}
-                                    onClick={() => {
-                                      if (confirm(`Remove login credentials for ${cred.portalName}?`)) {
-                                        const updatedCreds = (viewingClient.portalCredentials || []).filter(c => c.id !== cred.id);
-                                        const updated = { ...viewingClient, portalCredentials: updatedCreds };
+                          {(() => {
+                            const credsList: PortalCredential[] = (viewingClient.portalCredentials !== undefined)
+                              ? viewingClient.portalCredentials
+                              : (viewingClient.gstPortalId || viewingClient.gstPortalPassword)
+                                ? [
+                                    { id: `cred_gst_${viewingClient.id}`, portalName: "GST Portal", portalId: viewingClient.gstPortalId || "Not Set", password: viewingClient.gstPortalPassword || "" }
+                                  ]
+                                : [];
+
+                            if (credsList.length === 0) {
+                              return (
+                                <tr>
+                                  <td colSpan={4} style={{ padding: "20px 12px", textAlign: "center", color: "#94A3B8", fontSize: 12 }}>
+                                    No login credentials added yet. Click <strong>+ Add Login Credential</strong> above to add portal login details.
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            return credsList.map((cred) => (
+                              <tr key={cred.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                                <td style={{ padding: "8px 12px", fontWeight: 700, color: "#0F172A" }}>
+                                  🌐 {cred.portalName}
+                                </td>
+                                <td style={{ padding: "8px 12px", fontFamily: "monospace", color: "#1E293B", fontWeight: 600 }}>
+                                  {(!cred.portalId || cred.portalId === "Not Set" || !cred.portalId.trim()) ? (
+                                    <span style={{ color: "#94A3B8", fontStyle: "italic", fontWeight: 500 }}>Not Set</span>
+                                  ) : (
+                                    <>
+                                      {cred.portalId}
+                                      <button
+                                        type="button"
+                                        style={{ background: "none", border: "none", cursor: "pointer", marginLeft: 6, color: "#0176D3" }}
+                                        onClick={() => { navigator.clipboard.writeText(cred.portalId); toast.success(`Copied User ID for ${cred.portalName}`); }}
+                                        title="Copy User ID"
+                                      >
+                                        📋
+                                      </button>
+                                    </>
+                                  )}
+                                </td>
+                                <td style={{ padding: "8px 12px", fontFamily: "monospace", color: "#1E293B", fontWeight: 600 }}>
+                                  {(!cred.password || cred.password === "Not Set" || !cred.password.trim()) ? (
+                                    <span style={{ color: "#94A3B8", fontStyle: "italic", fontWeight: 500 }}>Not Set</span>
+                                  ) : (
+                                    <>
+                                      {visiblePasswords[cred.id] ? cred.password : "••••••••"}
+                                      <button
+                                        type="button"
+                                        style={{ background: "none", border: "none", cursor: "pointer", marginLeft: 6, color: "#475569" }}
+                                        onClick={() => setVisiblePasswords(prev => ({ ...prev, [cred.id]: !prev[cred.id] }))}
+                                        title={visiblePasswords[cred.id] ? "Hide Password" : "Show Password"}
+                                      >
+                                        {visiblePasswords[cred.id] ? <EyeOff size={13} /> : <Eye size={13} />}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        style={{ background: "none", border: "none", cursor: "pointer", marginLeft: 4, color: "#0176D3" }}
+                                        onClick={() => { navigator.clipboard.writeText(cred.password); toast.success(`Copied Password for ${cred.portalName}`); }}
+                                        title="Copy Password"
+                                      >
+                                        <Copy size={13} />
+                                      </button>
+                                    </>
+                                  )}
+                                </td>
+                                <td style={{ padding: "8px 12px", textAlign: "center" }}>
+                                  <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
+                                    <button
+                                      className="btn-slds btn-slds-secondary"
+                                      style={{ padding: "3px 8px", fontSize: 11 }}
+                                      onClick={() => {
+                                        const currentId = (!cred.portalId || cred.portalId === "Not Set") ? "" : cred.portalId;
+                                        const currentPass = (!cred.password || cred.password === "Not Set") ? "" : cred.password;
+                                        const newId = prompt(`Edit User ID / Username for ${cred.portalName}:`, currentId);
+                                        if (newId === null) return;
+                                        const newPass = prompt(`Edit Password for ${cred.portalName} (leave empty for Not Set):`, currentPass);
+                                        if (newPass === null) return;
+
+                                        const updatedCreds = credsList.map(c => {
+                                          if (c.id === cred.id || c.portalName === cred.portalName) {
+                                            return {
+                                              ...c,
+                                              portalId: newId.trim() || "Not Set",
+                                              password: newPass.trim()
+                                            };
+                                          }
+                                          return c;
+                                        });
+
+                                        const isGst = cred.portalName.toLowerCase().includes("gst");
+                                        const updated: Client = {
+                                          ...viewingClient,
+                                          portalCredentials: updatedCreds,
+                                          gstPortalId: isGst ? (newId.trim() || "") : viewingClient.gstPortalId,
+                                          gstPortalPassword: isGst ? (newPass.trim() || "") : viewingClient.gstPortalPassword
+                                        };
                                         updateClient(updated);
                                         setViewingClient(updated);
-                                        toast.success("Credential removed.");
-                                      }
-                                    }}
-                                    title="Delete Credential"
-                                  >
-                                    <Trash2 size={11} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
+                                        toast.success(`Saved credentials for ${cred.portalName}!`);
+                                      }}
+                                      title="Edit Credentials"
+                                    >
+                                      <Pencil size={11} /> Edit
+                                    </button>
+                                    <button
+                                      className="btn-slds btn-slds-secondary"
+                                      style={{ padding: "3px 6px", fontSize: 11, color: "#DC2626", borderColor: "#FCA5A5" }}
+                                      onClick={() => {
+                                        // 1-Click Instant Deletion of BOTH ID and Password
+                                        const updatedCreds = credsList.filter(c => c.id !== cred.id && c.portalName !== cred.portalName);
+                                        const isGst = cred.portalName.toLowerCase().includes("gst");
+                                        const updated: Client = {
+                                          ...viewingClient,
+                                          portalCredentials: updatedCreds,
+                                          gstPortalId: isGst ? "" : viewingClient.gstPortalId,
+                                          gstPortalPassword: isGst ? "" : viewingClient.gstPortalPassword
+                                        };
+                                        updateClient(updated);
+                                        setViewingClient(updated);
+                                        toast.success(`Deleted ${cred.portalName} (both ID and password removed)!`);
+                                      }}
+                                      title="Delete Credential (ID & Password)"
+                                    >
+                                      <Trash2 size={11} /> Delete
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ));
+                          })()}
                         </tbody>
                       </table>
                     </div>
@@ -1057,9 +1216,9 @@ export default function ClientsPage() {
                             if (file) {
                               const reader = new FileReader();
                               reader.onload = () => {
-                                const fileUrl = reader.result as string;
+                                const fileUrl = (file.size < 2 * 1024 * 1024) ? (reader.result as string) : "";
                                 const newDoc: ClientDocument = {
-                                  id: `cd_${Date.now()}`,
+                                  id: `cd_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
                                   clientId: viewingClient.id,
                                   name: file.name,
                                   type: file.name.split(".").pop()?.toUpperCase() || "PDF",
@@ -1069,8 +1228,14 @@ export default function ClientsPage() {
                                   status: "RECEIVED",
                                   fileUrl: fileUrl
                                 };
-                                const updatedDocs = [...(viewingClient.documents || []), newDoc];
-                                const updated = { ...viewingClient, documents: updatedDocs, documentCount: updatedDocs.length };
+                                const currentClient = clients.find(c => c.id === viewingClient.id || (viewingClient.id && ensureUUID(c.id) === ensureUUID(viewingClient.id))) || viewingClient;
+                                const currentDocs = currentClient.documents || [];
+                                const updatedDocs = [newDoc, ...currentDocs];
+                                const updated: Client = {
+                                  ...currentClient,
+                                  documents: updatedDocs,
+                                  documentCount: updatedDocs.length
+                                };
                                 updateClient(updated);
                                 setViewingClient(updated);
                                 toast.success(`Uploaded "${file.name}" to client profile!`);
@@ -1079,6 +1244,7 @@ export default function ClientsPage() {
                                 toast.error("Failed to read file content");
                               };
                               reader.readAsDataURL(file);
+                              e.target.value = "";
                             }
                           }}
                         />
@@ -1163,22 +1329,27 @@ export default function ClientsPage() {
                                     <Share2 size={13} />
                                     <span>WhatsApp</span>
                                   </a>
-                                  {/* Delete document button */}
+                                  {/* Delete document button (1-Click Instant Removal) */}
                                   <button
                                     className="btn-slds btn-slds-secondary"
                                     style={{ padding: "4px 6px", fontSize: 11, color: "#DC2626", borderColor: "#FCA5A5" }}
                                     onClick={() => {
-                                      if (confirm(`Remove document ${doc.name}?`)) {
-                                        const updatedDocs = (viewingClient.documents || []).filter(d => d.id !== doc.id);
-                                        const updated = { ...viewingClient, documents: updatedDocs, documentCount: updatedDocs.length };
-                                        updateClient(updated);
-                                        setViewingClient(updated);
-                                        toast.success("Document removed.");
-                                      }
+                                      const currentClient = clients.find(c => c.id === viewingClient.id || (viewingClient.id && ensureUUID(c.id) === ensureUUID(viewingClient.id))) || viewingClient;
+                                      const currentDocs = currentClient.documents || [];
+                                      const updatedDocs = currentDocs.filter(d => d.id !== doc.id && d.name !== doc.name);
+                                      const updated: Client = {
+                                        ...currentClient,
+                                        documents: updatedDocs,
+                                        documentCount: updatedDocs.length
+                                      };
+                                      updateClient(updated);
+                                      setViewingClient(updated);
+                                      toast.success(`Removed document "${doc.name}"`);
                                     }}
-                                    title="Delete Document"
+                                    title="Delete Document (1-Click)"
                                   >
                                     <Trash2 size={13} />
+                                    <span>Delete</span>
                                   </button>
                                 </div>
                               </td>

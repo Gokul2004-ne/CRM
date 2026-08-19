@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { motion } from "framer-motion";
 import { useAppStore } from "@/lib/store";
 import {
   Sparkles, X, Send, Bot, MessageCircle, AlertTriangle, TrendingUp,
@@ -183,45 +184,50 @@ Select a prompt below for automated AI execution!`;
 
   return (
     <>
-      {/* ─── FLOATING TRIGGER BUTTON ─── */}
-      <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 100 }}>
+      {/* ─── FLOATING TRIGGER BUTTON & CHAT MODAL (DRAGGABLE) ─── */}
+      <motion.div
+        drag
+        dragMomentum={false}
+        style={{ position: "fixed", bottom: 20, right: 20, zIndex: 100, cursor: "grab" }}
+        whileDrag={{ cursor: "grabbing" }}
+      >
         {!isOpen ? (
           <button
             onClick={() => setIsOpen(true)}
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              padding: "10px 16px",
-              borderRadius: 30,
+              gap: 6,
+              padding: "8px 14px",
+              borderRadius: 24,
               background: "linear-gradient(135deg, #0F172A 0%, #4F46E5 100%)",
               color: "white",
               border: "1px solid rgba(255,255,255,0.2)",
               cursor: "pointer",
-              boxShadow: "0 8px 24px rgba(79, 70, 229, 0.35)",
+              boxShadow: "0 6px 20px rgba(79, 70, 229, 0.35)",
               fontWeight: 800,
-              fontSize: 12.5,
+              fontSize: 11.5,
               transition: "all 0.2s ease",
             }}
           >
             <div style={{ position: "relative" }}>
-              <Bot size={18} color="#38BDF8" />
-              <span style={{ position: "absolute", top: -2, right: -2, width: 7, height: 7, background: "#10B981", borderRadius: "50%", border: "2px solid #0F172A" }} />
+              <Bot size={16} color="#38BDF8" />
+              <span style={{ position: "absolute", top: -2, right: -2, width: 6, height: 6, background: "#10B981", borderRadius: "50%", border: "1.5px solid #0F172A" }} />
             </div>
             <span>zplus AI Copilot</span>
-            <Sparkles size={14} color="#F59E0B" />
+            <Sparkles size={13} color="#F59E0B" />
           </button>
         ) : (
-          /* ─── AI CHAT PANEL POPUP ─── */
+          /* ─── COMPACT AI CHAT PANEL POPUP ─── */
           <div
             style={{
-              width: 350,
-              maxWidth: "90vw",
-              height: 460,
-              maxHeight: "75vh",
+              width: 320,
+              maxWidth: "88vw",
+              height: 400,
+              maxHeight: "65vh",
               background: "#FFFFFF",
-              borderRadius: 16,
-              boxShadow: "0 16px 40px rgba(15, 23, 42, 0.3)",
+              borderRadius: 14,
+              boxShadow: "0 12px 36px rgba(15, 23, 42, 0.3)",
               border: "1px solid #CBD5E1",
               display: "flex",
               flexDirection: "column",
@@ -229,25 +235,25 @@ Select a prompt below for automated AI execution!`;
               animation: "fadeIn 0.2s ease-in-out",
             }}
           >
-            {/* AI Panel Header */}
-            <div style={{ padding: "14px 16px", background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ padding: 6, background: "rgba(56, 189, 248, 0.15)", borderRadius: 10, border: "1px solid rgba(56, 189, 248, 0.3)" }}>
-                  <Bot size={18} color="#38BDF8" />
+            {/* AI Panel Header (Draggable Handle) */}
+            <div style={{ padding: "10px 12px", background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "move" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <div style={{ padding: 5, background: "rgba(56, 189, 248, 0.15)", borderRadius: 8, border: "1px solid rgba(56, 189, 248, 0.3)" }}>
+                  <Bot size={16} color="#38BDF8" />
                 </div>
                 <div>
-                  <div style={{ fontWeight: 900, fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
-                    zplus AI Copilot <span style={{ fontSize: 9, background: "#4F46E5", padding: "1px 5px", borderRadius: 6, textTransform: "uppercase" }}>MNC AI v4.0</span>
+                  <div style={{ fontWeight: 800, fontSize: 13, display: "flex", alignItems: "center", gap: 5 }}>
+                    zplus AI Copilot <span style={{ fontSize: 8.5, background: "#4F46E5", padding: "1px 4px", borderRadius: 5, textTransform: "uppercase" }}>v4.0</span>
                   </div>
-                  <div style={{ fontSize: 10.5, color: "#94A3B8", marginTop: 1 }}>Practice Intelligence Engine</div>
+                  <div style={{ fontSize: 9.5, color: "#94A3B8" }}>Practice Intelligence Engine</div>
                 </div>
               </div>
 
               <button
                 onClick={() => setIsOpen(false)}
-                style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "white", padding: 5, borderRadius: 6, cursor: "pointer" }}
+                style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "white", padding: 4, borderRadius: 5, cursor: "pointer" }}
               >
-                <X size={15} />
+                <X size={14} />
               </button>
             </div>
 
@@ -338,7 +344,7 @@ Select a prompt below for automated AI execution!`;
             </div>
           </div>
         )}
-      </div>
+      </motion.div>
     </>
   );
 }

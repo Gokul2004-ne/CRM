@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Supabase Database Operations - Complete Full Flow Guide (Insert, Update, Delete)</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 14mm 12mm 14mm 12mm;
+      @bottom-right {
+        content: counter(page);
+      }
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+      color: #0F172A;
+      background-color: #FFFFFF;
+      line-height: 1.45;
+      font-size: 11.5px;
+      margin: 0;
+      padding: 0;
+    }
+    
+    /* Cover / Main Header */
+    .cover-header {
+      background: linear-gradient(135deg, #0F172A 0%, #1E293B 60%, #0F766E 100%);
+      color: #FFFFFF;
+      padding: 22px 26px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .cover-header h1 {
+      font-size: 22px;
+      font-weight: 900;
+      margin: 0 0 4px 0;
+      letter-spacing: -0.5px;
+    }
+    .cover-header h1 span {
+      color: #38BDF8;
+    }
+    .cover-header p {
+      font-size: 12.5px;
+      color: #94A3B8;
+      margin: 0;
+    }
+    .cover-meta {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid #334155;
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #CBD5E1;
+    }
+
+    h2 {
+      font-size: 14.5px;
+      font-weight: 800;
+      color: #0F172A;
+      border-bottom: 2px solid #0EA5E9;
+      padding-bottom: 4px;
+      margin-top: 20px;
+      margin-bottom: 10px;
+      page-break-after: avoid;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    h3 {
+      font-size: 12px;
+      font-weight: 700;
+      color: #1E293B;
+      margin-top: 12px;
+      margin-bottom: 6px;
+      page-break-after: avoid;
+    }
+
+    p, li {
+      color: #334155;
+    }
+    ul, ol {
+      margin: 4px 0 10px 18px;
+      padding: 0;
+    }
+    li {
+      margin-bottom: 3px;
+    }
+
+    /* Key Box / Variables */
+    .key-box {
+      background-color: #0F172A;
+      color: #F8FAFC;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 10.5px;
+      margin: 10px 0;
+      line-height: 1.5;
+      page-break-inside: avoid;
+    }
+    .key-box .var-name {
+      color: #38BDF8;
+      font-weight: bold;
+    }
+    .key-box .var-val {
+      color: #A7F3D0;
+    }
+
+    /* Visual Flow Box / Diagrams */
+    .flow-container {
+      background-color: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0 14px 0;
+      page-break-inside: avoid;
+    }
+    .flow-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .flow-step {
+      display: flex;
+      align-items: flex-start;
+      background: #FFFFFF;
+      border: 1px solid #CBD5E1;
+      border-left: 4px solid #0EA5E9;
+      border-radius: 4px;
+      padding: 6px 10px;
+    }
+    .flow-step.insert { border-left-color: #10B981; }
+    .flow-step.update { border-left-color: #F59E0B; }
+    .flow-step.delete { border-left-color: #EF4444; }
+
+    .step-num {
+      background: #0F172A;
+      color: #FFFFFF;
+      font-weight: bold;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      margin-right: 10px;
+      min-width: 22px;
+      text-align: center;
+    }
+    .step-content {
+      flex: 1;
+    }
+    .step-title {
+      font-weight: 700;
+      font-size: 11px;
+      color: #0F172A;
+    }
+    .step-desc {
+      font-size: 10.5px;
+      color: #475569;
+      margin-top: 1px;
+    }
+
+    /* Diagram visual bar */
+    .arch-diagram {
+      background: #0F172A;
+      color: #E2E8F0;
+      border-radius: 6px;
+      padding: 12px;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 10px;
+      line-height: 1.4;
+      white-space: pre;
+      overflow-x: auto;
+      margin: 10px 0;
+      page-break-inside: avoid;
+    }
+
+    /* Code Blocks */
+    code {
+      font-family: Consolas, Monaco, 'Andale Mono', monospace;
+      background-color: #F1F5F9;
+      color: #0F172A;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 10.5px;
+    }
+    pre {
+      background-color: #020617;
+      color: #E2E8F0;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid #1E293B;
+      font-family: Consolas, Monaco, 'Andale Mono', monospace;
+      font-size: 10px;
+      line-height: 1.4;
+      overflow-x: auto;
+      page-break-inside: avoid;
+      margin: 6px 0 12px 0;
+    }
+    pre code {
+      background-color: transparent;
+      color: inherit;
+      padding: 0;
+    }
+    .comment { color: #64748B; font-style: italic; }
+    .method { color: #38BDF8; font-weight: bold; }
+    .url { color: #FCD34D; }
+    .keyword { color: #F472B6; font-weight: bold; }
+    .string { color: #A7F3D0; }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 10.5px;
+      page-break-inside: avoid;
+    }
+    th {
+      background-color: #0F172A;
+      color: #FFFFFF;
+      font-weight: 700;
+      text-align: left;
+      padding: 6px 8px;
+      border: 1px solid #0F172A;
+    }
+    td {
+      padding: 5px 8px;
+      border: 1px solid #E2E8F0;
+      vertical-align: top;
+    }
+    tr:nth-child(even) {
+      background-color: #F8FAFC;
+    }
+
+    /* Callout boxes */
+    .callout {
+      background-color: #EFF6FF;
+      border-left: 4px solid #0EA5E9;
+      padding: 8px 12px;
+      margin: 10px 0;
+      border-radius: 0 4px 4px 0;
+      page-break-inside: avoid;
+    }
+    .callout.success {
+      background-color: #ECFDF5;
+      border-left-color: #10B981;
+    }
+    .callout.warning {
+      background-color: #FFFBEB;
+      border-left-color: #F59E0B;
+    }
+    .callout.danger {
+      background-color: #FEF2F2;
+      border-left-color: #EF4444;
+    }
+    .callout-title {
+      font-weight: 700;
+      color: #0F172A;
+      margin-bottom: 2px;
+      font-size: 11px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 9.5px;
+      font-weight: 700;
+      border-radius: 3px;
+      color: #FFFFFF;
+    }
+    .badge-post { background-color: #10B981; }
+    .badge-patch { background-color: #F59E0B; }
+    .badge-delete { background-color: #EF4444; }
+    .badge-get { background-color: #3B82F6; }
+
+    .page-break {
+      page-break-before: always;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header Section -->
+  <div class="cover-header">
+    <h1>zplus<span>crm</span> & System Architecture</h1>
+    <p>Supabase Database Operations Full Flow Guide (Insert, Update, Delete)</p>
+    <div class="cover-meta">
+      <span><strong>Project ID:</strong> dwtsntjkysxlqluouhbr</span>
+      <span><strong>SDK & REST API:</strong> PostgREST / Supabase JS v2</span>
+      <span><strong>Updated:</strong> August 2026</span>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <div class="callout-title">📌 Document Purpose</div>
+    <p style="margin:0;">This reference manual details the <strong>complete end-to-end execution flow</strong> for database operations (<code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>) in Supabase. It covers client payload preparation, SDK & REST API calls, Row Level Security (RLS) enforcement, database triggers, status response codes, and production code patterns.</p>
+  </div>
+
+  <!-- Section 1: System Architecture & Overall Execution Flow -->
+  <h2>1. System Architecture & End-to-End Execution Pipeline</h2>
+  <p>When an application executes a database mutation in Supabase (whether via standard JavaScript/TypeScript SDK or raw HTTP cURL calls), the request traverses six distinct layers:</p>
+
+  <div class="arch-diagram">
++---------------------------------------------------------------------------------------------------+
+| 1. CLIENT APPLICATION LAYER (Next.js / React / TypeScript)                                        |
+|    Constructs Data Payload | Applies Client Validation (Zod / Schema) | Calls SDK / REST Endpoint     |
++---------------------------------------------------------------------------------------------------+
+                                                  |
+                                                  v
++---------------------------------------------------------------------------------------------------+
+| 2. API GATEWAY & AUTHENTICATION (Supabase PostgREST Proxy)                                        |
+|    Validates API Key (`apikey`) & Bearer Auth Token (`Authorization: Bearer <JWT>`)               |
+|    Translates SDK call into PostgREST SQL AST (Abstract Syntax Tree)                              |
++---------------------------------------------------------------------------------------------------+
+                                                  |
+                                                  v
++---------------------------------------------------------------------------------------------------+
+| 3. ROW LEVEL SECURITY (RLS) POLICY ENGINE                                                         |
+|    Evaluates SQL Policies: `FOR INSERT (WITH CHECK)`, `FOR UPDATE (USING & WITH CHECK)`, `FOR DELETE` |
+|    Verifies user identity: `auth.uid() = user_id`                                                  |
++---------------------------------------------------------------------------------------------------+
+                                                  |
+                                                  v
++---------------------------------------------------------------------------------------------------+
+| 4. POSTGRESQL DATABASE ENGINE                                                                     |
+|    Executes SQL Transaction | Auto-generates Primary Keys (UUID / Serial) | Enforces Foreign Keys    |
+|    Runs `BEFORE` and `AFTER` Triggers (e.g. auto-setting `updated_at = NOW()`)                    |
++---------------------------------------------------------------------------------------------------+
+                                                  |
+                                                  v
++---------------------------------------------------------------------------------------------------+
+| 5. RESPONSE PAYLOAD & HTTP STATUS GENERATION                                                      |
+|    Format JSON payload (according to `Prefer: return=representation` header)                      |
+|    Return HTTP Status Code: 201 Created | 200 OK | 204 No Content | 400/401/403/409 Error         |
++---------------------------------------------------------------------------------------------------+
+  </div>
+
+  <!-- Section 2: INSERT Flow -->
+  <h2>2. INSERT Operation — Complete Full Flow (Create Data)</h2>
+  <p>The <code>INSERT</code> operation creates one or multiple new rows in a target database table.</p>
+
+  <div class="flow-container">
+    <h3><span class="badge badge-post">INSERT</span> Lifecycle Flow Breakdown</h3>
+    <div class="flow-steps">
+      <div class="flow-step insert">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">Payload Preparation & Schema Validation</div>
+          <div class="step-desc">The application constructs a JavaScript object containing field values. Optional fields get default database values if omitted.</div>
+        </div>
+      </div>
+      <div class="flow-step insert">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">SDK Call / HTTP POST Dispatch</div>
+          <div class="step-desc">Calls <code>supabase.from('table').insert([data])</code> or sends HTTP <code>POST /rest/v1/table</code> with <code>Content-Type: application/json</code>.</div>
+        </div>
+      </div>
+      <div class="flow-step insert">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <div class="step-title">Header Inspection & Authentication</div>
+          <div class="step-desc">PostgREST inspects <code>apikey</code> and <code>Authorization: Bearer &lt;JWT&gt;</code> to resolve the active user session ID (<code>auth.uid()</code>).</div>
+        </div>
+      </div>
+      <div class="flow-step insert">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <div class="step-title">Row Level Security (RLS) Policy Check</div>
+          <div class="step-desc">Evaluates <code>INSERT WITH CHECK (...)</code> policies. If policy fails, execution aborts with <code>403 Forbidden / 42501 RLS Violation</code>.</div>
+        </div>
+      </div>
+      <div class="flow-step insert">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <div class="step-title">PostgreSQL Storage & Primary Key Generation</div>
+          <div class="step-desc">PostgreSQL generates primary key UUID/ID, evaluates column constraints (UNIQUE, NOT NULL), populates <code>created_at = NOW()</code>, and commits row.</div>
+        </div>
+      </div>
+      <div class="flow-step insert">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <div class="step-title">HTTP Response & Payload Return</div>
+          <div class="step-desc">Returns HTTP <code>201 Created</code>. If header <code>Prefer: return=representation</code> is set, returns the newly inserted record JSON.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>A. Supabase JavaScript SDK Insert & Upsert Code</h3>
+  <pre><code><span class="keyword">import</span> { supabase } <span class="keyword">from</span> <span class="string">"./supabase"</span>;
+
+<span class="comment">// 1. Standard Insert Operation</span>
+<span class="keyword">export async function</span> <span class="method">createNewClient</span>(clientData) {
+  <span class="keyword">const</span> { data, error } = <span class="keyword">await</span> supabase
+    .<span class="method">from</span>(<span class="string">"clients"</span>)
+    .<span class="method">insert</span>([
+      {
+        <span class="string">id</span>: <span class="string">`c_${Date.now()}`</span>,
+        <span class="string">name</span>: clientData.name,
+        <span class="string">type</span>: clientData.type, <span class="comment">// e.g. "PRIVATE_LIMITED"</span>
+        <span class="string">email</span>: clientData.email,
+        <span class="string">mobile</span>: clientData.mobile,
+        <span class="string">user_id</span>: clientData.user_id
+      }
+    ])
+    .<span class="method">select</span>(); <span class="comment">// Returns created representation</span>
+
+  <span class="keyword">if</span> (error) {
+    console.error(<span class="string">"Insert failed:"</span>, error.message);
+    <span class="keyword">throw</span> error;
+  }
+  <span class="keyword">return</span> data[0];
+}
+
+<span class="comment">// 2. Upsert Operation (Insert or Update if Conflict exists)</span>
+<span class="keyword">export async function</span> <span class="method">upsertClient</span>(clientRecord) {
+  <span class="keyword">const</span> { data, error } = <span class="keyword">await</span> supabase
+    .<span class="method">from</span>(<span class="string">"clients"</span>)
+    .<span class="method">upsert</span>(clientRecord, { <span class="string">onConflict</span>: <span class="string">"id"</span> })
+    .<span class="method">select</span>();
+  <span class="keyword">return</span> { data, error };
+}</code></pre>
+
+  <h3>B. Supabase REST API / cURL Insert Command</h3>
+  <pre><code>curl -X <span class="method">POST</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/clients</span>" \
+  -H "apikey: $SUPABASE_ANON_KEY" \
+  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d '{
+    "id": "c_172400100",
+    "name": "Apex Global Tech",
+    "type": "PRIVATE_LIMITED",
+    "mobile": "9876543210",
+    "email": "info@apexglobal.com",
+    "city": "Mumbai",
+    "user_id": "usr_harsha_g_c"
+  }'</code></pre>
+
+  <h3>C. PostgreSQL RLS Insert Security Policy</h3>
+  <pre><code><span class="comment">-- Policy: Allow users to insert records only if user_id matches their Auth ID</span>
+<span class="keyword">CREATE POLICY</span> <span class="string">"Enable insert for authenticated users"</span>
+<span class="keyword">ON</span> clients <span class="keyword">FOR INSERT</span>
+<span class="keyword">WITH CHECK</span> (auth.uid() = user_id <span class="keyword">OR</span> user_id = <span class="string">'usr_harsha_g_c'</span>);</code></pre>
+
+  <div class="page-break"></div>
+
+  <!-- Section 3: UPDATE Flow -->
+  <h2>3. UPDATE Operation — Complete Full Flow (Modify Data)</h2>
+  <p>The <code>UPDATE</code> operation modifies existing row(s) matching filter criteria.</p>
+
+  <div class="flow-container">
+    <h3><span class="badge badge-patch">UPDATE</span> Lifecycle Flow Breakdown</h3>
+    <div class="flow-steps">
+      <div class="flow-step update">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">Target Row Selection & Patch Payload Assembly</div>
+          <div class="step-desc">Client identifies record by primary key or filter condition (e.g. <code>id = c_101</code>) and passes modified field key-value pairs.</div>
+        </div>
+      </div>
+      <div class="flow-step update">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">SDK Dispatch / HTTP PATCH Request</div>
+          <div class="step-desc">Calls <code>supabase.from('table').update({ field: val }).eq('id', targetId)</code> or HTTP <code>PATCH /rest/v1/table?id=eq.targetId</code>.</div>
+        </div>
+      </div>
+      <div class="flow-step update">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <div class="step-title">RLS Policy Dual Check (USING & WITH CHECK)</div>
+          <div class="step-desc">Evaluates <code>USING (...)</code> (can user see existing row?) and <code>WITH CHECK (...)</code> (is user allowed to write new values?).</div>
+        </div>
+      </div>
+      <div class="flow-step update">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <div class="step-title">Trigger Execution (`BEFORE UPDATE`)</div>
+          <div class="step-desc">PostgreSQL executes active triggers (e.g. <code>BEFORE UPDATE ON table FOR EACH ROW EXECUTE FUNCTION update_timestamp()</code>).</div>
+        </div>
+      </div>
+      <div class="flow-step update">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <div class="step-title">PostgreSQL Disk Write & Index Maintenance</div>
+          <div class="step-desc">Applies partial row updates, updates modified column indexes, and commits transaction.</div>
+        </div>
+      </div>
+      <div class="flow-step update">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <div class="step-title">HTTP Response Delivery</div>
+          <div class="step-desc">Returns <code>200 OK</code> with updated JSON representation (or <code>204 No Content</code> if return header omitted).</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>A. Supabase JavaScript SDK Update Code</h3>
+  <pre><code><span class="keyword">import</span> { supabase } <span class="keyword">from</span> <span class="string">"./supabase"</span>;
+
+<span class="keyword">export async function</span> <span class="method">updateLeadStatus</span>(leadId, newStatus, notes) {
+  <span class="keyword">const</span> { data, error } = <span class="keyword">await</span> supabase
+    .<span class="method">from</span>(<span class="string">"leads"</span>)
+    .<span class="method">update</span>({
+      <span class="string">status</span>: newStatus, <span class="comment">// "CONTACTED", "QUALIFIED", "WON", "LOST"</span>
+      <span class="string">notes</span>: notes,
+      <span class="string">updated_at</span>: <span class="keyword">new</span> Date().toISOString()
+    })
+    .<span class="method">eq</span>(<span class="string">"id"</span>, leadId) <span class="comment">// Strict filter predicate</span>
+    .<span class="method">select</span>();
+
+  <span class="keyword">if</span> (error) {
+    console.error(<span class="string">"Update failed:"</span>, error.message);
+    <span class="keyword">return</span> null;
+  }
+  <span class="keyword">return</span> data[0];
+}</code></pre>
+
+  <h3>B. Supabase REST API / cURL Update Command</h3>
+  <pre><code>curl -X <span class="method">PATCH</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/leads?id=eq.lead_301</span>" \
+  -H "apikey: $SUPABASE_ANON_KEY" \
+  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d '{
+    "status": "QUALIFIED",
+    "value": 45000,
+    "notes": "Client requested proposal for annual tax filing."
+  }'</code></pre>
+
+  <h3>C. PostgreSQL Automatic `updated_at` Trigger SQL</h3>
+  <pre><code><span class="comment">-- Trigger function to keep updated_at current automatically</span>
+<span class="keyword">CREATE OR REPLACE FUNCTION</span> set_updated_at_timestamp()
+<span class="keyword">RETURNS TRIGGER AS</span> $$
+<span class="keyword">BEGIN</span>
+  NEW.updated_at = NOW();
+  <span class="keyword">RETURN</span> NEW;
+<span class="keyword">END</span>;
+$$ <span class="keyword">LANGUAGE</span> plpgsql;
+
+<span class="keyword">CREATE TRIGGER</span> update_leads_timestamp
+<span class="keyword">BEFORE UPDATE ON</span> leads
+<span class="keyword">FOR EACH ROW EXECUTE FUNCTION</span> set_updated_at_timestamp();</code></pre>
+
+  <div class="page-break"></div>
+
+  <!-- Section 4: DELETE Flow -->
+  <h2>4. DELETE Operation — Complete Full Flow (Remove Data)</h2>
+  <p>The <code>DELETE</code> operation removes row(s) from a database table. In enterprise applications, deletion is categorized into <strong>Hard Deletes</strong> (permanent SQL row removal) and <strong>Soft Deletes</strong> (marking <code>is_deleted = true</code>).</p>
+
+  <div class="flow-container">
+    <h3><span class="badge badge-delete">DELETE</span> Lifecycle Flow Breakdown</h3>
+    <div class="flow-steps">
+      <div class="flow-step delete">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">Deletion Criteria Predicate Definition</div>
+          <div class="step-desc">Client sets strict target primary key filter (e.g., <code>id = inv_501</code>) to prevent unintended mass deletion.</div>
+        </div>
+      </div>
+      <div class="flow-step delete">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">SDK Dispatch / HTTP DELETE Dispatch</div>
+          <div class="step-desc">Calls <code>supabase.from('table').delete().eq('id', id)</code> or HTTP <code>DELETE /rest/v1/table?id=eq.id</code>.</div>
+        </div>
+      </div>
+      <div class="flow-step delete">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <div class="step-title">RLS Policy USING Verification</div>
+          <div class="step-desc">PostgREST evaluates <code>DELETE USING (...)</code> policy. If caller is not row owner, delete call affects 0 rows or throws permission error.</div>
+        </div>
+      </div>
+      <div class="flow-step delete">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <div class="step-title">Foreign Key Constraint Enforcement</div>
+          <div class="step-desc">Database checks child table references. If child records exist without <code>ON DELETE CASCADE</code>, PostgreSQL aborts with <code>23503 FK Violation</code>.</div>
+        </div>
+      </div>
+      <div class="flow-step delete">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <div class="step-title">PostgreSQL Physical Deletion / Cleanup</div>
+          <div class="step-desc">Removes tuple from database pages, updates table indexes, and frees disk space via vacuuming.</div>
+        </div>
+      </div>
+      <div class="flow-step delete">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <div class="step-title">Response Delivery & Status Code</div>
+          <div class="step-desc">Returns <code>200 OK</code> (with deleted record JSON if requested) or <code>204 No Content</code>.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>A. Hard Delete vs Soft Delete SDK Code Patterns</h3>
+  <pre><code><span class="keyword">import</span> { supabase } <span class="keyword">from</span> <span class="string">"./supabase"</span>;
+
+<span class="comment">// Pattern 1: Hard Delete (Permanent Database Removal)</span>
+<span class="keyword">export async function</span> <span class="method">hardDeleteBankingEntry</span>(entryId) {
+  <span class="keyword">const</span> { data, error } = <span class="keyword">await</span> supabase
+    .<span class="method">from</span>(<span class="string">"banking_entries"</span>)
+    .<span class="method">delete</span>()
+    .<span class="method">eq</span>(<span class="string">"id"</span>, entryId)
+    .<span class="method">select</span>();
+
+  <span class="keyword">if</span> (error) <span class="keyword">throw</span> error;
+  <span class="keyword">return</span> data;
+}
+
+<span class="comment">// Pattern 2: Soft Delete (Enterprise Recommended Archival)</span>
+<span class="keyword">export async function</span> <span class="method">softDeleteClient</span>(clientId) {
+  <span class="keyword">const</span> { data, error } = <span class="keyword">await</span> supabase
+    .<span class="method">from</span>(<span class="string">"clients"</span>)
+    .<span class="method">update</span>({
+      <span class="string">is_deleted</span>: true,
+      <span class="string">deleted_at</span>: <span class="keyword">new</span> Date().toISOString()
+    })
+    .<span class="method">eq</span>(<span class="string">"id"</span>, clientId)
+    .<span class="method">select</span>();
+
+  <span class="keyword">return</span> { data, error };
+}</code></pre>
+
+  <h3>B. Supabase REST API / cURL Delete Command</h3>
+  <pre><code>curl -X <span class="method">DELETE</span> "<span class="url">https://dwtsntjkysxlqluouhbr.supabase.co/rest/v1/banking_entries?id=eq.bnk_901</span>" \
+  -H "apikey: $SUPABASE_ANON_KEY" \
+  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "Prefer: return=representation"</code></pre>
+
+  <h3>C. PostgreSQL RLS Delete Policy</h3>
+  <pre><code><span class="comment">-- Restrict deletion strictly to record owner</span>
+<span class="keyword">CREATE POLICY</span> <span class="string">"Enable delete for owner"</span>
+<span class="keyword">ON</span> banking_entries <span class="keyword">FOR DELETE</span>
+<span class="keyword">USING</span> (auth.uid() = user_id);</code></pre>
+
+  <div class="page-break"></div>
+
+  <!-- Section 5: HTTP Status Codes & Error Handling Matrix -->
+  <h2>5. HTTP Status Codes & Error Handling Matrix</h2>
+  <p>The matrix below summarizes standard PostgREST / Supabase response status codes during database operations:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Status Title</th>
+        <th>Operation</th>
+        <th>Meaning & Cause</th>
+        <th>Action Required</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>201</code></td>
+        <td>Created</td>
+        <td>INSERT</td>
+        <td>Record created successfully. Payload returned if <code>return=representation</code> set.</td>
+        <td>Proceed with application flow.</td>
+      </tr>
+      <tr>
+        <td><code>200</code></td>
+        <td>OK</td>
+        <td>UPDATE / DELETE</td>
+        <td>Operation completed successfully and returned affected record(s).</td>
+        <td>Update UI state.</td>
+      </tr>
+      <tr>
+        <td><code>204</code></td>
+        <td>No Content</td>
+        <td>UPDATE / DELETE</td>
+        <td>Operation succeeded without returning body payload.</td>
+        <td>Confirm success in UI.</td>
+      </tr>
+      <tr>
+        <td><code>400</code></td>
+        <td>Bad Request</td>
+        <td>ALL</td>
+        <td>Schema error (invalid data type, missing non-null field, malformed UUID).</td>
+        <td>Validate input schema before dispatching.</td>
+      </tr>
+      <tr>
+        <td><code>401</code></td>
+        <td>Unauthorized</td>
+        <td>ALL</td>
+        <td>Missing or invalid <code>apikey</code> or JWT token in request headers.</td>
+        <td>Check auth credentials & login session.</td>
+      </tr>
+      <tr>
+        <td><code>403</code></td>
+        <td>Forbidden</td>
+        <td>ALL</td>
+        <td>Row Level Security (RLS) policy check failed for active <code>user_id</code>.</td>
+        <td>Verify user permissions & RLS SQL policy.</td>
+      </tr>
+      <tr>
+        <td><code>409</code></td>
+        <td>Conflict</td>
+        <td>INSERT / UPDATE</td>
+        <td>Duplicate primary key or UNIQUE constraint violation (e.g. existing email).</td>
+        <td>Use <code>.upsert()</code> or prompt user for unique data.</td>
+      </tr>
+      <tr>
+        <td><code>500</code></td>
+        <td>Internal Server Error</td>
+        <td>ALL</td>
+        <td>Database server issue, connection failure, or unhandled trigger crash.</td>
+        <td>Inspect Supabase logs & trigger functions.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Standard TypeScript Production Wrapper Pattern</h3>
+  <pre><code><span class="keyword">import</span> { supabase } <span class="keyword">from</span> <span class="string">"./supabase"</span>;
+
+<span class="keyword">export async function</span> <span class="method">executeSupabaseMutation</span>(operationFn) {
+  <span class="keyword">try</span> {
+    <span class="keyword">const</span> { data, error } = <span class="keyword">await</span> operationFn();
+
+    <span class="keyword">if</span> (error) {
+      <span class="comment">// Handle Supabase PostgREST Error Object</span>
+      console.warn(<span class="string">`Supabase Mutation Error [Code: ${error.code}]:`</span>, error.message);
+      
+      <span class="keyword">switch</span> (error.code) {
+        <span class="keyword">case</span> <span class="string">"23505"</span>: <span class="comment">// Unique constraint violation</span>
+          <span class="keyword">throw new</span> Error(<span class="string">"A record with this identifier already exists."</span>);
+        <span class="keyword">case</span> <span class="string">"42501"</span>: <span class="comment">// RLS Policy failure</span>
+          <span class="keyword">throw new</span> Error(<span class="string">"You do not have permission to modify this item."</span>);
+        <span class="keyword">default</span>:
+          <span class="keyword">throw new</span> Error(error.message || <span class="string">"Database operation failed."</span>);
+      }
+    }
+
+    <span class="keyword">return</span> { success: true, data };
+  } <span class="keyword">catch</span> (err) {
+    <span class="keyword">return</span> { success: false, error: err.message };
+  }
+}</code></pre>
+
+  <!-- Section 6: Real-World zpluscrm Database Examples -->
+  <h2>6. Real-World zpluscrm Database Operations Reference</h2>
+
+  <h3>A. Inserting a New Service Package (`services`)</h3>
+  <pre><code><span class="comment">// Insert new GST Compliance Service package</span>
+<span class="keyword">const</span> { data, error } = <span class="keyword">await</span> supabase
+  .<span class="method">from</span>(<span class="string">"services"</span>)
+  .<span class="method">insert</span>([{
+    <span class="string">id</span>: <span class="string">"srv_gst_01"</span>,
+    <span class="string">name</span>: <span class="string">"GST Monthly Filing & Reconciliation"</span>,
+    <span class="string">category</span>: <span class="string">"TAXATION"</span>,
+    <span class="string">default_fee</span>: 3500,
+    <span class="string">user_id</span>: <span class="string">"usr_harsha_g_c"</span>
+  }])
+  .<span class="method">select</span>();</code></pre>
+
+  <h3>B. Updating Invoice Payment Status (`invoices`)</h3>
+  <pre><code><span class="comment">// Mark Invoice as Paid with Payment Reference</span>
+<span class="keyword">const</span> { data, error } = <span class="keyword">await</span> supabase
+  .<span class="method">from</span>(<span class="string">"invoices"</span>)
+  .<span class="method">update</span>({
+    <span class="string">status</span>: <span class="string">"PAID"</span>,
+    <span class="string">paid_amount</span>: 15400,
+    <span class="string">payment_mode</span>: <span class="string">"UPI"</span>,
+    <span class="string">paid_date</span>: <span class="keyword">new</span> Date().toISOString().split(<span class="string">'T'</span>)[0]
+  })
+  .<span class="method">eq</span>(<span class="string">"id"</span>, <span class="string">"inv_2026_089"</span>)
+  .<span class="method">select</span>();</code></pre>
+
+  <h3>C. Deleting a Banking Ledger Entry (`banking_entries`)</h3>
+  <pre><code><span class="comment">// Remove erroneous ledger transaction</span>
+<span class="keyword">const</span> { data, error } = <span class="keyword">await</span> supabase
+  .<span class="method">from</span>(<span class="string">"banking_entries"</span>)
+  .<span class="method">delete</span>()
+  .<span class="method">eq</span>(<span class="string">"id"</span>, <span class="string">"bnk_trn_991"</span>)
+  .<span class="method">eq</span>(<span class="string">"user_id"</span>, <span class="string">"usr_harsha_g_c"</span>);</code></pre>
+
+  <div class="callout warning" style="margin-top:16px;">
+    <div class="callout-title">⚠️ Summary Checklist for Supabase Database Operations</div>
+    <ul style="margin:4px 0 0 14px; padding:0;">
+      <li>Always send mandatory headers: <code>apikey</code> and <code>Authorization: Bearer &lt;token&gt;</code>.</li>
+      <li>Use <code>Prefer: return=representation</code> if you want the mutated row returned in response payload.</li>
+      <li>Enforce strict primary key checks (<code>.eq('id', value)</code>) on <code>UPDATE</code> and <code>DELETE</code> calls.</li>
+      <li>Enable Row Level Security (RLS) on all production tables to prevent unauthorized data access.</li>
+      <li>Prefer <strong>Soft Delete</strong> over Hard Delete for critical compliance or financial entities.</li>
+    </ul>
+  </div>
+
+</body>
+</html>

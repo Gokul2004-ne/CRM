@@ -1,7 +1,8 @@
 // Shared TypeScript types for the entire application
 
 export type Recurrence = "MONTHLY" | "QUARTERLY" | "ANNUAL" | "CUSTOM";
-export type LeadStatus = "LEAD" | "CONVERTED";
+export type LeadStatus = "LEAD" | "CONTACTED" | "QUALIFIED" | "CONVERTED" | "LOST";
+export type LeadSource = "WHATSAPP" | "WEBSITE" | "REFERRAL" | "DIRECT_CALL" | "CAMPAIGN" | "WALK_IN" | "SOCIAL_MEDIA" | "EMAIL" | "OTHER";
 export type ServiceStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "OVERDUE";
 
 export interface ClientDocument {
@@ -149,7 +150,10 @@ export interface Lead {
   name: string;
   mobile: string;
   phone?: string;
+  email?: string;
   source: string;
+  type?: string;
+  city?: string;
   status: LeadStatus;
   convertedClientId?: string;
   notes?: string;

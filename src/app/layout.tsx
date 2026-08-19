@@ -24,26 +24,6 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if (typeof window !== 'undefined') {
-                if ('scrollRestoration' in window.history) {
-                  window.history.scrollRestoration = 'manual';
-                }
-                if ('serviceWorker' in navigator) {
-                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                    for (var registration of registrations) {
-                      registration.unregister();
-                    }
-                  });
-                }
-              }
-            `,
-          }}
-        />
-      </head>
       <body className={`${inter.variable} ${plusJakarta.variable} font-sans antialiased bg-[#F8FAFC]`}>
         <AuthProvider>
           {children}

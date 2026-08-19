@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { Save, Building2, User, Bell, Shield, Palette, CreditCard, Database, Download, Trash2, KeyRound, LogOut, CheckCircle, Eye, EyeOff, RefreshCw, PenTool, UploadCloud, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { useAppStore } from "@/lib/store";
-import { syncUserSettingsToSupabase } from "@/lib/supabaseData";
+import { useAppStore, purgeUserLocalData } from "@/lib/store";
+import { syncUserSettingsToSupabase, purgeAllUserDataFromSupabase } from "@/lib/supabaseData";
 
 const SETTINGS_KEY = "zpluscrm_settings";
 
@@ -302,16 +302,30 @@ export default function SettingsPage() {
     document.body.removeChild(link);
   };
 
-  const clearLocalData = () => {
-    if (confirm("⚠️ This will clear all LOCAL data (not Supabase). Are you sure?")) {
-      const keysToKeep = ["sb-", "supabase", "zpluscrm_settings", "zpluscrm_floating_notes"];
-      const toDelete: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && !keysToKeep.some(k => key.includes(k))) toDelete.push(key);
-      }
-      toDelete.forEach(k => localStorage.removeItem(k));
-      toast.success("Local cache cleared. Please refresh.");
+  const [clearing, setClearing] = useState(false);
+
+  const clearAllData = async () => {
+    if (!confirm("⚠️ DANGER: This will permanently delete ALL data (clients, packages, invoices, leads, renewals, and documents) from BOTH Supabase Cloud and Local Storage.\n\nAre you sure you want to proceed?")) {
+      return;
+    }
+    setClearing(true);
+    try {
+      // 1. Purge all records from Supabase Cloud
+      await purgeAllUserDataFromSupabase();
+
+      // 2. Purge user-scoped local storage keys
+      const email = user?.email || "";
+      purgeUserLocalData(email);
+
+      // 3. Reset in-memory Zustand store
+      useAppStore.getState().resetStore();
+
+      toast.success("✅ All data successfully deleted from both Cloud Database and Local Storage!");
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Failed to delete data: " + (e?.message || "Unknown error"));
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -703,16 +717,30 @@ export default function SettingsPage() {
 
               <div style={{ padding: "20px", background: "#FEF2F2", border: "1.5px solid #FCA5A5", borderRadius: 14 }}>
                 <div style={{ fontSize: 14, fontWeight: 800, color: "#991B1B", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
-                  <Trash2 size={16} /> Danger Zone
+                  <Trash2 size={16} /> Danger Zone: Delete All Account Data (Cloud & Local)
                 </div>
-                <div style={{ fontSize: 13, color: "#7F1D1D", marginBottom: 12, lineHeight: 1.5 }}>
-                  Clear local cache clears browser-stored data only. Your Supabase database data will remain safe and will re-sync on next load.
+                <div style={{ fontSize: 13, color: "#7F1D1D", marginBottom: 14, lineHeight: 1.5 }}>
+                  Permanently deletes all practice data (clients, packages, invoices, leads, renewals, and documents) from both <strong>Supabase Cloud Database</strong> and <strong>Local Browser Storage</strong>.
                 </div>
                 <button
-                  onClick={clearLocalData}
-                  style={{ padding: "10px 18px", background: "#DC2626", border: "none", borderRadius: 10, color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                  disabled={clearing}
+                  onClick={clearAllData}
+                  style={{
+                    padding: "10px 18px",
+                    background: "#DC2626",
+                    border: "none",
+                    borderRadius: 10,
+                    color: "white",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: clearing ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    opacity: clearing ? 0.7 : 1
+                  }}
                 >
-                  <Trash2 size={14} /> Clear Local Cache
+                  <Trash2 size={14} /> {clearing ? "Deleting Everything..." : "Delete All Data (Cloud & Local)"}
                 </button>
               </div>
             </div>

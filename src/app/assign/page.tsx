@@ -331,7 +331,7 @@ export default function AssignPage() {
                       <div style={{ display: "flex", gap: 4 }}>
                         <button className="icon-btn-slds" title="View Details" onClick={() => setViewDetailModal({ open: true, assignment: a })}><Eye size={14} color="#0176D3" /></button>
                         <button className="icon-btn-slds" title="Edit Assignment" onClick={() => openEdit(a)}><Pencil size={14} color="#64748B" /></button>
-                        <button className="icon-btn-slds" title="Delete" onClick={() => { if (confirm("Delete this assigned package?")) deleteAssignedService(a.id); }}><Trash2 size={14} color="#DC2626" /></button>
+                        <button className="icon-btn-slds" title="Delete" onClick={() => { deleteAssignedService(a.id); toast.success("Assigned package deleted"); }}><Trash2 size={14} color="#DC2626" /></button>
                       </div>
                     </td>
                   </tr>

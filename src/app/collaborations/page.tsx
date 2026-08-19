@@ -5,7 +5,7 @@ import { useAppStore } from "@/lib/store";
 import { useState } from "react";
 import { Collaboration } from "@/lib/types";
 import { Plus, Search, Handshake, Phone, Mail, MessageCircle, Edit3, Trash2, ExternalLink, X } from "lucide-react";
-import { getWhatsAppLink, formatDate } from "@/lib/utils";
+import { getWhatsAppLink, formatDate, validateEmail, validatePhone } from "@/lib/utils";
 import { toast } from "sonner";
 
 const emptyCollaboration = (): Collaboration => ({
@@ -19,7 +19,7 @@ const emptyCollaboration = (): Collaboration => ({
 });
 
 export default function CollaborationsPage() {
-  const { collaborations, addCollaboration, updateCollaboration, deleteCollaboration } = useAppStore();
+  const { clients, collaborations, addCollaboration, updateCollaboration, deleteCollaboration } = useAppStore();
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<{ open: boolean; editing: boolean }>({ open: false, editing: false });
   const [form, setForm] = useState<Collaboration>(emptyCollaboration());
@@ -45,18 +45,60 @@ export default function CollaborationsPage() {
   };
 
   const handleSave = () => {
-    if (!form.name.trim() || !form.number.trim() || !form.email.trim()) {
+    const nameClean = form.name.trim();
+    const phoneClean = form.number.trim();
+    const emailClean = form.email.trim().toLowerCase();
+
+    if (!nameClean || !phoneClean || !emailClean) {
       toast.error("Please fill in Name, Number, and Email ID fields.");
       return;
     }
 
+    if (!validateEmail(emailClean)) {
+      toast.error("❌ Invalid Email Address! Please enter a valid email address (e.g. partner@agency.com).");
+      return;
+    }
+
+    // 1. Check duplicate email in Collaborations
+    const existingCollabEmail = (collaborations || []).find(
+      (c) => (!modal.editing || c.id !== form.id) && c.email?.trim().toLowerCase() === emailClean
+    );
+    if (existingCollabEmail) {
+      toast.error(`❌ Email already used! "${form.email.trim()}" is already registered for collaboration partner "${existingCollabEmail.name}".`);
+      return;
+    }
+
+    // 2. Check duplicate email in Clients
+    const existingClientEmail = (clients || []).find(
+      (cl) => cl.email?.trim().toLowerCase() === emailClean
+    );
+    if (existingClientEmail) {
+      toast.error(`❌ Email already used! "${form.email.trim()}" is already registered to client "${existingClientEmail.name}".`);
+      return;
+    }
+
+    // 3. Check duplicate phone in Collaborations
+    const rawNum = phoneClean.replace(/\D/g, "");
+    if (rawNum.length >= 10) {
+      const existingCollabPhone = (collaborations || []).find(
+        (c) => (!modal.editing || c.id !== form.id) && c.number?.replace(/\D/g, "") === rawNum
+      );
+      if (existingCollabPhone) {
+        toast.error(`❌ Phone number already used! "${phoneClean}" is already registered for partner "${existingCollabPhone.name}".`);
+        return;
+      }
+    }
+
     if (modal.editing) {
-      updateCollaboration(form);
+      updateCollaboration({ ...form, name: nameClean, number: phoneClean, email: emailClean });
       toast.success("Collaboration details updated successfully!");
     } else {
       const newCollab: Collaboration = {
         ...form,
         id: `collab_${Date.now()}`,
+        name: nameClean,
+        number: phoneClean,
+        email: emailClean,
         createdAt: new Date().toISOString().split("T")[0],
       };
       addCollaboration(newCollab);
@@ -67,10 +109,8 @@ export default function CollaborationsPage() {
   };
 
   const handleDelete = (id: string, name: string) => {
-    if (confirm(`Are you sure you want to delete collaboration with "${name}"?`)) {
-      deleteCollaboration(id);
-      toast.success("Collaboration deleted.");
-    }
+    deleteCollaboration(id);
+    toast.success(`Collaboration with "${name}" deleted.`);
   };
 
   return (
