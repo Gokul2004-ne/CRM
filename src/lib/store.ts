@@ -95,53 +95,6 @@ const getRenewalKey = (rn: any) => `${(rn.clientName || '').toLowerCase().trim()
 // Track in-flight client IDs being deleted so realtime re-fetch cannot restore them
 const pendingDeletes = new Set<string>();
 
-// User-Scoped LocalStorage Persistence Helpers (Strict Multi-Tenant Privacy)
-function getScopedUserKey(key: string): string {
-  if (typeof window === "undefined") return `zpluscrm_${key}`;
-  try {
-    const rawSession = localStorage.getItem("zpluscrm_active_session");
-    if (rawSession) {
-      const parsed = JSON.parse(rawSession);
-      const uid = parsed?.user?.id || parsed?.user?.email;
-      if (uid) return `zpluscrm_user_${String(uid).replace(/[^a-zA-Z0-9_]/g, "_")}_${key}`;
-    }
-
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && (k.startsWith("sb-") || k.includes("auth-token"))) {
-        const raw = localStorage.getItem(k);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          const uid = parsed?.user?.id || parsed?.user?.email || parsed?.currentSession?.user?.id;
-          if (uid) return `zpluscrm_user_${String(uid).replace(/[^a-zA-Z0-9_]/g, "_")}_${key}`;
-        }
-      }
-    }
-  } catch {}
-  return `zpluscrm_local_${key}`;
-}
-
-function loadFromLocal<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const fullKey = getScopedUserKey(key);
-    const item = localStorage.getItem(fullKey);
-    return item ? JSON.parse(item) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveToLocal(key: string, data: any) {
-  if (typeof window === "undefined") return;
-  try {
-    const fullKey = getScopedUserKey(key);
-    localStorage.setItem(fullKey, JSON.stringify(data));
-  } catch (e) {
-    console.error(`Error saving ${key} to localStorage:`, e);
-  }
-}
-
 export function purgeUserLocalData(email?: string) {
   if (typeof window === "undefined") return;
   try {
@@ -252,9 +205,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>()((set, get) => ({
-  // Initialize from user-scoped localStorage so data persists across page refreshes.
-  // getScopedUserKey() reads the saved session token, so the correct scoped key is
-  // used even at module init time. New users get empty arrays (no mock data).
+  // Cloud-only data architecture. Initial state starts with empty arrays until Supabase hydration completes.
   clients: [],
   services: [],
   subServices: [],
@@ -304,37 +255,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
     const renewalKey = (rn: any) => `${(rn.clientName || '').toLowerCase()}_${(rn.serviceName || '').toLowerCase()}`;
 
-    // Cloud is ALWAYS authoritative. Never merge localStorage when Supabase is reachable.
-    // This prevents deleted items from being re-hydrated from stale local cache.
+    // Cloud is ALWAYS authoritative. No local storage caching for CRM entities.
     if (data === null) {
-      // Supabase completely unreachable — fall back to local cache only
-      const localClients = loadFromLocal<Client[]>("clients", []);
-      const localServices = loadFromLocal<Service[]>("services", []);
-      const localSubServices = loadFromLocal<SubService[]>("subServices", []);
-      const localRequiredDocs = loadFromLocal<RequiredDoc[]>("requiredDocs", []);
-      const localAssigned = loadFromLocal<AssignedService[]>("assignedServices", []);
-      const localBanking = loadFromLocal<BankingEntry[]>("bankingEntries", []);
-      const localLeads = loadFromLocal<Lead[]>("leads", []);
-      const localDrafts = loadFromLocal<DocumentDraft[]>("drafts", []);
-      const localCollabs = loadFromLocal<Collaboration[]>("collaborations", []);
-      const localInvoices = loadFromLocal<any[]>("invoices", []);
-      const localOneTime = loadFromLocal<any[]>("oneTimeServices", []);
-      const localRenewals = loadFromLocal<any[]>("renewals", []);
-      set({
-        clients: localClients,
-        services: localServices,
-        subServices: localSubServices,
-        requiredDocs: localRequiredDocs,
-        assignedServices: localAssigned,
-        bankingEntries: localBanking,
-        leads: localLeads,
-        drafts: localDrafts,
-        collaborations: localCollabs,
-        invoices: localInvoices,
-        oneTimeServices: localOneTime,
-        renewals: localRenewals,
-        isLoadingSupabase: false,
-      });
+      set({ isLoadingSupabase: false });
       return;
     }
 
