@@ -72,7 +72,7 @@ const getClientKey = (c: Client) => {
   const detail = (c.pan || c.panNo || c.gstin || c.gstNo || c.email || c.mobile || c.phone || '').toLowerCase().trim();
   return detail ? `${name}_${detail}` : `${name}_${c.id}`;
 };
-const getServiceKey = (s: Service) => (s.name || '').toLowerCase().trim();
+const getServiceKey = (s: Service) => s.id;
 const getSubServiceKey = (ss: SubService) => `${(ss.serviceId || (ss.serviceIds && ss.serviceIds[0]) || '').trim()}_${(ss.name || '').toLowerCase().trim()}`;
 const getRequiredDocKey = (rd: RequiredDoc) => `${(rd.subServiceId || '').trim()}_${(rd.name || '').toLowerCase().trim()}`;
 const getAssignedServiceKey = (a: AssignedService) => `${(a.clientId || '').trim()}_${(a.serviceId || '').trim()}_${(a.financialYear || '').trim()}_${(a.dueDate || '').trim()}`;
@@ -419,8 +419,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   addService: async (sv) => {
     const svFixed: Service = { ...sv, id: ensureUUID(sv.id) };
     set((s) => {
-      const key = getServiceKey(svFixed);
-      if (s.services.some(x => x.id === svFixed.id || (key && getServiceKey(x) === key))) return s;
+      if (s.services.some(x => x.id === svFixed.id || (svFixed.id && ensureUUID(x.id) === svFixed.id))) return s;
       const next = [...s.services, svFixed];
       return { services: next };
     });

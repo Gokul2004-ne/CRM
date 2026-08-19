@@ -4,7 +4,7 @@ import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
 import { Service } from "@/lib/types";
 import { Plus, Pencil, Trash2, Search, IndianRupee, Package } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, generateUUID } from "@/lib/utils";
 import { toast } from "sonner";
 
 const PACKAGE_TYPES = [
@@ -41,8 +41,13 @@ export default function PackagesPage() {
       return;
     }
     const payload: Service = { ...form };
-    if (modal.editing) { updateService(payload); toast.success("Package updated"); }
-    else { addService({ ...payload, id: `s${Date.now()}` }); toast.success("Package added"); }
+    if (modal.editing) {
+      updateService(payload);
+      toast.success("Package updated");
+    } else {
+      addService({ ...payload, id: generateUUID() });
+      toast.success("Package added");
+    }
     setModal({ open: false, editing: null });
   };
 

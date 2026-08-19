@@ -80,43 +80,6 @@ export async function getUserId(): Promise<string> {
   return "usr_default_account";
 }
 
-const DEFAULT_PACKAGE_TEMPLATES = [
-  { name: "Income Tax Return & Audit", price: 7500, recurrence: "ANNUAL", months: ["July", "September", "October"] },
-  { name: "GST Compliance & Filing", price: 5000, recurrence: "MONTHLY", months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] },
-  { name: "TDS & Statutory Compliance", price: 4000, recurrence: "QUARTERLY", months: ["April", "July", "October", "January"] },
-  { name: "ROC & Company Secretarial", price: 8500, recurrence: "ANNUAL", months: ["October", "November"] },
-  { name: "Bookkeeping & Accounting", price: 10000, recurrence: "MONTHLY", months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] },
-  { name: "Payroll & Labor Law Compliance", price: 6000, recurrence: "MONTHLY", months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] },
-  { name: "Trademark & Business Registration", price: 5000, recurrence: "CUSTOM", months: ["April"] },
-  { name: "Audit & Assurance Package", price: 15000, recurrence: "ANNUAL", months: ["September", "October"] },
-];
-
-async function seedDefaultPackagesIfEmpty(userId: string, existingServices: any[]) {
-  if (existingServices && existingServices.length > 0) return existingServices;
-  if (!userId || userId === "usr_default_account") return existingServices;
-
-  try {
-    const seeded: any[] = [];
-    for (const tmpl of DEFAULT_PACKAGE_TEMPLATES) {
-      const srvId = ensureUUID(`srv_${userId}_${tmpl.name.toLowerCase().replace(/[^a-z0-9]/g, "_")}`);
-      const row = {
-        id: srvId,
-        user_id: userId,
-        name: tmpl.name,
-        price: tmpl.price,
-        recurrence: tmpl.recurrence,
-        applicable_months: tmpl.months,
-        due_date: null,
-      };
-      await supabase.from("services").upsert(row);
-      seeded.push(row);
-    }
-    return seeded;
-  } catch {
-    return existingServices;
-  }
-}
-
 // Fetch all CRM data from Supabase (Scoped to current authenticated user_id)
 export async function fetchAllCRMData() {
   try {
@@ -170,9 +133,6 @@ export async function fetchAllCRMData() {
       safeTableFetch("renewals", userId),
       safeTableFetch("user_settings", userId),
     ]);
-
-    // Auto-seed default packages if user has none configured
-    services = await seedDefaultPackagesIfEmpty(userId, services);
 
     const formattedClients: Client[] = (clients || []).map((c: any) => ({
       id: c.id,
