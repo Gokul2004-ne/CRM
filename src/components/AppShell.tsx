@@ -139,6 +139,21 @@ export default function AppShell({ children, title, subtitle }: AppShellProps) {
 
   useEffect(() => {
     if (user) {
+      // Purge ALL stale CRM localStorage keys — cloud is the only source of truth
+      try {
+        const crmKeys = ["clients","services","subServices","requiredDocs","assignedServices",
+          "bankingEntries","leads","drafts","collaborations","invoices","oneTimeServices","renewals"];
+        const toRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (!k) continue;
+          if (k.startsWith("zpluscrm_user_") || k.startsWith("zpluscrm_local_")) {
+            if (crmKeys.some(ck => k.includes(`_${ck}`))) toRemove.push(k);
+          }
+        }
+        toRemove.forEach(k => localStorage.removeItem(k));
+      } catch {}
+
       loadSupabaseData();
 
       const handleFocus = () => {
@@ -147,7 +162,7 @@ export default function AppShell({ children, title, subtitle }: AppShellProps) {
       window.addEventListener("focus", handleFocus);
       document.addEventListener("visibilitychange", handleFocus);
 
-      // Realtime DB subscription for instant multi-device / cross-session sync
+      // Realtime DB subscription — debounce increased to 2s to prevent race with in-flight deletes
       let debounceTimeout: NodeJS.Timeout | null = null;
       const channel = supabase
         .channel("public_crm_changes")
@@ -158,14 +173,14 @@ export default function AppShell({ children, title, subtitle }: AppShellProps) {
             if (debounceTimeout) clearTimeout(debounceTimeout);
             debounceTimeout = setTimeout(() => {
               loadSupabaseData();
-            }, 300);
+            }, 2000);
           }
         )
         .subscribe();
 
       const interval = setInterval(() => {
         loadSupabaseData();
-      }, 15000);
+      }, 30000);
 
       return () => {
         window.removeEventListener("focus", handleFocus);

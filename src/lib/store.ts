@@ -92,6 +92,9 @@ const getInvoiceKey = (inv: Invoice) => (inv.invoiceNumber || '').toLowerCase().
 const getOneTimeKey = (ots: OneTimeService) => `${(ots.clientName || '').toLowerCase().trim()}_${(ots.serviceName || '').toLowerCase().trim()}_${(ots.dueDate || '').trim()}`;
 const getRenewalKey = (rn: any) => `${(rn.clientName || '').toLowerCase().trim()}_${(rn.serviceName || '').toLowerCase().trim()}_${(rn.financialYear || rn.dueDate || '').trim()}`;
 
+// Track in-flight client IDs being deleted so realtime re-fetch cannot restore them
+const pendingDeletes = new Set<string>();
+
 // User-Scoped LocalStorage Persistence Helpers (Strict Multi-Tenant Privacy)
 function getScopedUserKey(key: string): string {
   if (typeof window === "undefined") return `zpluscrm_${key}`;
@@ -252,36 +255,24 @@ export const useAppStore = create<AppState>()((set, get) => ({
   // Initialize from user-scoped localStorage so data persists across page refreshes.
   // getScopedUserKey() reads the saved session token, so the correct scoped key is
   // used even at module init time. New users get empty arrays (no mock data).
-  clients: loadFromLocal("clients", []),
-  services: loadFromLocal("services", []),
-  subServices: loadFromLocal("subServices", []),
-  requiredDocs: loadFromLocal("requiredDocs", []),
-  assignedServices: loadFromLocal("assignedServices", []),
-  bankingEntries: loadFromLocal("bankingEntries", []),
-  leads: loadFromLocal("leads", []),
-  drafts: loadFromLocal("drafts", []),
-  collaborations: loadFromLocal("collaborations", []),
-  invoices: loadFromLocal("invoices", []),
-  oneTimeServices: loadFromLocal("oneTimeServices", []),
-  renewals: loadFromLocal("renewals", []),
+  clients: [],
+  services: [],
+  subServices: [],
+  requiredDocs: [],
+  assignedServices: [],
+  bankingEntries: [],
+  leads: [],
+  drafts: [],
+  collaborations: [],
+  invoices: [],
+  oneTimeServices: [],
+  renewals: [],
   selectedFY: getCurrentFY(),
   sidebarCollapsed: false,
   isLoadingSupabase: false,
 
   resetStore: () => {
     // Reset local cache & state without deleting cloud database records
-    saveToLocal("clients", []);
-    saveToLocal("services", []);
-    saveToLocal("subServices", []);
-    saveToLocal("requiredDocs", []);
-    saveToLocal("assignedServices", []);
-    saveToLocal("bankingEntries", []);
-    saveToLocal("leads", []);
-    saveToLocal("drafts", []);
-    saveToLocal("collaborations", []);
-    saveToLocal("invoices", []);
-    saveToLocal("oneTimeServices", []);
-    saveToLocal("renewals", []);
 
     set({
       clients: [],
@@ -303,45 +294,67 @@ export const useAppStore = create<AppState>()((set, get) => ({
   loadSupabaseData: async () => {
     set({ isLoadingSupabase: true });
 
-    // Load user-scoped local data AFTER auth is established (key is now correct)
-    const localClients = loadFromLocal<Client[]>("clients", []);
-    const localServices = loadFromLocal<Service[]>("services", []);
-    const localSubServices = loadFromLocal<SubService[]>("subServices", []);
-    const localRequiredDocs = loadFromLocal<RequiredDoc[]>("requiredDocs", []);
-    const localAssigned = loadFromLocal<AssignedService[]>("assignedServices", []);
-    const localBanking = loadFromLocal<BankingEntry[]>("bankingEntries", []);
-    const localLeads = loadFromLocal<Lead[]>("leads", []);
-    const localCollabs = loadFromLocal<Collaboration[]>("collaborations", []);
-    const localDrafts = loadFromLocal<DocumentDraft[]>("drafts", []);
-    const localInvoices = loadFromLocal<any[]>("invoices", []);
-    const localOneTime = loadFromLocal<any[]>("oneTimeServices", []);
-    const localRenewals = loadFromLocal<any[]>("renewals", []);
-
     const data = await fetchAllCRMData();
 
     if (data?.userSettings && typeof window !== "undefined") {
       try {
         localStorage.setItem("zpluscrm_settings", JSON.stringify(data.userSettings));
-        saveToLocal("settings", data.userSettings);
       } catch {}
     }
 
-    const useCloud = data !== null;
     const renewalKey = (rn: any) => `${(rn.clientName || '').toLowerCase()}_${(rn.serviceName || '').toLowerCase()}`;
 
-    // When Supabase is available, cloud data is authoritative (deleted items stay deleted)
-    const rawClients = useCloud ? data!.clients : localClients;
-    const rawServices = useCloud ? data!.services : localServices;
-    const rawSubServices = useCloud ? data!.subServices : localSubServices;
-    const rawRequiredDocs = useCloud ? data!.requiredDocs : localRequiredDocs;
-    const rawAssigned = useCloud ? data!.assignedServices : localAssigned;
-    const rawBanking = useCloud ? data!.bankingEntries : localBanking;
-    const rawLeads = useCloud ? data!.leads : localLeads;
-    const rawDrafts = useCloud ? data!.drafts : localDrafts;
-    const rawCollabs = useCloud ? data!.collaborations : localCollabs;
-    const rawInvoices = useCloud ? (data!.invoices || []) : localInvoices;
-    const rawOneTime = useCloud ? (data!.oneTimeServices || []) : localOneTime;
-    const rawRenewals = useCloud ? (data!.renewals || []) : localRenewals;
+    // Cloud is ALWAYS authoritative. Never merge localStorage when Supabase is reachable.
+    // This prevents deleted items from being re-hydrated from stale local cache.
+    if (data === null) {
+      // Supabase completely unreachable — fall back to local cache only
+      const localClients = loadFromLocal<Client[]>("clients", []);
+      const localServices = loadFromLocal<Service[]>("services", []);
+      const localSubServices = loadFromLocal<SubService[]>("subServices", []);
+      const localRequiredDocs = loadFromLocal<RequiredDoc[]>("requiredDocs", []);
+      const localAssigned = loadFromLocal<AssignedService[]>("assignedServices", []);
+      const localBanking = loadFromLocal<BankingEntry[]>("bankingEntries", []);
+      const localLeads = loadFromLocal<Lead[]>("leads", []);
+      const localDrafts = loadFromLocal<DocumentDraft[]>("drafts", []);
+      const localCollabs = loadFromLocal<Collaboration[]>("collaborations", []);
+      const localInvoices = loadFromLocal<any[]>("invoices", []);
+      const localOneTime = loadFromLocal<any[]>("oneTimeServices", []);
+      const localRenewals = loadFromLocal<any[]>("renewals", []);
+      set({
+        clients: localClients,
+        services: localServices,
+        subServices: localSubServices,
+        requiredDocs: localRequiredDocs,
+        assignedServices: localAssigned,
+        bankingEntries: localBanking,
+        leads: localLeads,
+        drafts: localDrafts,
+        collaborations: localCollabs,
+        invoices: localInvoices,
+        oneTimeServices: localOneTime,
+        renewals: localRenewals,
+        isLoadingSupabase: false,
+      });
+      return;
+    }
+
+    // Cloud fetch succeeded — filter out any items currently being deleted
+    const cloudClients = (data.clients || []).filter((c: Client) =>
+      !pendingDeletes.has(c.id) && !pendingDeletes.has(ensureUUID(c.id))
+    );
+
+    const rawClients = cloudClients;
+    const rawServices = data.services || [];
+    const rawSubServices = data.subServices || [];
+    const rawRequiredDocs = data.requiredDocs || [];
+    const rawAssigned = data.assignedServices || [];
+    const rawBanking = data.bankingEntries || [];
+    const rawLeads = data.leads || [];
+    const rawDrafts = data.drafts || [];
+    const rawCollabs = data.collaborations || [];
+    const rawInvoices = data.invoices || [];
+    const rawOneTime = data.oneTimeServices || [];
+    const rawRenewals = data.renewals || [];
 
     const clientsRes = deduplicateItems(rawClients, getClientKey);
     const servicesRes = deduplicateItems(rawServices, getServiceKey);
@@ -376,18 +389,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       isLoadingSupabase: false,
     });
 
-    saveToLocal("clients", clientsRes.unique);
-    saveToLocal("services", servicesRes.unique);
-    saveToLocal("subServices", subServicesRes.unique);
-    saveToLocal("requiredDocs", requiredDocsRes.unique);
-    saveToLocal("assignedServices", assignedRes.unique);
-    saveToLocal("bankingEntries", finalBanking);
-    saveToLocal("leads", leadsRes.unique);
-    saveToLocal("drafts", draftsRes.unique);
-    saveToLocal("collaborations", collabsRes.unique);
-    saveToLocal("invoices", invoicesRes.unique);
-    saveToLocal("oneTimeServices", oneTimeRes.unique);
-    saveToLocal("renewals", renewalsRes.unique);
 
     // Sync clean data & purge duplicate IDs from Supabase
     if (clientsRes.duplicateIds.length) purgeDuplicatesFromSupabase("clients", clientsRes.duplicateIds);
@@ -438,7 +439,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const key = getClientKey(preparedClient);
       if (s.clients.some(x => x.id === preparedClient.id || (key && getClientKey(x) === key))) return s;
       const next = [...s.clients, preparedClient];
-      saveToLocal("clients", next);
       return { clients: next };
     });
 
@@ -460,23 +460,37 @@ export const useAppStore = create<AppState>()((set, get) => ({
         return x;
       });
       const finalClients = found ? next : [...s.clients, c];
-      saveToLocal("clients", finalClients);
       return { clients: finalClients };
     });
     await syncClientToSupabase(c);
   },
   deleteClient: async (id) => {
-    // 1. Instantly update local store and user-scoped localStorage
+    // Mark this ID as pending delete so the realtime listener
+    // cannot race and restore it during the delete operation
+    const dbId = ensureUUID(id);
+    pendingDeletes.add(id);
+    pendingDeletes.add(dbId);
+
+    // 1. Instantly remove from store and localStorage
     set((s) => {
       const next = s.clients.filter(x => {
         if (x.id === id) return false;
-        if (id && ensureUUID(x.id) === ensureUUID(id)) return false;
+        if (ensureUUID(x.id) === dbId) return false;
         return true;
       });
-      saveToLocal("clients", next);
       return { clients: next };
     });
-    await removeClientFromSupabase(id);
+
+    try {
+      await removeClientFromSupabase(id);
+    } finally {
+      // Remove from pending set after a safe window (5s) to allow
+      // the realtime subscription to process without resurrecting the item
+      setTimeout(() => {
+        pendingDeletes.delete(id);
+        pendingDeletes.delete(dbId);
+      }, 5000);
+    }
   },
 
   addService: async (sv) => {
@@ -485,7 +499,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const key = getServiceKey(svFixed);
       if (s.services.some(x => x.id === svFixed.id || (key && getServiceKey(x) === key))) return s;
       const next = [...s.services, svFixed];
-      saveToLocal("services", next);
       return { services: next };
     });
     await syncServiceToSupabase(svFixed);
@@ -493,7 +506,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   updateService: async (sv) => {
     set((s) => {
       const next = s.services.map(x => x.id === sv.id ? sv : x);
-      saveToLocal("services", next);
       return { services: next };
     });
     await syncServiceToSupabase(sv);
@@ -507,7 +519,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
         if (targetName && x.name?.toLowerCase().trim() === targetName.toLowerCase().trim()) return false;
         return true;
       });
-      saveToLocal("services", next);
       return { services: next };
     });
     await removeServiceFromSupabase(id, targetName);
@@ -519,7 +530,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const key = getSubServiceKey(ssFixed);
       if (s.subServices.some(x => x.id === ssFixed.id || (key && getSubServiceKey(x) === key))) return s;
       const next = [...s.subServices, ssFixed];
-      saveToLocal("subServices", next);
       return { subServices: next };
     });
     await syncSubServiceToSupabase(ssFixed);
@@ -533,7 +543,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       });
       if (uniqueBatch.length === 0) return s;
       const next = [...s.subServices, ...uniqueBatch];
-      saveToLocal("subServices", next);
       return { subServices: next };
     });
     await Promise.all(fixedBatch.map(ss => syncSubServiceToSupabase(ss)));
@@ -541,7 +550,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   updateSubService: async (ss) => {
     set((s) => {
       const next = s.subServices.map(x => x.id === ss.id ? ss : x);
-      saveToLocal("subServices", next);
       return { subServices: next };
     });
     await syncSubServiceToSupabase(ss);
@@ -555,7 +563,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
         if (targetName && x.name?.toLowerCase().trim() === targetName.toLowerCase().trim()) return false;
         return true;
       });
-      saveToLocal("subServices", next);
       return { subServices: next };
     });
     await removeSubServiceFromSupabase(id, targetName);
@@ -572,7 +579,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const key = getRequiredDocKey(dFixed);
       if (s.requiredDocs.some(x => x.id === dFixed.id || (key && getRequiredDocKey(x) === key))) return s;
       const next = [...s.requiredDocs, dFixed];
-      saveToLocal("requiredDocs", next);
       return { requiredDocs: next };
     });
     await syncRequiredDocToSupabase(dFixed);
@@ -590,7 +596,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
         return x;
       });
       const finalDocs = found ? next : [...s.requiredDocs, dFixed];
-      saveToLocal("requiredDocs", finalDocs);
       return { requiredDocs: finalDocs };
     });
     await syncRequiredDocToSupabase(dFixed);
@@ -604,7 +609,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
         if (id && ensureUUID(x.id) === ensureUUID(id)) return false;
         return true;
       });
-      saveToLocal("requiredDocs", next);
       return { requiredDocs: next };
     });
     await removeRequiredDocFromSupabase(id, targetName);
@@ -628,7 +632,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       );
       if (isDuplicate) return s;
       const nextAssigned = [...s.assignedServices, aFixed];
-      saveToLocal("assignedServices", nextAssigned);
       return { assignedServices: nextAssigned };
     });
     await syncAssignedServiceToSupabase(aFixed);
@@ -636,7 +639,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   updateAssignedService: async (a) => {
     set((s) => {
       const nextAssigned = s.assignedServices.map(x => x.id === a.id ? a : x);
-      saveToLocal("assignedServices", nextAssigned);
       return { assignedServices: nextAssigned };
     });
     await syncAssignedServiceToSupabase(a);
@@ -644,7 +646,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   deleteAssignedService: async (id) => {
     set((s) => {
       const nextAssigned = s.assignedServices.filter(x => x.id !== id);
-      saveToLocal("assignedServices", nextAssigned);
       return { assignedServices: nextAssigned };
     });
     await removeAssignedServiceFromSupabase(id);
@@ -653,7 +654,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   addBankingEntry: async (b) => {
     set((s) => {
       const next = [...s.bankingEntries, b];
-      saveToLocal("bankingEntries", next);
       return { bankingEntries: next };
     });
     await syncBankingEntryToSupabase(b);
@@ -684,10 +684,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       }) : s.invoices;
 
       const nextBanking = s.bankingEntries.map(x => x.id === b.id ? b : x);
-      saveToLocal("bankingEntries", nextBanking);
-      saveToLocal("assignedServices", updatedAssigned);
-      if (invoiceId) saveToLocal("invoices", updatedInvoices);
-
       return {
         bankingEntries: nextBanking,
         assignedServices: updatedAssigned,
@@ -699,7 +695,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   deleteBankingEntry: async (id) => {
     set((s) => {
       const next = s.bankingEntries.filter(x => x.id !== id);
-      saveToLocal("bankingEntries", next);
       return { bankingEntries: next };
     });
     await removeBankingEntryFromSupabase(id);
@@ -708,7 +703,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   addLead: async (l) => {
     set((s) => {
       const next = [...s.leads, l];
-      saveToLocal("leads", next);
       return { leads: next };
     });
     await syncLeadToSupabase(l);
@@ -716,7 +710,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   updateLead: async (l) => {
     set((s) => {
       const next = s.leads.map(x => x.id === l.id ? l : x);
-      saveToLocal("leads", next);
       return { leads: next };
     });
     await syncLeadToSupabase(l);
@@ -730,7 +723,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
         if (targetName && x.name?.toLowerCase().trim() === targetName.toLowerCase().trim()) return false;
         return true;
       });
-      saveToLocal("leads", next);
       return { leads: next };
     });
     await removeLeadFromSupabase(id, targetName);
@@ -740,7 +732,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const updatedLeads = currentLeads.map(x => x.id === leadId ? { ...x, status: "CONVERTED" as const, convertedClientId: clientId } : x);
     const convertedLead = updatedLeads.find(x => x.id === leadId);
     set({ leads: updatedLeads });
-    saveToLocal("leads", updatedLeads);
     if (convertedLead) {
       await syncLeadToSupabase(convertedLead);
     }
@@ -749,7 +740,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   addDraft: async (d) => {
     set((s) => {
       const next = [...s.drafts, d];
-      saveToLocal("drafts", next);
       return { drafts: next };
     });
     await syncDraftToSupabase(d);
@@ -757,7 +747,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   updateDraft: async (d) => {
     set((s) => {
       const next = s.drafts.map(x => x.id === d.id ? d : x);
-      saveToLocal("drafts", next);
       return { drafts: next };
     });
     await syncDraftToSupabase(d);
@@ -765,7 +754,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   deleteDraft: async (id) => {
     set((s) => {
       const next = s.drafts.filter(x => x.id !== id);
-      saveToLocal("drafts", next);
       return { drafts: next };
     });
     await removeDraftFromSupabase(id);
@@ -774,7 +762,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   addCollaboration: async (c) => {
     set((s) => {
       const next = [...s.collaborations, c];
-      saveToLocal("collaborations", next);
       return { collaborations: next };
     });
     await syncCollaborationToSupabase(c);
@@ -782,7 +769,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   updateCollaboration: async (c) => {
     set((s) => {
       const next = s.collaborations.map(x => x.id === c.id ? c : x);
-      saveToLocal("collaborations", next);
       return { collaborations: next };
     });
     await syncCollaborationToSupabase(c);
@@ -796,7 +782,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
         if (targetName && x.name?.toLowerCase().trim() === targetName.toLowerCase().trim()) return false;
         return true;
       });
-      saveToLocal("collaborations", next);
       return { collaborations: next };
     });
     await removeCollaborationFromSupabase(id, targetName);
@@ -806,7 +791,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
     let bEntryToSync: BankingEntry | null = null;
     set((s) => {
       const next = [inv, ...s.invoices];
-      saveToLocal("invoices", next);
 
       if (inv.type !== "PROFORMA" && inv.clientId) {
         const rcv = inv.amountReceived || (inv.status === "PAID" ? inv.total : 0);
@@ -825,7 +809,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
           };
           bEntryToSync = bEntry;
           const nextBanking = [...s.bankingEntries.filter(b => b.id !== bEntry.id), bEntry];
-          saveToLocal("bankingEntries", nextBanking);
           return { invoices: next, bankingEntries: nextBanking };
         }
       }
@@ -841,7 +824,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
     let bEntryToSync: BankingEntry | null = null;
     set((s) => {
       const next = s.invoices.map(x => x.id === inv.id ? inv : x);
-      saveToLocal("invoices", next);
 
       if (inv.type !== "PROFORMA" && inv.clientId) {
         const rcv = inv.amountReceived || (inv.status === "PAID" ? inv.total : 0);
@@ -859,7 +841,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
         };
         bEntryToSync = bEntry;
         const nextBanking = [...s.bankingEntries.filter(b => b.id !== bEntry.id), bEntry];
-        saveToLocal("bankingEntries", nextBanking);
         return { invoices: next, bankingEntries: nextBanking };
       }
 
@@ -875,8 +856,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
     set((s) => {
       const nextInvoices = s.invoices.filter(x => x.id !== id);
       const nextBanking = s.bankingEntries.filter(b => b.id !== targetBankingId && b.id !== id);
-      saveToLocal("invoices", nextInvoices);
-      saveToLocal("bankingEntries", nextBanking);
       return { invoices: nextInvoices, bankingEntries: nextBanking };
     });
     await Promise.all([
@@ -891,7 +870,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const key = getOneTimeKey(otsFixed);
       if (s.oneTimeServices.some(x => x.id === otsFixed.id || (key && getOneTimeKey(x) === key))) return s;
       const next = [otsFixed, ...s.oneTimeServices];
-      saveToLocal("oneTimeServices", next);
       return { oneTimeServices: next };
     });
     await syncOneTimeServiceToSupabase(otsFixed);
@@ -899,7 +877,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   updateOneTimeService: async (ots) => {
     set((s) => {
       const next = s.oneTimeServices.map(x => x.id === ots.id ? ots : x);
-      saveToLocal("oneTimeServices", next);
       return { oneTimeServices: next };
     });
     await syncOneTimeServiceToSupabase(ots);
@@ -907,7 +884,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   deleteOneTimeService: async (id) => {
     set((s) => {
       const next = s.oneTimeServices.filter(x => x.id !== id);
-      saveToLocal("oneTimeServices", next);
       return { oneTimeServices: next };
     });
     await removeOneTimeServiceFromSupabase(id);
@@ -919,7 +895,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const existing = s.renewals || [];
       const filtered = existing.filter(x => x.id !== rnFixed.id);
       const next = [rnFixed, ...filtered];
-      saveToLocal("renewals", next);
       return { renewals: next };
     });
     await syncRenewalToSupabase(rnFixed);
@@ -928,7 +903,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const rnFixed = { ...rn, id: ensureUUID(rn.id) };
     set((s) => {
       const next = (s.renewals || []).map(x => x.id === rnFixed.id ? rnFixed : x);
-      saveToLocal("renewals", next);
       return { renewals: next };
     });
     await syncRenewalToSupabase(rnFixed);
@@ -937,7 +911,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const targetId = ensureUUID(id);
     set((s) => {
       const next = (s.renewals || []).filter(x => x.id !== id && x.id !== targetId);
-      saveToLocal("renewals", next);
       return { renewals: next };
     });
     await removeRenewalFromSupabase(id);
@@ -1005,7 +978,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
       renewedItemToSync = renewedItem;
       const next = (s.renewals || []).map(x => x.id === id ? renewedItem : x);
-      saveToLocal("renewals", next);
       return { renewals: next };
     });
     if (renewedItemToSync) {
