@@ -94,3 +94,54 @@ export async function PUT(req: Request) {
     );
   }
 }
+
+// GET: Fetch Services / Packages
+export async function GET(req: Request) {
+  try {
+    const url = new URL(req.url);
+    const userId = url.searchParams.get("userId") || url.searchParams.get("user_id") || req.headers.get("x-user-id") || "usr_default_account";
+
+    const { data, error } = await supabase
+      .from("services")
+      .select("*")
+      .eq("user_id", userId);
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: data || [],
+      count: (data || []).length,
+    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err?.message || "Internal server error" }, { status: 500 });
+  }
+}
+
+// DELETE /api/services?id=:id: Delete service package from database
+export async function DELETE(req: Request) {
+  try {
+    const url = new URL(req.url);
+    const id = url.searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Service ID is required" }, { status: 400 });
+    }
+
+    const dbId = ensureUUID(id);
+    const { error } = await supabase
+      .from("services")
+      .delete()
+      .or(`id.eq.${dbId},id.eq.${id}`);
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, message: "Service deleted successfully" });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err?.message || "Internal server error" }, { status: 500 });
+  }
+}

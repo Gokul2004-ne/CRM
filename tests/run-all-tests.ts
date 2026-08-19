@@ -9,6 +9,7 @@ import { runRecursiveTests } from "./recursive/recursive.test";
 import { runDuplicateAndFileTests } from "./integration/duplicate-service-and-files.test";
 import { runClientIsolationTests } from "./integration/client-isolation.test";
 import { runDeletePersistenceTests } from "./integration/delete-persistence.test";
+import { runFullCrudLifecycleTests } from "./integration/full-crud-lifecycle.test";
 
 async function runAllTests() {
   const startTime = Date.now();
@@ -49,7 +50,12 @@ async function runAllTests() {
   totalPassed += delPersistRes.passed;
   totalFailed += delPersistRes.failed;
 
-  // 7. Run Authentication & Cross-Device Sync Tests
+  // 7. Run Full CRUD Lifecycle & DB Operations Flow Tests
+  const fullCrudRes = await runFullCrudLifecycleTests();
+  totalPassed += fullCrudRes.passed;
+  totalFailed += fullCrudRes.failed;
+
+  // 8. Run Authentication & Cross-Device Sync Tests
   const authRes = await runAuthTests();
   totalPassed += authRes.passed;
   totalFailed += authRes.failed;
