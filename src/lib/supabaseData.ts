@@ -397,13 +397,14 @@ export async function syncClientToSupabase(c: Client) {
   try {
     const userId = await getUserId();
     const dbId = ensureUUID(c.id);
+    console.log("[CRM SYNC] syncClientToSupabase:", { clientId: c.id, dbId, userId, name: c.name });
 
     // Extract GST portal credentials from portalCredentials array or direct fields
     const gstCred = c.portalCredentials?.find(p => p.portalName.toLowerCase().includes("gst"));
     const gstPortalId = gstCred?.portalId || c.gstPortalId || null;
     const gstPortalPassword = (gstCred !== undefined ? gstCred.password : c.gstPortalPassword) || null;
 
-    const { error } = await supabase.from("clients").upsert({
+    const { error, data } = await supabase.from("clients").upsert({
       id: dbId,
       user_id: userId,
       name: c.name,
@@ -441,24 +442,40 @@ export async function syncClientToSupabase(c: Client) {
       address: c.address,
       notes: c.notes,
       created_at: c.createdAt || new Date().toISOString(),
-    });
+    }).select();
     if (error) {
-      console.error("Supabase syncClientToSupabase error:", error.message || error);
+      console.error("[CRM SYNC] ❌ syncClientToSupabase FAILED:", error.code, error.message, error.hint);
+    } else {
+      console.log("[CRM SYNC] ✅ syncClientToSupabase OK:", dbId, "rows:", (data as any[])?.length);
     }
   } catch (err) {
-    console.error("syncClientToSupabase caught exception:", err);
+    console.error("[CRM SYNC] ❌ syncClientToSupabase EXCEPTION:", err);
   }
 }
 
 export async function removeClientFromSupabase(id: string, name?: string) {
   try {
     const dbId = ensureUUID(id);
+    console.log("[CRM DELETE] removeClientFromSupabase:", { originalId: id, dbId });
 
-    // 1. Delete parent client row by exact ID / UUID directly from Supabase Cloud
-    const { error } = await supabase.from("clients").delete().or(`id.eq.${dbId},id.eq.${id}`);
+    // 1. Delete parent client row by exact UUID
+    const { error, data } = await supabase.from("clients").delete().eq("id", dbId).select("id");
     if (error) {
-      console.error("Error deleting client from Supabase:", error);
-      throw error;
+      console.error("[CRM DELETE] ❌ delete by dbId failed:", error.code, error.message);
+      // Try with original id as fallback
+      const { error: err2, data: data2 } = await supabase.from("clients").delete().eq("id", id).select("id");
+      if (err2) {
+        console.error("[CRM DELETE] ❌ delete by originalId also failed:", err2.code, err2.message);
+        throw err2;
+      }
+      console.log("[CRM DELETE] ✅ deleted by originalId, rows:", (data2 as any[])?.length);
+    } else {
+      console.log("[CRM DELETE] ✅ deleted by dbId, rows affected:", (data as any[])?.length);
+      if ((data as any[])?.length === 0) {
+        console.warn("[CRM DELETE] ⚠️ 0 rows deleted — trying originalId");
+        const { data: data2 } = await supabase.from("clients").delete().eq("id", id).select("id");
+        console.log("[CRM DELETE] originalId delete result:", (data2 as any[])?.length, "rows");
+      }
     }
     // 2. Purge linked child records
     await Promise.all([
@@ -469,7 +486,7 @@ export async function removeClientFromSupabase(id: string, name?: string) {
     ]);
     return { success: true };
   } catch (err) {
-    console.error("Error removing client from Supabase:", err);
+    console.error("[CRM DELETE] ❌ EXCEPTION in removeClientFromSupabase:", err);
     throw err;
   }
 }
