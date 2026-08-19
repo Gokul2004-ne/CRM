@@ -44,6 +44,7 @@ export async function runDeletePersistenceTests(): Promise<{ passed: number; fai
     name: `Delete Test Client ${testTimestamp}`,
     type: "PROPRIETORSHIP",
     phone: "9123456780",
+    mobile: "9123456780",
     email: `del_client_${testTimestamp}@test.com`,
     pan: "ABCDE1234F",
     gstin: "27ABCDE1234F1Z5",
@@ -142,7 +143,8 @@ export async function runDeletePersistenceTests(): Promise<{ passed: number; fai
     phone: "9876543210",
     mobile: "9876543210",
     source: "WHATSAPP",
-    status: "LEAD"
+    status: "LEAD",
+    createdAt: "2026-08-19"
   });
 
   const { data: insertedLeads } = await supabase.from("leads").select("*").eq("id", testLeadDbId);
