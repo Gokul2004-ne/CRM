@@ -235,6 +235,7 @@ export async function fetchAllCRMData() {
       amountBilled: Number(b.amount_billed || 0),
       amountReceived: Number(b.amount_received || 0),
       amountPending: Number(b.amount_pending || 0),
+      paymentStatus: (b.payment_status as any) || (Number(b.amount_received || 0) >= Number(b.amount_billed || 0) && Number(b.amount_billed || 0) > 0 ? "PAID" : Number(b.amount_received || 0) > 0 ? "PARTIAL" : "PENDING"),
       remark: b.remark,
     }));
 
@@ -615,7 +616,7 @@ export async function syncBankingEntryToSupabase(b: BankingEntry) {
     amount_billed: b.amountBilled || 0,
     amount_received: b.amountReceived || 0,
     amount_pending: b.amountPending || 0,
-    payment_status: (b as any).paymentStatus || (b.amountReceived >= b.amountBilled ? "PAID" : "PENDING"),
+    payment_status: (b as any).paymentStatus || (Number(b.amountReceived || 0) >= Number(b.amountBilled || 0) && Number(b.amountBilled || 0) > 0 ? "PAID" : Number(b.amountReceived || 0) > 0 ? "PARTIAL" : "PENDING"),
     remark: b.remark || null,
   });
   if (error) {
