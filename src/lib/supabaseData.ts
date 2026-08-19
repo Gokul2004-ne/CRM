@@ -345,7 +345,7 @@ function getEmailFromSession(): string | undefined {
   return undefined;
 }
 
-export async function getUserId(): Promise<string | undefined> {
+export async function getUserId(): Promise<string> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     const email = user?.email?.toLowerCase().trim() || getEmailFromSession();
@@ -359,17 +359,25 @@ export async function getUserId(): Promise<string | undefined> {
       return "usr_" + email.replace(/[^a-z0-9]/gi, "_");
     }
 
-    return user?.id ? String(user.id).replace(/[^a-zA-Z0-9_]/g, "_") : mockId;
+    if (mockId) {
+      return mockId.startsWith("usr_") ? mockId : `usr_${mockId}`;
+    }
+
+    if (user?.id) {
+      return "usr_" + String(user.id).replace(/[^a-zA-Z0-9_]/g, "_");
+    }
+
+    return "usr_default_account";
   } catch {
     const email = getEmailFromSession();
     if (email) {
       return "usr_" + email.replace(/[^a-z0-9]/gi, "_");
     }
     const mockId = getMockSessionUserId();
-    if (checkIsSaivarala(null, mockId)) {
-      return "usr_saivarala33_gmail_com";
+    if (mockId) {
+      return mockId.startsWith("usr_") ? mockId : `usr_${mockId}`;
     }
-    return mockId;
+    return "usr_default_account";
   }
 }
 
@@ -437,27 +445,29 @@ export async function removeClientFromSupabase(id: string, name?: string) {
     const dbId = ensureUUID(id);
 
     if (userId) {
-      await supabase.from("assigned_services").delete().eq("client_id", dbId).eq("user_id", userId);
-      await supabase.from("banking_entries").delete().eq("client_id", dbId).eq("user_id", userId);
-      await supabase.from("invoices").delete().eq("client_id", dbId).eq("user_id", userId);
-      await supabase.from("drafts").delete().eq("client_id", dbId).eq("user_id", userId);
+      // 1. Delete parent client row FIRST so any concurrent fetchAllCRMData immediately sees zero rows
+      await supabase.from("clients").delete().eq("id", dbId).eq("user_id", userId);
       if (id && id !== dbId) {
-        await supabase.from("assigned_services").delete().eq("client_id", id).eq("user_id", userId);
-        await supabase.from("banking_entries").delete().eq("client_id", id).eq("user_id", userId);
-        await supabase.from("invoices").delete().eq("client_id", id).eq("user_id", userId);
-        await supabase.from("drafts").delete().eq("client_id", id).eq("user_id", userId);
         await supabase.from("clients").delete().eq("id", id).eq("user_id", userId);
       }
-      await supabase.from("clients").delete().eq("id", dbId).eq("user_id", userId);
+      // 2. Purge linked child records
+      await Promise.all([
+        supabase.from("assigned_services").delete().eq("client_id", dbId).eq("user_id", userId),
+        supabase.from("banking_entries").delete().eq("client_id", dbId).eq("user_id", userId),
+        supabase.from("invoices").delete().eq("client_id", dbId).eq("user_id", userId),
+        supabase.from("drafts").delete().eq("client_id", dbId).eq("user_id", userId),
+      ]);
     } else {
-      await supabase.from("assigned_services").delete().eq("client_id", dbId);
-      await supabase.from("banking_entries").delete().eq("client_id", dbId);
-      await supabase.from("invoices").delete().eq("client_id", dbId);
-      await supabase.from("drafts").delete().eq("client_id", dbId);
+      await supabase.from("clients").delete().eq("id", dbId);
       if (id && id !== dbId) {
         await supabase.from("clients").delete().eq("id", id);
       }
-      await supabase.from("clients").delete().eq("id", dbId);
+      await Promise.all([
+        supabase.from("assigned_services").delete().eq("client_id", dbId),
+        supabase.from("banking_entries").delete().eq("client_id", dbId),
+        supabase.from("invoices").delete().eq("client_id", dbId),
+        supabase.from("drafts").delete().eq("client_id", dbId),
+      ]);
     }
   } catch (err) {
     console.error("Error removing client from Supabase:", err);
