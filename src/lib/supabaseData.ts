@@ -152,18 +152,24 @@ export async function fetchAllCRMData() {
     const formattedSubServices: SubService[] = (subServices || []).map((ss: any) => ({
       id: ss.id,
       serviceId: ss.service_id,
+      serviceIds: ss.service_ids || (ss.service_id ? [ss.service_id] : []),
       name: ss.name,
       dueDate: ss.due_date,
       dueDateDay: ss.due_date_day ? Number(ss.due_date_day) : undefined,
       applicableMonths: ss.applicable_months || [],
       recurrence: ss.recurrence || "MONTHLY",
+      clientId: ss.client_id || undefined,
+      clientName: ss.client_name || undefined,
     }));
 
     const formattedRequiredDocs: RequiredDoc[] = (requiredDocs || []).map((rd: any) => ({
       id: rd.id,
       subServiceId: rd.sub_service_id,
       name: rd.name,
-      isMandatory: rd.is_mandatory,
+      isMandatory: rd.is_mandatory ?? true,
+      fileName: rd.file_name || undefined,
+      fileUrl: rd.file_url || undefined,
+      fileType: rd.file_type || undefined,
     }));
 
     const formattedAssignedServices: AssignedService[] = (assignedServices || []).map((a: any) => ({
@@ -211,9 +217,13 @@ export async function fetchAllCRMData() {
 
     const formattedDrafts: DocumentDraft[] = (drafts || []).map((d: any) => ({
       id: d.id,
+      clientId: d.client_id || undefined,
+      documentType: d.document_type || undefined,
+      financialYear: d.financial_year || undefined,
       title: d.title,
       content: d.content,
-      updatedAt: d.updated_at,
+      status: d.status || "DRAFT",
+      updatedAt: d.updated_at || new Date().toISOString(),
     }));
 
     const formattedCollaborations: Collaboration[] = (collaborations || []).map((c: any) => ({
@@ -454,9 +464,6 @@ export async function removeServiceFromSupabase(id: string, name?: string) {
       await supabase.from("services").delete().eq("id", id);
     }
     await supabase.from("services").delete().eq("id", dbId);
-    if (name && name.trim()) {
-      await supabase.from("services").delete().ilike("name", name.trim());
-    }
   } catch (err) {
     console.error("Error removing service from Supabase:", err);
   }
@@ -476,6 +483,7 @@ export async function syncSubServiceToSupabase(ss: SubService) {
     id: dbId,
     user_id: userId,
     service_id: ss.serviceId ? ensureUUID(ss.serviceId) : null,
+    service_ids: ss.serviceIds || (ss.serviceId ? [ss.serviceId] : []),
     name: ss.name,
     due_date: ss.dueDate || null,
     applicable_months: months,
@@ -496,9 +504,6 @@ export async function removeSubServiceFromSupabase(id: string, name?: string) {
       await supabase.from("sub_services").delete().eq("id", id);
     }
     await supabase.from("sub_services").delete().eq("id", dbId);
-    if (name && name.trim()) {
-      await supabase.from("sub_services").delete().ilike("name", name.trim());
-    }
   } catch (err) {
     console.error("Error removing sub-service from Supabase:", err);
   }
@@ -530,9 +535,6 @@ export async function removeRequiredDocFromSupabase(id: string, name?: string) {
       await supabase.from("required_docs").delete().eq("id", id);
     }
     await supabase.from("required_docs").delete().eq("id", dbId);
-    if (name && name.trim()) {
-      await supabase.from("required_docs").delete().ilike("name", name.trim());
-    }
   } catch (err) {
     console.error("Error removing required doc from Supabase:", err);
   }

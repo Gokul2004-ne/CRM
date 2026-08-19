@@ -4,7 +4,7 @@ import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
 import { RequiredDoc, SubService } from "@/lib/types";
 import { Plus, Pencil, Trash2, Search, CheckCircle, Circle, Eye, Share2, MessageCircle, Layers, Folder, FileText, Upload, Download } from "lucide-react";
-import { getWhatsAppLink } from "@/lib/utils";
+import { getWhatsAppLink, ensureUUID } from "@/lib/utils";
 import { toast } from "sonner";
 
 const empty = (): RequiredDoc => ({ id: "", subServiceId: "", name: "", isMandatory: true });
@@ -19,8 +19,8 @@ export default function RequiredDocsPage() {
   const [form, setForm] = useState<RequiredDoc>(empty());
 
   const getSSInfo = (ssId: string) => {
-    const ss = subServices.find(s => s.id === ssId);
-    const svc = services.find(s => s.id === ss?.serviceId);
+    const ss = subServices.find(s => s.id === ssId || (ssId && ensureUUID(s.id) === ensureUUID(ssId)));
+    const svc = services.find(s => s.id === ss?.serviceId || (ss?.serviceId && ensureUUID(s.id) === ensureUUID(ss.serviceId)));
     return { ss, svc };
   };
 
@@ -33,7 +33,7 @@ export default function RequiredDocsPage() {
         (ss?.name || "").toLowerCase().includes(q) ||
         (svc?.name || "").toLowerCase().includes(q) ||
         (d.fileName || "").toLowerCase().includes(q);
-      const matchesSS = filterSS === "all" || d.subServiceId === filterSS;
+      const matchesSS = filterSS === "all" || d.subServiceId === filterSS || (filterSS && ensureUUID(d.subServiceId) === ensureUUID(filterSS));
       return matchesSearch && matchesSS;
     }), [requiredDocs, search, filterSS, subServices, services]);
 
@@ -51,9 +51,14 @@ export default function RequiredDocsPage() {
   const hierarchyTree = useMemo(() => {
     const q = search.trim().toLowerCase();
     return services.map(svc => {
-      const subs = subServices.filter(ss => ss.serviceId === svc.id || (ss.serviceIds && ss.serviceIds.includes(svc.id)));
+      const subs = subServices.filter(ss =>
+        ss.serviceId === svc.id ||
+        (svc.id && ensureUUID(ss.serviceId) === ensureUUID(svc.id)) ||
+        (ss.serviceIds && (ss.serviceIds.includes(svc.id) || (svc.id && ss.serviceIds.some(id => ensureUUID(id) === ensureUUID(svc.id)))))
+      );
       const filteredSubs = subs.map(ss => {
-        const docs = requiredDocs.filter(d => d.subServiceId === ss.id && (
+        const docs = requiredDocs.filter(d =>
+          (d.subServiceId === ss.id || (ss.id && ensureUUID(d.subServiceId) === ensureUUID(ss.id))) && (
           !q ||
           d.name.toLowerCase().includes(q) ||
           ss.name.toLowerCase().includes(q) ||
@@ -260,8 +265,8 @@ export default function RequiredDocsPage() {
               <div style={{ fontSize: 13, fontWeight: 700, color: "#475569", marginBottom: 12 }}>
                 Required Documents Checklist & Sample Downloads:
               </div>
-              {requiredDocs.filter(d => d.subServiceId === viewSubServiceModal.id).length > 0 ? (
-                requiredDocs.filter(d => d.subServiceId === viewSubServiceModal.id).map(doc => {
+              {requiredDocs.filter(d => d.subServiceId === viewSubServiceModal.id || (viewSubServiceModal.id && ensureUUID(d.subServiceId) === ensureUUID(viewSubServiceModal.id))).length > 0 ? (
+                requiredDocs.filter(d => d.subServiceId === viewSubServiceModal.id || (viewSubServiceModal.id && ensureUUID(d.subServiceId) === ensureUUID(viewSubServiceModal.id))).map(doc => {
                   const samplePdfData = doc.fileUrl || `data:application/pdf;base64,JVBERi0xLjQKJSDl4uXn...`;
                   const fileName = doc.fileName || `${doc.name.replace(/\s+/g, "_")}_Sample.pdf`;
 
@@ -491,13 +496,17 @@ export default function RequiredDocsPage() {
                           onChange={e => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              setForm(f => ({
-                                ...f,
-                                fileName: file.name,
-                                fileUrl: URL.createObjectURL(file),
-                                fileType: "PDF"
-                              }));
-                              toast.success(`Attached ${file.name}`);
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                setForm(f => ({
+                                  ...f,
+                                  fileName: file.name,
+                                  fileUrl: reader.result as string,
+                                  fileType: "PDF"
+                                }));
+                                toast.success(`Attached ${file.name}`);
+                              };
+                              reader.readAsDataURL(file);
                             }
                           }}
                         />

@@ -2,7 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState, useMemo, useRef } from "react";
-import { formatCurrency, formatDate, getCurrentFY, getFYOptions, numberToWords } from "@/lib/utils";
+import { formatCurrency, formatDate, getCurrentFY, getFYOptions, numberToWords, ensureUUID } from "@/lib/utils";
 import { Invoice, InvoiceItem, InvoiceType } from "@/lib/types";
 import {
   Plus, Printer, Eye, X, IndianRupee, FileText, Filter, CheckCircle2,
@@ -127,7 +127,7 @@ export default function InvoicePage() {
       toast.error("Please select a client");
       return;
     }
-    const clientObj = clients.find(c => c.id === form.clientId);
+    const clientObj = clients.find(c => c.id === form.clientId || (form.clientId && ensureUUID(c.id) === ensureUUID(form.clientId)));
     const finalAmountReceived = status === "PAID" ? total : (form.amountReceived || 0);
 
     const invoiceRecord: Invoice = {

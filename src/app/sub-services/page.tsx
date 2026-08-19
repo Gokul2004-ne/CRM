@@ -5,7 +5,7 @@ import { useState, useMemo } from "react";
 import { SubService, Service } from "@/lib/types";
 import { Plus, Pencil, Trash2, Search, Eye, Check, Sparkles, Calendar, RefreshCw, X, Layers } from "lucide-react";
 import { toast } from "sonner";
-import { formatDate, ALL_MONTHS } from "@/lib/utils";
+import { formatDate, ALL_MONTHS, ensureUUID } from "@/lib/utils";
 
 type Recurrence = "MONTHLY" | "QUARTERLY" | "ANNUALLY" | "CUSTOM";
 
@@ -106,8 +106,8 @@ export default function ServicesPage() {
 
   const filtered = useMemo(() =>
     subServices.filter(ss => {
-      const parentSvc = services.find(s => s.id === ss.serviceId);
-      const matchesPkg = filterPackage === "all" || ss.serviceId === filterPackage;
+      const parentSvc = services.find(s => s.id === ss.serviceId || (ss.serviceId && ensureUUID(s.id) === ensureUUID(ss.serviceId)));
+      const matchesPkg = filterPackage === "all" || ss.serviceId === filterPackage || (filterPackage && ensureUUID(ss.serviceId) === ensureUUID(filterPackage));
       const query = search.toLowerCase().trim();
       const matchesSearch = !query ||
                             ss.name.toLowerCase().includes(query) ||

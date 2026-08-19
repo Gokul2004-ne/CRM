@@ -54,7 +54,7 @@ function deduplicateItems<T extends { id: string }>(
     if (getKey) {
       const key = getKey(item);
       if (key && seenKeys.has(key)) {
-        duplicateIds.push(item.id);
+        // Drop secondary in-memory collision but do not purge unless identical ID
         return;
       }
       if (key) seenKeys.add(key);
@@ -70,26 +70,27 @@ function deduplicateItems<T extends { id: string }>(
 const getClientKey = (c: Client) => {
   const name = (c.name || '').toLowerCase().trim();
   const detail = (c.pan || c.panNo || c.gstin || c.gstNo || c.email || c.mobile || c.phone || '').toLowerCase().trim();
-  return detail ? `${name}_${detail}` : name;
+  return detail ? `${name}_${detail}` : `${name}_${c.id}`;
 };
 const getServiceKey = (s: Service) => (s.name || '').toLowerCase().trim();
-const getSubServiceKey = (ss: SubService) => (ss.name || '').toLowerCase().trim();
-const getRequiredDocKey = (rd: RequiredDoc) => (rd.name || '').toLowerCase().trim();
+const getSubServiceKey = (ss: SubService) => `${(ss.serviceId || (ss.serviceIds && ss.serviceIds[0]) || '').trim()}_${(ss.name || '').toLowerCase().trim()}`;
+const getRequiredDocKey = (rd: RequiredDoc) => `${(rd.subServiceId || '').trim()}_${(rd.name || '').toLowerCase().trim()}`;
 const getAssignedServiceKey = (a: AssignedService) => `${(a.clientId || '').trim()}_${(a.serviceId || '').trim()}_${(a.financialYear || '').trim()}_${(a.dueDate || '').trim()}`;
-const getBankingEntryKey = (b: BankingEntry) => `${(b.clientId || '').trim()}_${(b.serviceId || '').trim()}_${(b.financialYear || '').trim()}_${b.amountBilled || 0}_${b.amountReceived || 0}`;
+const getBankingEntryKey = (b: BankingEntry) => b.id || `${(b.clientId || '').trim()}_${(b.serviceId || '').trim()}_${(b.financialYear || '').trim()}_${b.amountBilled || 0}_${b.amountReceived || 0}`;
 const getLeadKey = (l: Lead) => {
   const name = (l.name || '').toLowerCase().trim();
-  const contact = (l.mobile || l.phone || '').toLowerCase().trim();
-  return name ? `${name}_${contact}` : '';
+  const contact = (l.mobile || l.phone || l.email || '').toLowerCase().trim();
+  return contact ? `${name}_${contact}` : `${name}_${l.id}`;
 };
-const getDraftKey = (d: DocumentDraft) => (d.title || '').toLowerCase().trim();
+const getDraftKey = (d: DocumentDraft) => `${(d as any).clientId || ''}_${(d.title || '').toLowerCase().trim()}`;
 const getCollabKey = (c: Collaboration) => {
   const name = (c.name || '').toLowerCase().trim();
   const detail = (c.number || c.email || '').toLowerCase().trim();
-  return name ? `${name}_${detail}` : '';
+  return detail ? `${name}_${detail}` : `${name}_${c.id}`;
 };
-const getInvoiceKey = (inv: Invoice) => `${(inv.invoiceNumber || '').toLowerCase().trim()}_${(inv.type || '').toLowerCase().trim()}`;
-const getOneTimeKey = (ots: OneTimeService) => `${(ots.clientName || '').toLowerCase().trim()}_${(ots.serviceName || '').toLowerCase().trim()}`;
+const getInvoiceKey = (inv: Invoice) => (inv.invoiceNumber || '').toLowerCase().trim() ? `${(inv.invoiceNumber || '').toLowerCase().trim()}_${(inv.type || '').toLowerCase().trim()}` : inv.id;
+const getOneTimeKey = (ots: OneTimeService) => `${(ots.clientName || '').toLowerCase().trim()}_${(ots.serviceName || '').toLowerCase().trim()}_${(ots.dueDate || '').trim()}`;
+const getRenewalKey = (rn: any) => `${(rn.clientName || '').toLowerCase().trim()}_${(rn.serviceName || '').toLowerCase().trim()}_${(rn.financialYear || rn.dueDate || '').trim()}`;
 
 // User-Scoped LocalStorage Persistence Helpers (Strict Multi-Tenant Privacy)
 function getScopedUserKey(key: string): string {
@@ -590,7 +591,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   // Required Docs Sync
   addRequiredDoc: (d) => {
-    const dFixed: RequiredDoc = { ...d, id: ensureUUID(d.id) };
+    const dFixed: RequiredDoc = {
+      ...d,
+      id: ensureUUID(d.id),
+      subServiceId: d.subServiceId ? d.subServiceId.trim() : "",
+      name: d.name.trim(),
+    };
     set((s) => {
       const key = getRequiredDocKey(dFixed);
       if (s.requiredDocs.some(x => x.id === dFixed.id || (key && getRequiredDocKey(x) === key))) return s;
@@ -601,21 +607,31 @@ export const useAppStore = create<AppState>()((set, get) => ({
     syncRequiredDocToSupabase(dFixed);
   },
   updateRequiredDoc: (d) => {
+    const cleanId = d.id;
+    const dFixed: RequiredDoc = { ...d, id: ensureUUID(d.id) };
     set((s) => {
-      const next = s.requiredDocs.map(x => x.id === d.id ? d : x);
-      saveToLocal("requiredDocs", next);
-      return { requiredDocs: next };
+      let found = false;
+      const next = s.requiredDocs.map(x => {
+        if (x.id === cleanId || (cleanId && ensureUUID(x.id) === ensureUUID(cleanId))) {
+          found = true;
+          return { ...x, ...dFixed };
+        }
+        return x;
+      });
+      const finalDocs = found ? next : [...s.requiredDocs, dFixed];
+      saveToLocal("requiredDocs", finalDocs);
+      return { requiredDocs: finalDocs };
     });
-    syncRequiredDocToSupabase(d);
+    syncRequiredDocToSupabase(dFixed);
   },
   deleteRequiredDoc: (id) => {
-    const target = useAppStore.getState().requiredDocs.find(d => d.id === id);
+    const target = useAppStore.getState().requiredDocs.find(d => d.id === id || (id && ensureUUID(d.id) === ensureUUID(id)));
     const targetName = target?.name;
     removeRequiredDocFromSupabase(id, targetName);
     set((s) => {
       const next = s.requiredDocs.filter(x => {
         if (x.id === id) return false;
-        if (targetName && x.name?.toLowerCase().trim() === targetName.toLowerCase().trim()) return false;
+        if (id && ensureUUID(x.id) === ensureUUID(id)) return false;
         return true;
       });
       saveToLocal("requiredDocs", next);

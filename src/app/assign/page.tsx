@@ -4,7 +4,7 @@ import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
 import { AssignedService, SubService } from "@/lib/types";
 import { Plus, Pencil, Trash2, Search, Eye, MessageCircle, AlertTriangle, CheckCircle2, Clock, Circle, Calendar } from "lucide-react";
-import { formatDate, getCurrentFY, getFYOptions, getWhatsAppLink, ALL_MONTHS, getValidDateForMonthDay } from "@/lib/utils";
+import { formatDate, getCurrentFY, getFYOptions, getWhatsAppLink, ALL_MONTHS, getValidDateForMonthDay, ensureUUID } from "@/lib/utils";
 import { toast } from "sonner";
 
 function getNextUpcomingDueDate(applicableMonths?: string[], targetDay: number = 15): string {
@@ -76,9 +76,9 @@ export default function AssignPage() {
     const list = assignedServices
       .filter(a => a.financialYear === selectedFY)
       .filter(a => {
-        const client = clients.find(c => c.id === a.clientId);
-        const service = services.find(s => s.id === a.serviceId);
-        const subs = subServices.filter(ss => a.subServiceIds?.includes(ss.id));
+        const client = clients.find(c => c.id === a.clientId || (a.clientId && ensureUUID(c.id) === ensureUUID(a.clientId)));
+        const service = services.find(s => s.id === a.serviceId || (a.serviceId && ensureUUID(s.id) === ensureUUID(a.serviceId)));
+        const subs = subServices.filter(ss => a.subServiceIds?.some(sid => sid === ss.id || (sid && ensureUUID(sid) === ensureUUID(ss.id))));
         const subName = subs.map(s => s.name).join(" ");
         return (client?.name || "").toLowerCase().includes(search.toLowerCase()) ||
                (service?.name || "").toLowerCase().includes(search.toLowerCase()) ||
@@ -100,7 +100,11 @@ export default function AssignPage() {
   const availableSubServices = useMemo(() => {
     const list = subServices.length > 0 ? subServices : DEFAULT_SUB_SERVICES;
     if (!form.serviceId) return list;
-    const directMatches = list.filter(ss => ss.serviceId === form.serviceId || (ss.serviceIds && ss.serviceIds.includes(form.serviceId)));
+    const directMatches = list.filter(ss =>
+      ss.serviceId === form.serviceId ||
+      (form.serviceId && ensureUUID(ss.serviceId) === ensureUUID(form.serviceId)) ||
+      (ss.serviceIds && (ss.serviceIds.includes(form.serviceId) || (form.serviceId && ss.serviceIds.some(sid => ensureUUID(sid) === ensureUUID(form.serviceId)))))
+    );
     return directMatches.length > 0 ? directMatches : list;
   }, [subServices, form.serviceId]);
 
