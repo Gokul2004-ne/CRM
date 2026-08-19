@@ -395,10 +395,8 @@ export default function InvoicePage() {
                             className="btn-slds"
                             style={{ padding: "4px 8px", fontSize: 11, fontWeight: 700, background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA" }}
                             onClick={() => {
-                              if (confirm(`Delete ${inv.type} #${inv.invoiceNumber}? This will automatically remove its entry from Banking & Ledger as well.`)) {
-                                deleteInvoice(inv.id);
-                                toast.success(`${inv.type} #${inv.invoiceNumber} deleted!`);
-                              }
+                              deleteInvoice(inv.id);
+                              toast.success(`${inv.type} #${inv.invoiceNumber} deleted!`);
                             }}
                             title="Delete document"
                           >

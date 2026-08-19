@@ -69,7 +69,7 @@ function deduplicateItems<T extends { id: string }>(
 
 const getClientKey = (c: Client) => {
   const name = (c.name || '').toLowerCase().trim();
-  const detail = (c.pan || c.panNo || c.gstin || c.gstNo || c.email || '').toLowerCase().trim();
+  const detail = (c.pan || c.panNo || c.gstin || c.gstNo || c.email || c.mobile || c.phone || '').toLowerCase().trim();
   return detail ? `${name}_${detail}` : name;
 };
 const getServiceKey = (s: Service) => (s.name || '').toLowerCase().trim();
@@ -135,6 +135,26 @@ function saveToLocal(key: string, data: any) {
     localStorage.setItem(fullKey, JSON.stringify(data));
   } catch (e) {
     console.error(`Error saving ${key} to localStorage:`, e);
+  }
+}
+
+export function purgeUserLocalData(email?: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const clean = (email || "").toLowerCase().replace(/[^a-z0-9_]/g, "_");
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (clean && key.toLowerCase().includes(clean)) {
+        toRemove.push(key);
+      } else if (key.startsWith("zpluscrm_local_")) {
+        toRemove.push(key);
+      }
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
+  } catch (e) {
+    console.error("Error purging local data:", e);
   }
 }
 
@@ -305,54 +325,22 @@ export const useAppStore = create<AppState>()((set, get) => ({
       } catch {}
     }
 
-    // MERGE STRATEGY: Combine cloud data + local-only records.
-    // Local records not found in cloud are preserved (they may not have synced yet)
-    // and will be re-uploaded to Supabase further below.
-    function mergeCloudLocal<T extends { id: string }>(
-      cloudItems: T[],
-      localItems: T[],
-      getKey: (item: T) => string
-    ): { merged: T[]; localOnly: T[] } {
-      const cloudIds = new Set(cloudItems.map(i => i.id));
-      const cloudKeys = new Set(cloudItems.map(i => getKey(i)).filter(Boolean));
-      const localOnly = localItems.filter(item => {
-        if (!item || !item.id) return false;
-        if (cloudIds.has(item.id)) return false;
-        const key = getKey(item);
-        if (key && cloudKeys.has(key)) return false;
-        return true;
-      });
-      return { merged: [...cloudItems, ...localOnly], localOnly };
-    }
-
     const useCloud = data !== null;
-    const cloudClients = useCloud ? data!.clients : [];
-    const cloudServices = useCloud ? data!.services : [];
-    const cloudSubServices = useCloud ? data!.subServices : [];
-    const cloudRequiredDocs = useCloud ? data!.requiredDocs : [];
-    const cloudAssigned = useCloud ? data!.assignedServices : [];
-    const cloudBanking = useCloud ? data!.bankingEntries : [];
-    const cloudLeads = useCloud ? data!.leads : [];
-    const cloudDrafts = useCloud ? data!.drafts : [];
-    const cloudCollabs = useCloud ? data!.collaborations : [];
-    const cloudInvoices = useCloud ? (data!.invoices || []) : [];
-    const cloudOneTime = useCloud ? (data!.oneTimeServices || []) : [];
-    const cloudRenewals = useCloud ? (data!.renewals || []) : [];
-
     const renewalKey = (rn: any) => `${(rn.clientName || '').toLowerCase()}_${(rn.serviceName || '').toLowerCase()}`;
 
-    const { merged: rawClients, localOnly: loClients } = useCloud ? mergeCloudLocal(cloudClients, localClients, getClientKey) : { merged: localClients, localOnly: [] };
-    const { merged: rawServices, localOnly: loServices } = useCloud ? mergeCloudLocal(cloudServices, localServices, getServiceKey) : { merged: localServices, localOnly: [] };
-    const { merged: rawSubServices, localOnly: loSubServices } = useCloud ? mergeCloudLocal(cloudSubServices, localSubServices, getSubServiceKey) : { merged: localSubServices, localOnly: [] };
-    const { merged: rawRequiredDocs, localOnly: loRequiredDocs } = useCloud ? mergeCloudLocal(cloudRequiredDocs, localRequiredDocs, getRequiredDocKey) : { merged: localRequiredDocs, localOnly: [] };
-    const { merged: rawAssigned, localOnly: loAssigned } = useCloud ? mergeCloudLocal(cloudAssigned, localAssigned, getAssignedServiceKey) : { merged: localAssigned, localOnly: [] };
-    const { merged: rawBanking, localOnly: loBanking } = useCloud ? mergeCloudLocal(cloudBanking, localBanking, getBankingEntryKey) : { merged: localBanking, localOnly: [] };
-    const { merged: rawLeads, localOnly: loLeads } = useCloud ? mergeCloudLocal(cloudLeads, localLeads, getLeadKey) : { merged: localLeads, localOnly: [] };
-    const { merged: rawDrafts, localOnly: loDrafts } = useCloud ? mergeCloudLocal(cloudDrafts, localDrafts, getDraftKey) : { merged: localDrafts, localOnly: [] };
-    const { merged: rawCollabs, localOnly: loCollabs } = useCloud ? mergeCloudLocal(cloudCollabs, localCollabs, getCollabKey) : { merged: localCollabs, localOnly: [] };
-    const { merged: rawInvoices, localOnly: loInvoices } = useCloud ? mergeCloudLocal(cloudInvoices, localInvoices, getInvoiceKey) : { merged: localInvoices, localOnly: [] };
-    const { merged: rawOneTime, localOnly: loOneTime } = useCloud ? mergeCloudLocal(cloudOneTime, localOneTime, getOneTimeKey) : { merged: localOneTime, localOnly: [] };
-    const { merged: rawRenewals, localOnly: loRenewals } = useCloud ? mergeCloudLocal(cloudRenewals, localRenewals, renewalKey) : { merged: localRenewals, localOnly: [] };
+    // When Supabase is available, cloud data is authoritative (deleted items stay deleted)
+    const rawClients = useCloud ? data!.clients : localClients;
+    const rawServices = useCloud ? data!.services : localServices;
+    const rawSubServices = useCloud ? data!.subServices : localSubServices;
+    const rawRequiredDocs = useCloud ? data!.requiredDocs : localRequiredDocs;
+    const rawAssigned = useCloud ? data!.assignedServices : localAssigned;
+    const rawBanking = useCloud ? data!.bankingEntries : localBanking;
+    const rawLeads = useCloud ? data!.leads : localLeads;
+    const rawDrafts = useCloud ? data!.drafts : localDrafts;
+    const rawCollabs = useCloud ? data!.collaborations : localCollabs;
+    const rawInvoices = useCloud ? (data!.invoices || []) : localInvoices;
+    const rawOneTime = useCloud ? (data!.oneTimeServices || []) : localOneTime;
+    const rawRenewals = useCloud ? (data!.renewals || []) : localRenewals;
 
     const clientsRes = deduplicateItems(rawClients, getClientKey);
     const servicesRes = deduplicateItems(rawServices, getServiceKey);
@@ -423,22 +411,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
     saveToLocal("oneTimeServices", oneTimeRes.unique);
     saveToLocal("renewals", renewalsRes.unique);
 
-    // Re-upload local-only records that were missing from Supabase (missed sync)
-    if (useCloud) {
-      loClients.forEach(c => syncClientToSupabase(c));
-      loServices.forEach(s => syncServiceToSupabase(s));
-      loSubServices.forEach(ss => syncSubServiceToSupabase(ss));
-      loRequiredDocs.forEach(d => syncRequiredDocToSupabase(d));
-      loAssigned.forEach(a => syncAssignedServiceToSupabase(a));
-      loBanking.forEach(b => syncBankingEntryToSupabase(b));
-      loLeads.forEach(l => syncLeadToSupabase(l));
-      loDrafts.forEach(d => syncDraftToSupabase(d));
-      loCollabs.forEach(c => syncCollaborationToSupabase(c));
-      loInvoices.forEach(inv => syncInvoiceToSupabase(inv));
-      loOneTime.forEach(ots => syncOneTimeServiceToSupabase(ots));
-      loRenewals.forEach(rn => syncRenewalToSupabase(rn));
-    }
-
     // Sync clean data & purge duplicate IDs from Supabase
     if (clientsRes.duplicateIds.length) purgeDuplicatesFromSupabase("clients", clientsRes.duplicateIds);
     if (servicesRes.duplicateIds.length) purgeDuplicatesFromSupabase("services", servicesRes.duplicateIds);
@@ -468,11 +440,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
     // Auto-provision initial portal credentials if missing
     const panId = (c.pan || c.panNo || "").trim();
     const gstId = (c.gstNo || c.gstin || "").trim();
-    const portalCredentials = (c.portalCredentials && c.portalCredentials.length > 0)
+    const portalCredentials = c.portalCredentials !== undefined
       ? c.portalCredentials
       : [
-          { id: `cred_gst_${Date.now()}`, portalName: "GST Portal", portalId: gstId || "Not Set", password: c.gstPortalPassword || "TempPass@123" },
-          { id: `cred_it_${Date.now()}`, portalName: "Income Tax Portal", portalId: panId || "Not Set", password: "TempPass@123" }
+          { id: `cred_gst_${Date.now()}`, portalName: "GST Portal", portalId: gstId || "Not Set", password: c.gstPortalPassword || "" },
+          { id: `cred_it_${Date.now()}`, portalName: "Income Tax Portal", portalId: panId || "Not Set", password: "" }
         ];
 
     const preparedClient: Client = {
@@ -495,20 +467,35 @@ export const useAppStore = create<AppState>()((set, get) => ({
     });
   },
   updateClient: (c) => {
+    const cleanId = c.id;
+    const targetName = c.name?.toLowerCase().trim();
     syncClientToSupabase(c);
     set((s) => {
-      const next = s.clients.map(x => x.id === c.id ? c : x);
-      saveToLocal("clients", next);
-      return { clients: next };
+      let found = false;
+      const next = s.clients.map(x => {
+        if (
+          x.id === cleanId ||
+          (cleanId && ensureUUID(x.id) === ensureUUID(cleanId)) ||
+          (targetName && x.name?.toLowerCase().trim() === targetName)
+        ) {
+          found = true;
+          return { ...x, ...c };
+        }
+        return x;
+      });
+      const finalClients = found ? next : [...s.clients, c];
+      saveToLocal("clients", finalClients);
+      return { clients: finalClients };
     });
   },
   deleteClient: (id) => {
-    const target = useAppStore.getState().clients.find(c => c.id === id);
+    const target = useAppStore.getState().clients.find(c => c.id === id || (id && ensureUUID(c.id) === ensureUUID(id)));
     const targetName = target?.name;
     removeClientFromSupabase(id, targetName);
     set((s) => {
       const next = s.clients.filter(x => {
         if (x.id === id) return false;
+        if (id && ensureUUID(x.id) === ensureUUID(id)) return false;
         if (targetName && x.name?.toLowerCase().trim() === targetName.toLowerCase().trim()) return false;
         return true;
       });

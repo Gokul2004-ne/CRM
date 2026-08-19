@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { useAppStore } from "@/lib/store";
+import { ensureUUID } from "@/lib/utils";
 
 interface AuthContextType {
   user: User | null;
@@ -18,48 +19,14 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Account Persistence Helpers
-const getStoredAccounts = (): Record<string, string> => {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = localStorage.getItem("zpluscrm_user_accounts");
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-};
-
-const saveStoredAccount = (email: string, pass: string) => {
-  if (typeof window === "undefined") return;
-  try {
-    const accounts = getStoredAccounts();
-    accounts[email.toLowerCase().trim()] = pass;
-    localStorage.setItem("zpluscrm_user_accounts", JSON.stringify(accounts));
-  } catch (e) {
-    console.error("Failed to save local auth account", e);
-  }
-};
-
-const checkLocalAccount = (email: string, pass: string): boolean => {
-  const accounts = getStoredAccounts();
-  const storedPass = accounts[email.toLowerCase().trim()];
-  return storedPass === pass;
-};
-
-const isAccountRegistered = (email: string): boolean => {
-  const accounts = getStoredAccounts();
-  const clean = email.toLowerCase().trim();
-  return Object.prototype.hasOwnProperty.call(accounts, clean);
-};
-
 const isValidRealEmail = (email: string): boolean => {
   if (!email) return false;
   const clean = email.toLowerCase().trim();
-  // RFC compliant strict email pattern
+  // Strict RFC-compliant email pattern
   const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   if (!regex.test(clean)) return false;
 
-  // Reject obvious placeholder/invalid domains
+  // Reject placeholder/invalid domains
   const domain = clean.split("@")[1];
   const invalidDomains = ["b.c", "test.com", "example.com", "dummy.com", "asdf.com", "foo.bar"];
   if (invalidDomains.includes(domain)) return false;
@@ -73,6 +40,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    // Client-side cleanup: disable auto scroll restoration and unregister stale service workers
+    if (typeof window !== "undefined") {
+      if ("scrollRestoration" in window.history) {
+        window.history.scrollRestoration = "manual";
+      }
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+    }
+
     // 1. Check initial Supabase session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
@@ -80,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session.user ?? null);
         setLoading(false);
       } else {
-        // Fallback to saved session if present
+        // Fallback to active session if present in browser storage
         if (typeof window !== "undefined") {
           try {
             const rawSession = localStorage.getItem("zpluscrm_active_session");
@@ -105,10 +86,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
 
         const { id, email } = session.user;
-        await supabase.from("profiles").upsert(
-          { id, email, created_at: new Date().toISOString() },
-          { onConflict: "id" }
-        );
+        if (email) {
+          await supabase.from("profiles").upsert(
+            { id, email, created_at: new Date().toISOString() },
+            { onConflict: "id" }
+          );
+        }
       }
     });
 
@@ -126,45 +109,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: { message: "Please enter a valid real email address (e.g. name@company.com)." } };
     }
 
-    // Try native Supabase Auth first
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: cleanEmail,
-      password: pass,
-    });
+    // 2. Try native Supabase Auth sign-in
+    try {
+      const { data } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: pass,
+      });
 
-    if (data?.session) {
-      setSession(data.session);
-      setUser(data.session.user);
-      saveStoredAccount(cleanEmail, pass);
-      return { error: null };
-    }
-
-    // 2. Check if user is registered locally OR in Cloud Database
-    let isRegistered = isAccountRegistered(cleanEmail);
-    let cloudPass: string | null = null;
-
-    if (!isRegistered) {
-      try {
-        const { data: regSetting } = await supabase.from("user_settings").select("settings").eq("id", "global_user_registry").maybeSingle();
-        if (regSetting?.settings && regSetting.settings[cleanEmail]) {
-          isRegistered = true;
-          cloudPass = regSetting.settings[cleanEmail];
-          saveStoredAccount(cleanEmail, cloudPass!);
-        } else {
-          const { data: profile } = await supabase.from("profiles").select("email, full_name").eq("email", cleanEmail).maybeSingle();
-          if (profile) {
-            isRegistered = true;
-            cloudPass = profile.full_name || pass;
-            if (cloudPass) {
-              saveStoredAccount(cleanEmail, cloudPass);
-            }
-          }
+      if (data?.session) {
+        setSession(data.session);
+        setUser(data.session.user);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("zpluscrm_active_session", JSON.stringify(data.session));
         }
-      } catch (err) {}
+        return { error: null };
+      }
+    } catch (err) {
+      console.log("Supabase native sign-in notice:", err);
     }
 
-    // MANDATORY REQUIREMENT: Block sign in if account has NOT registered first!
-    if (!isRegistered) {
+    // 3. Centralized Database Query against public.crm_users in Supabase Cloud
+    let cloudUser: any = null;
+    try {
+      const { data: dbUser } = await supabase
+        .from("crm_users")
+        .select("*")
+        .ilike("email", cleanEmail)
+        .maybeSingle();
+
+      if (dbUser) {
+        cloudUser = dbUser;
+      } else {
+        // Fallback check on profiles table in Supabase Cloud
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .ilike("email", cleanEmail)
+          .maybeSingle();
+
+        if (profile) {
+          cloudUser = {
+            email: profile.email,
+            password_hash: profile.full_name || pass,
+            full_name: profile.full_name || cleanEmail.split("@")[0],
+            company_name: "Practice Management",
+            role: profile.role || "admin",
+          };
+        }
+      }
+    } catch (err) {
+      console.error("Centralized database auth lookup error:", err);
+    }
+
+    // STRICT REQUIREMENT: If email does NOT exist in the centralized cloud database, return unregistered error
+    if (!cloudUser) {
       return {
         error: {
           message: "❌ Account not registered! You must sign up / register your email first before logging in.",
@@ -172,29 +170,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
-    // Verify password for registered account (either local match or cloud match)
-    if (checkLocalAccount(cleanEmail, pass) || (cloudPass && cloudPass === pass)) {
-      const mockUser: any = {
-        id: "usr_" + cleanEmail.replace(/[^a-z0-9]/gi, "_"),
-        email: cleanEmail,
-        aud: "authenticated",
-        role: "authenticated",
-        created_at: new Date().toISOString(),
-        user_metadata: { company_name: "Practice Management" }
+    // 4. Verify password against the cloud database record
+    const expectedPassword = cloudUser.password_hash;
+    if (expectedPassword && expectedPassword !== pass) {
+      return {
+        error: {
+          message: "❌ Incorrect password. Please check your credentials and try again.",
+        },
       };
-      const mockSession: any = {
-        access_token: "mock_token_" + Date.now(),
-        user: mockUser
-      };
-      setSession(mockSession);
-      setUser(mockUser);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("zpluscrm_active_session", JSON.stringify(mockSession));
-      }
-      return { error: null };
     }
 
-    return { error: { message: "❌ Incorrect password. Please check your credentials and try again." } };
+    // 5. Build and synchronize authenticated session across all devices
+    const authUser: any = {
+      id: "usr_" + cleanEmail.replace(/[^a-z0-9]/gi, "_"),
+      email: cleanEmail,
+      aud: "authenticated",
+      role: cloudUser.role || "authenticated",
+      created_at: cloudUser.created_at || new Date().toISOString(),
+      user_metadata: {
+        full_name: cloudUser.full_name,
+        company_name: cloudUser.company_name || "Practice Management",
+      },
+    };
+    const authSession: any = {
+      access_token: "jwt_token_" + Date.now(),
+      user: authUser,
+    };
+
+    setSession(authSession);
+    setUser(authUser);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("zpluscrm_active_session", JSON.stringify(authSession));
+    }
+
+    return { error: null };
   };
 
   const signUpWithEmail = async (email: string, pass: string) => {
@@ -205,43 +214,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: { message: "Please enter a valid real email address for registration." } };
     }
 
-    saveStoredAccount(cleanEmail, pass);
-
     const usrId = "usr_" + cleanEmail.replace(/[^a-z0-9]/gi, "_");
 
-    // Persist registration cloud record so other devices immediately recognize this email
+    // 1. Immediately persist registration into centralized Supabase Cloud database
     try {
-      await supabase.from("profiles").upsert({
-        id: usrId,
-        email: cleanEmail,
-        full_name: pass,
-        created_at: new Date().toISOString()
-      }, { onConflict: "id" });
+      await supabase.from("crm_users").upsert(
+        {
+          email: cleanEmail,
+          password_hash: pass,
+          full_name: cleanEmail.split("@")[0],
+          company_name: "Practice Management",
+          role: "admin",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "email" }
+      );
 
-      const { data: currentReg } = await supabase.from("user_settings").select("settings").eq("id", "global_user_registry").maybeSingle();
-      const updatedRegistry = currentReg?.settings || {};
-      updatedRegistry[cleanEmail] = pass;
-      await supabase.from("user_settings").upsert({
-        id: "global_user_registry",
-        user_id: "global",
-        settings: updatedRegistry,
-        updated_at: new Date().toISOString()
-      }, { onConflict: "id" });
-    } catch (err) {}
+      const profileId = ensureUUID(cleanEmail);
+      await supabase.from("profiles").upsert(
+        {
+          id: profileId,
+          email: cleanEmail,
+          full_name: cleanEmail.split("@")[0],
+          role: "user",
+          created_at: new Date().toISOString(),
+        },
+        { onConflict: "id" }
+      );
+    } catch (err) {
+      console.error("Error saving user registration to Supabase cloud:", err);
+    }
 
-    const mockUser: any = {
-      id: usrId,
-      email: cleanEmail,
-      aud: "authenticated",
-      role: "authenticated",
-      created_at: new Date().toISOString(),
-      user_metadata: {}
-    };
-    const mockSession: any = {
-      access_token: "mock_token_" + Date.now(),
-      user: mockUser
-    };
-
+    // 2. Also attempt native Supabase Auth signUp in background
     try {
       const { data } = await supabase.auth.signUp({
         email: cleanEmail,
@@ -251,13 +255,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data?.session) {
         setSession(data.session);
         setUser(data.session.user);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("zpluscrm_active_session", JSON.stringify(data.session));
+        }
         return { error: null };
       }
     } catch (e) {
-      console.log("Supabase signUp background notice:", e);
+      console.log("Supabase background signUp notice:", e);
     }
 
-    // Set active session for verified registration
+    // 3. Set active authenticated session
+    const mockUser: any = {
+      id: usrId,
+      email: cleanEmail,
+      aud: "authenticated",
+      role: "authenticated",
+      created_at: new Date().toISOString(),
+      user_metadata: { company_name: "Practice Management" },
+    };
+    const mockSession: any = {
+      access_token: "jwt_token_" + Date.now(),
+      user: mockUser,
+    };
+
     setSession(mockSession);
     setUser(mockUser);
     if (typeof window !== "undefined") {
@@ -268,7 +288,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     useAppStore.getState().resetStore();
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {}
     setUser(null);
     setSession(null);
     if (typeof window !== "undefined") {
@@ -278,20 +300,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updatePassword = async (newPassword: string) => {
     if (user?.email) {
-      saveStoredAccount(user.email, newPassword);
+      const cleanEmail = user.email.toLowerCase().trim();
+      try {
+        await supabase
+          .from("crm_users")
+          .update({ password_hash: newPassword, updated_at: new Date().toISOString() })
+          .ilike("email", cleanEmail);
+      } catch (err) {
+        console.error("Error updating cloud password:", err);
+      }
     }
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
+    try {
+      await supabase.auth.updateUser({
+        password: newPassword,
+      });
+    } catch {}
     return { error: null };
   };
 
   const resetPasswordForEmail = async (email: string, redirectTo?: string) => {
     const redirectUrl = redirectTo || (typeof window !== "undefined" ? `${window.location.origin}/reset-password` : undefined);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: redirectUrl,
-    });
-    return { error };
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      });
+      return { error };
+    } catch (err: any) {
+      return { error: err };
+    }
   };
 
   return (

@@ -198,10 +198,8 @@ export default function RenewalsPage() {
   };
 
   const handleRenewAction = (rn: RenewalItem) => {
-    if (confirm(`Renew service "${rn.serviceName}" for client "${rn.clientName}" for the next cycle?`)) {
-      renewService(rn.id);
-      toast.success(`Service "${rn.serviceName}" renewed for next cycle!`);
-    }
+    renewService(rn.id);
+    toast.success(`Service "${rn.serviceName}" renewed for next cycle!`);
   };
 
   const progressCounts = useMemo(() => {
@@ -445,10 +443,8 @@ export default function RenewalsPage() {
                           style={{ padding: 6, borderRadius: 8, background: "#FEE2E2" }}
                           title="Delete Renewal"
                           onClick={() => {
-                            if (confirm(`Delete renewal record for "${rn.clientName}"?`)) {
-                              deleteRenewal(rn.id);
-                              toast.success("Renewal deleted.");
-                            }
+                            deleteRenewal(rn.id);
+                            toast.success(`Deleted renewal record for "${rn.clientName}"`);
                           }}
                         >
                           <Trash2 size={15} color="#DC2626" />

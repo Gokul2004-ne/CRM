@@ -2,6 +2,7 @@ import { runUtilsTests } from "./unit/utils.test";
 import { runStoreTests } from "./unit/store.test";
 import { runDatabaseTests } from "./integration/database.test";
 import { runApiTests } from "./integration/api.test";
+import { runAuthTests } from "./integration/auth.test";
 import { runUATTests } from "./uat/user-acceptance.test";
 import { runBlackBoxTests } from "./blackbox/black-box.test";
 import { runRecursiveTests } from "./recursive/recursive.test";
@@ -34,6 +35,11 @@ async function runAllTests() {
   const apiRes = await runApiTests();
   totalPassed += apiRes.passed;
   totalFailed += apiRes.failed;
+
+  // 5. Run Authentication & Cross-Device Sync Tests
+  const authRes = await runAuthTests();
+  totalPassed += authRes.passed;
+  totalFailed += authRes.failed;
 
   // 5. Run User Acceptance Testing (UAT) Scenarios
   const uatRes = await runUATTests();

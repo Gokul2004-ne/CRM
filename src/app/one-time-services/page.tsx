@@ -245,10 +245,8 @@ export default function OneTimeServicesPage() {
                           className="icon-btn-slds"
                           title="Delete Service"
                           onClick={() => {
-                            if (confirm(`Delete one-time service "${ots.serviceName}" for ${ots.clientName}?`)) {
-                              deleteOneTimeService(ots.id);
-                              toast.success("One Time Service deleted!");
-                            }
+                            deleteOneTimeService(ots.id);
+                            toast.success(`Deleted one-time service "${ots.serviceName}"`);
                           }}
                         >
                           <Trash2 size={15} color="#DC2626" />

@@ -60,12 +60,12 @@ const emptyRow = (defaultName = ""): SelectedServiceRow => ({
   id: `row_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
   name: defaultName,
   recurrence: "MONTHLY",
-  applicableMonths: [...ALL_MONTHS],
+  applicableMonths: [], // Start empty so user is required to select months
   dueDateDay: 15,
   dueDate: ""
 });
 
-const empty = (): SubService => ({ id: "", serviceId: "", name: "", serviceIds: [], recurrence: "MONTHLY", applicableMonths: [...ALL_MONTHS], dueDateDay: 15, dueDate: "" });
+const empty = (): SubService => ({ id: "", serviceId: "", name: "", serviceIds: [], recurrence: "MONTHLY", applicableMonths: [], dueDateDay: 15, dueDate: "" });
 
 function getDueDateLabel(ss: SubService): string {
   if (ss.dueDateDay) {
@@ -128,7 +128,7 @@ export default function ServicesPage() {
       id: ss.id,
       name: ss.name,
       recurrence: ((ss as any).recurrence as Recurrence) || "MONTHLY",
-      applicableMonths: ss.applicableMonths || [...ALL_MONTHS],
+      applicableMonths: ss.applicableMonths || [],
       dueDateDay: ss.dueDateDay || 15,
       dueDate: ss.dueDate || ""
     }]);
@@ -199,7 +199,7 @@ export default function ServicesPage() {
         return;
       }
       if (!row.applicableMonths || row.applicableMonths.length === 0) {
-        toast.error("⚠️ Recurrence error: Please select at least one applicable month!");
+        toast.error("Please select at least one month before saving this service.");
         return;
       }
       const isDup = existingPkgSubs.some(ss => ss.id !== modal.editing?.id && ss.name.toLowerCase().trim() === row.name.toLowerCase().trim());
@@ -212,7 +212,7 @@ export default function ServicesPage() {
         ...form,
         name: row.name.trim(),
         recurrence: row.recurrence,
-        applicableMonths: row.applicableMonths || [...ALL_MONTHS],
+        applicableMonths: row.applicableMonths,
         dueDateDay: row.dueDateDay || 15,
         dueDate: row.dueDate,
         serviceIds: [form.serviceId],
@@ -232,7 +232,7 @@ export default function ServicesPage() {
       // Validate month selections
       const invalidMonthsRow = validRows.find(r => !r.applicableMonths || r.applicableMonths.length === 0);
       if (invalidMonthsRow) {
-        toast.error(`⚠️ Recurrence error on "${invalidMonthsRow.name}": Please select at least one month!`);
+        toast.error("Please select at least one month before saving this service.");
         return;
       }
 
@@ -246,6 +246,8 @@ export default function ServicesPage() {
         if (exists) {
           duplicates.push(nameClean);
         } else {
+          const months = r.applicableMonths || [];
+          const computedRecurrence = months.length === 12 ? "MONTHLY" : months.length === 4 ? "QUARTERLY" : months.length === 1 ? "ANNUALLY" : "CUSTOM";
           newSubServices.push({
             id: `ss_${Date.now()}_${i}`,
             serviceId: form.serviceId,
@@ -253,8 +255,8 @@ export default function ServicesPage() {
             serviceIds: [form.serviceId],
             clientId: form.clientId,
             clientName: form.clientName || clients.find(c => c.id === form.clientId)?.name || "",
-            recurrence: r.recurrence || "MONTHLY",
-            applicableMonths: r.applicableMonths || [...ALL_MONTHS],
+            recurrence: computedRecurrence,
+            applicableMonths: months,
             dueDateDay: r.dueDateDay || 15,
             dueDate: r.dueDate || ""
           });
@@ -400,7 +402,7 @@ export default function ServicesPage() {
                               const updated: SubService = {
                                 ...ss,
                                 dueDateDay: newDay,
-                                applicableMonths: ss.applicableMonths && ss.applicableMonths.length > 0 ? ss.applicableMonths : [...ALL_MONTHS]
+                                applicableMonths: ss.applicableMonths || []
                               };
                               updateSubService(updated);
                               toast.success(`Auto-saved! ${ss.name} due date set to ${newDay}${newDay === 1 || newDay === 21 || newDay === 31 ? "st" : newDay === 2 || newDay === 22 ? "nd" : newDay === 3 || newDay === 23 ? "rd" : "th"} of month.`);
@@ -630,7 +632,9 @@ export default function ServicesPage() {
                           onChange={e => updateRow(idx, "name", e.target.value)}
                           placeholder="e.g. GSTR-1"
                         />
-                                            {/* Plus Symbol (+) Beside Service Name to Append Below + Delete (✕) */}
+                      </div>
+
+                      {/* Plus Symbol (+) Beside Service Name to Append Below + Delete (✕) */}
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
                         <button
                           type="button"
@@ -655,22 +659,61 @@ export default function ServicesPage() {
                       </div>
 
                       {/* 1. Multi-Month Selector (12-Month Checkboxes) */}
-                      <div style={{ width: "100%", marginTop: 8, padding: 10, background: "#FFFFFF", borderRadius: 8, border: "1px solid #CBD5E1" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>
-                            🗓️ Select Applicable Months (Perpetual Yearly Recurrence):
+                      <div
+                        style={{
+                          width: "100%",
+                          marginTop: 8,
+                          padding: 12,
+                          background: (row.applicableMonths || []).length === 0 ? "#FEF2F2" : "#FFFFFF",
+                          borderRadius: 8,
+                          border: (row.applicableMonths || []).length === 0 ? "1.5px solid #EF4444" : "1px solid #CBD5E1",
+                          transition: "all 0.2s ease"
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: (row.applicableMonths || []).length === 0 ? "#DC2626" : "#0F172A" }}>
+                            🗓️ Select Applicable Months <span style={{ color: "#DC2626" }}>*</span>
                           </span>
-                          <button
-                            type="button"
-                            className="btn-slds btn-slds-secondary"
-                            style={{ padding: "2px 8px", fontSize: 10, fontWeight: 700 }}
-                            onClick={() => {
-                              const isAll = (row.applicableMonths || []).length === 12;
-                              updateRow(idx, "applicableMonths", isAll ? [] : [...ALL_MONTHS]);
-                            }}
-                          >
-                            {(row.applicableMonths || []).length === 12 ? "Deselect All" : "Select All 12 Months"}
-                          </button>
+                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                            <button
+                              type="button"
+                              className="btn-slds btn-slds-secondary"
+                              style={{ padding: "2px 6px", fontSize: 10, fontWeight: 600 }}
+                              onClick={() => updateRow(idx, "applicableMonths", [...ALL_MONTHS])}
+                              title="Select all 12 calendar months"
+                            >
+                              Monthly (All 12)
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-slds btn-slds-secondary"
+                              style={{ padding: "2px 6px", fontSize: 10, fontWeight: 600 }}
+                              onClick={() => updateRow(idx, "applicableMonths", ["June", "September", "December", "March"])}
+                              title="Select quarterly compliance months (Jun, Sep, Dec, Mar)"
+                            >
+                              Quarterly (4 Mo)
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-slds btn-slds-secondary"
+                              style={{ padding: "2px 6px", fontSize: 10, fontWeight: 600 }}
+                              onClick={() => updateRow(idx, "applicableMonths", ["July"])}
+                              title="Select annual compliance month (July)"
+                            >
+                              Annual (1 Mo)
+                            </button>
+                            {(row.applicableMonths || []).length > 0 && (
+                              <button
+                                type="button"
+                                className="btn-slds btn-slds-secondary"
+                                style={{ padding: "2px 6px", fontSize: 10, fontWeight: 600, color: "#DC2626", borderColor: "#FCA5A5" }}
+                                onClick={() => updateRow(idx, "applicableMonths", [])}
+                                title="Clear all month selections"
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
                           {ALL_MONTHS.map(m => {
@@ -709,6 +752,11 @@ export default function ServicesPage() {
                             );
                           })}
                         </div>
+                        {(row.applicableMonths || []).length === 0 && (
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
+                            ⚠️ Please select at least one month before saving this service.
+                          </div>
+                        )}
 
                         {/* 2. Single Day Picker (1-31) */}
                         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, paddingTop: 8, borderTop: "1px dashed #E2E8F0" }}>
@@ -729,7 +777,7 @@ export default function ServicesPage() {
                             (Applies to all selected months perpetually every year. Days 29–31 auto-adjust for shorter months)
                           </span>
                         </div>
-                      </div>      </div>
+                      </div>
                     </div>
                   ))}
                 </div>

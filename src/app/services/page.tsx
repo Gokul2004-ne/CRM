@@ -4,7 +4,7 @@ import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
 import { Service } from "@/lib/types";
 import { Plus, Pencil, Trash2, Search, IndianRupee, Package } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, ALL_MONTHS } from "@/lib/utils";
 import { toast } from "sonner";
 
 const PACKAGE_TYPES = [
@@ -19,7 +19,7 @@ const PACKAGE_TYPES = [
 ];
 
 const emptyService = (): Service => ({
-  id: "", name: "", price: 0, recurrence: "ANNUAL", applicableMonths: [], dueDate: ""
+  id: "", name: "", price: 0, recurrence: "MONTHLY", applicableMonths: [], dueDate: ""
 });
 
 export default function PackagesPage() {
@@ -27,18 +27,27 @@ export default function PackagesPage() {
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<{ open: boolean; editing: Service | null }>({ open: false, editing: null });
   const [form, setForm] = useState<Service>(emptyService());
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const filtered = useMemo(() =>
     services.filter(s => s.name.toLowerCase().includes(search.toLowerCase())), [services, search]);
 
   const openAdd = () => { setForm(emptyService()); setModal({ open: true, editing: null }); };
-  const openEdit = (s: Service) => { setForm({ ...s }); setModal({ open: true, editing: s }); };
+  const openEdit = (s: Service) => { setForm({ ...s, applicableMonths: s.applicableMonths || [] }); setModal({ open: true, editing: s }); };
 
   const handleSave = () => {
-    if (!form.name) { toast.error("Package name is required"); return; }
-    if (modal.editing) { updateService(form); toast.success("Package updated"); }
-    else { addService({ ...form, id: `s${Date.now()}` }); toast.success("Package added"); }
+    if (!form.name || !form.name.trim()) {
+      toast.error("Package name is required");
+      return;
+    }
+    if (!form.applicableMonths || form.applicableMonths.length === 0) {
+      toast.error("Please select at least one month before saving this service.");
+      return;
+    }
+    const months = form.applicableMonths;
+    const computedRecurrence = months.length === 12 ? "MONTHLY" : months.length === 4 ? "QUARTERLY" : months.length === 1 ? "ANNUALLY" : "CUSTOM";
+    const payload: Service = { ...form, recurrence: computedRecurrence };
+    if (modal.editing) { updateService(payload); toast.success("Package updated"); }
+    else { addService({ ...payload, id: `s${Date.now()}` }); toast.success("Package added"); }
     setModal({ open: false, editing: null });
   };
 
@@ -139,7 +148,11 @@ export default function PackagesPage() {
                   <button
                     className="btn-slds btn-slds-secondary"
                     style={{ padding: "7px 10px", color: "#DC2626", borderColor: "#FCA5A5" }}
-                    onClick={() => setDeleteConfirm(s.id)}
+                    onClick={() => {
+                      deleteService(s.id);
+                      toast.success(`Deleted package "${s.name}"`);
+                    }}
+                    title="Delete Package"
                   >
                     <Trash2 size={13} />
                   </button>
@@ -189,7 +202,15 @@ export default function PackagesPage() {
                         <button className="btn-slds btn-slds-secondary" style={{ padding: "5px 8px" }} onClick={() => openEdit(s)} title="Edit">
                           <Pencil size={13} />
                         </button>
-                        <button className="btn-slds btn-slds-secondary" style={{ padding: "5px 8px", color: "#DC2626", borderColor: "#FCA5A5" }} onClick={() => setDeleteConfirm(s.id)} title="Delete">
+                        <button
+                          className="btn-slds btn-slds-secondary"
+                          style={{ padding: "5px 8px", color: "#DC2626", borderColor: "#FCA5A5" }}
+                          onClick={() => {
+                            deleteService(s.id);
+                            toast.success(`Deleted package "${s.name}"`);
+                          }}
+                          title="Delete"
+                        >
                           <Trash2 size={13} />
                         </button>
                       </div>
@@ -202,7 +223,7 @@ export default function PackagesPage() {
         </div>
       )}
 
-      {/* Add / Edit Package Modal — Only Name & Amount */}
+      {/* Add / Edit Package Modal */}
       {modal.open && (
         <div className="modal-overlay" onClick={() => setModal({ open: false, editing: null })}>
           <div className="modal" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
@@ -274,6 +295,106 @@ export default function PackagesPage() {
                   placeholder="Enter package price e.g. 5000"
                 />
               </div>
+
+              {/* Applicable Months Selection (Mandatory) */}
+              <div
+                style={{
+                  width: "100%",
+                  padding: 12,
+                  background: (form.applicableMonths || []).length === 0 ? "#FEF2F2" : "#F8FAFC",
+                  borderRadius: 8,
+                  border: (form.applicableMonths || []).length === 0 ? "1.5px solid #EF4444" : "1px solid #CBD5E1",
+                  transition: "all 0.2s ease"
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: (form.applicableMonths || []).length === 0 ? "#DC2626" : "#0F172A" }}>
+                    🗓️ Select Applicable Months <span style={{ color: "#DC2626" }}>*</span>
+                  </span>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="btn-slds btn-slds-secondary"
+                      style={{ padding: "2px 6px", fontSize: 10, fontWeight: 600 }}
+                      onClick={() => setForm(f => ({ ...f, applicableMonths: [...ALL_MONTHS] }))}
+                      title="Select all 12 calendar months"
+                    >
+                      Monthly (All 12)
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-slds btn-slds-secondary"
+                      style={{ padding: "2px 6px", fontSize: 10, fontWeight: 600 }}
+                      onClick={() => setForm(f => ({ ...f, applicableMonths: ["June", "September", "December", "March"] }))}
+                      title="Select quarterly compliance months"
+                    >
+                      Quarterly (4 Mo)
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-slds btn-slds-secondary"
+                      style={{ padding: "2px 6px", fontSize: 10, fontWeight: 600 }}
+                      onClick={() => setForm(f => ({ ...f, applicableMonths: ["July"] }))}
+                      title="Select annual compliance month"
+                    >
+                      Annual (1 Mo)
+                    </button>
+                    {(form.applicableMonths || []).length > 0 && (
+                      <button
+                        type="button"
+                        className="btn-slds btn-slds-secondary"
+                        style={{ padding: "2px 6px", fontSize: 10, fontWeight: 600, color: "#DC2626", borderColor: "#FCA5A5" }}
+                        onClick={() => setForm(f => ({ ...f, applicableMonths: [] }))}
+                        title="Clear all month selections"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
+                  {ALL_MONTHS.map(m => {
+                    const isChecked = (form.applicableMonths || []).includes(m);
+                    return (
+                      <label
+                        key={m}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
+                          fontSize: 11,
+                          fontWeight: isChecked ? 700 : 500,
+                          color: isChecked ? "#1D4ED8" : "#475569",
+                          padding: "5px 8px",
+                          background: isChecked ? "#EFF6FF" : "#FFFFFF",
+                          border: isChecked ? "1px solid #93C5FD" : "1px solid #E2E8F0",
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          userSelect: "none"
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={e => {
+                            const current = form.applicableMonths || [];
+                            const next = e.target.checked
+                              ? [...current, m]
+                              : current.filter(x => x !== m);
+                            setForm(f => ({ ...f, applicableMonths: next }));
+                          }}
+                        />
+                        <span>{m.substring(0, 3)}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                {(form.applicableMonths || []).length === 0 && (
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
+                    ⚠️ Please select at least one month before saving this service.
+                  </div>
+                )}
+              </div>
             </div>
             <div className="modal-footer">
               <button className="btn-slds btn-slds-secondary" onClick={() => setModal({ open: false, editing: null })}>Cancel</button>
@@ -283,18 +404,6 @@ export default function PackagesPage() {
         </div>
       )}
 
-      {deleteConfirm && (
-        <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: 400 }}>
-            <div className="modal-header"><div className="modal-title">Delete Package?</div></div>
-            <div className="modal-body"><p style={{ color: "#64748B", fontSize: 14 }}>This will permanently delete this package and all associated data. This action cannot be undone.</p></div>
-            <div className="modal-footer">
-              <button className="btn-slds btn-slds-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn-slds btn-slds-primary" style={{ background: "#DC2626" }} onClick={() => { deleteService(deleteConfirm!); setDeleteConfirm(null); toast.success("Package deleted"); }}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
     </AppShell>
   );
 }

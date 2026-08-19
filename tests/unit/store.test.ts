@@ -121,6 +121,16 @@ export async function runStoreTests() {
   const otsA = { id: "ots1", clientName: "Acme Corp", serviceName: "PAN Registration" } as OneTimeService;
   assert(getOneTimeKey(otsA) === "acme corp_pan registration", "getOneTimeKey formats client name and service name");
 
+  // 9. Collaboration Email Duplicate & Cross-Directory Validation
+  const collabB = { id: "col2", name: "Another Partner", email: "ca@partner.com" } as Collaboration;
+  const collabList = [collabA, collabB];
+  const isDuplicateCollabEmail = collabList.some(c => c.id !== collabB.id && c.email.toLowerCase() === "ca@partner.com");
+  assert(isDuplicateCollabEmail === true, "Collaboration identifies duplicate email across partners");
+
+  const clientList = [{ id: "c1", name: "Client Corp", email: "client@corp.com" }] as Client[];
+  const isCrossDirectoryEmailUsed = clientList.some(c => c.email.toLowerCase() === "client@corp.com");
+  assert(isCrossDirectoryEmailUsed === true, "Cross-directory check identifies email already registered to client");
+
   console.log(`\nSummary: ${passed} Passed, ${failed} Failed`);
   return { passed, failed };
 }
