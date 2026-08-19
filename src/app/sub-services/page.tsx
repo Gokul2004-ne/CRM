@@ -431,7 +431,20 @@ export default function ServicesPage() {
                           <button className="btn-slds btn-slds-secondary" style={{ padding: "5px 8px" }} onClick={() => openEdit(ss)} title="Edit">
                             <Pencil size={13} />
                           </button>
-                          <button className="btn-slds btn-slds-secondary" style={{ padding: "5px 8px", color: "#DC2626", borderColor: "#FCA5A5" }} onClick={() => { deleteSubService(ss.id); toast.success("Deleted"); }} title="Delete">
+                          <button
+                            className="btn-slds btn-slds-secondary"
+                            style={{ padding: "5px 8px", color: "#DC2626", borderColor: "#FCA5A5" }}
+                            onClick={async () => {
+                              try {
+                                await deleteSubService(ss.id);
+                                toast.success(`Deleted service "${ss.name}"`);
+                              } catch (err) {
+                                console.error(err);
+                                toast.error("Failed to delete entry from database. Please try again.");
+                              }
+                            }}
+                            title="Delete"
+                          >
                             <Trash2 size={13} />
                           </button>
                         </div>

@@ -244,9 +244,14 @@ export default function OneTimeServicesPage() {
                         <button
                           className="icon-btn-slds"
                           title="Delete Service"
-                          onClick={() => {
-                            deleteOneTimeService(ots.id);
-                            toast.success(`Deleted one-time service "${ots.serviceName}"`);
+                          onClick={async () => {
+                            try {
+                              await deleteOneTimeService(ots.id);
+                              toast.success(`Deleted one-time service "${ots.serviceName}"`);
+                            } catch (err) {
+                              console.error(err);
+                              toast.error("Failed to delete entry from database. Please try again.");
+                            }
                           }}
                         >
                           <Trash2 size={15} color="#DC2626" />

@@ -143,9 +143,14 @@ export default function PackagesPage() {
                   <button
                     className="btn-slds btn-slds-secondary"
                     style={{ padding: "7px 10px", color: "#DC2626", borderColor: "#FCA5A5" }}
-                    onClick={() => {
-                      deleteService(s.id);
-                      toast.success(`Deleted package "${s.name}"`);
+                    onClick={async () => {
+                      try {
+                        await deleteService(s.id);
+                        toast.success(`Deleted package "${s.name}"`);
+                      } catch (err) {
+                        console.error(err);
+                        toast.error("Failed to delete entry from database. Please try again.");
+                      }
                     }}
                     title="Delete Package"
                   >
@@ -200,9 +205,14 @@ export default function PackagesPage() {
                         <button
                           className="btn-slds btn-slds-secondary"
                           style={{ padding: "5px 8px", color: "#DC2626", borderColor: "#FCA5A5" }}
-                          onClick={() => {
-                            deleteService(s.id);
-                            toast.success(`Deleted package "${s.name}"`);
+                          onClick={async () => {
+                            try {
+                              await deleteService(s.id);
+                              toast.success(`Deleted package "${s.name}"`);
+                            } catch (err) {
+                              console.error(err);
+                              toast.error("Failed to delete entry from database. Please try again.");
+                            }
                           }}
                           title="Delete"
                         >

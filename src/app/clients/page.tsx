@@ -1139,19 +1139,24 @@ export default function ClientsPage() {
                                     <button
                                       className="btn-slds btn-slds-secondary"
                                       style={{ padding: "3px 6px", fontSize: 11, color: "#DC2626", borderColor: "#FCA5A5" }}
-                                      onClick={() => {
-                                        // 1-Click Instant Deletion of BOTH ID and Password
-                                        const updatedCreds = credsList.filter(c => c.id !== cred.id && c.portalName !== cred.portalName);
-                                        const isGst = cred.portalName.toLowerCase().includes("gst");
-                                        const updated: Client = {
-                                          ...viewingClient,
-                                          portalCredentials: updatedCreds,
-                                          gstPortalId: isGst ? "" : viewingClient.gstPortalId,
-                                          gstPortalPassword: isGst ? "" : viewingClient.gstPortalPassword
-                                        };
-                                        updateClient(updated);
-                                        setViewingClient(updated);
-                                        toast.success(`Deleted ${cred.portalName} (both ID and password removed)!`);
+                                      onClick={async () => {
+                                        try {
+                                          // 1-Click Instant Deletion of BOTH ID and Password
+                                          const updatedCreds = credsList.filter(c => c.id !== cred.id && c.portalName !== cred.portalName);
+                                          const isGst = cred.portalName.toLowerCase().includes("gst");
+                                          const updated: Client = {
+                                            ...viewingClient,
+                                            portalCredentials: updatedCreds,
+                                            gstPortalId: isGst ? "" : viewingClient.gstPortalId,
+                                            gstPortalPassword: isGst ? "" : viewingClient.gstPortalPassword
+                                          };
+                                          await updateClient(updated);
+                                          setViewingClient(updated);
+                                          toast.success(`Deleted ${cred.portalName} (both ID and password removed)!`);
+                                        } catch (err) {
+                                          console.error(err);
+                                          toast.error("Failed to delete entry from database. Please try again.");
+                                        }
                                       }}
                                       title="Delete Credential (ID & Password)"
                                     >
@@ -1210,11 +1215,11 @@ export default function ClientsPage() {
                           type="file"
                           style={{ display: "none" }}
                           accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (file) {
                               const reader = new FileReader();
-                              reader.onload = () => {
+                              reader.onload = async () => {
                                 const fileUrl = (file.size < 2 * 1024 * 1024) ? (reader.result as string) : "";
                                 const newDoc: ClientDocument = {
                                   id: `cd_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -1236,7 +1241,7 @@ export default function ClientsPage() {
                                   documents: updatedDocs,
                                   documentCount: updatedDocs.length
                                 };
-                                updateClient(updated);
+                                await updateClient(updated);
                                 setViewingClient(updated);
                                 toast.success(`Uploaded "${file.name}" to client profile!`);
                               };
@@ -1333,18 +1338,23 @@ export default function ClientsPage() {
                                   <button
                                     className="btn-slds btn-slds-secondary"
                                     style={{ padding: "4px 6px", fontSize: 11, color: "#DC2626", borderColor: "#FCA5A5" }}
-                                    onClick={() => {
-                                      const currentClient = clients.find(c => c.id === viewingClient.id || (viewingClient.id && ensureUUID(c.id) === ensureUUID(viewingClient.id))) || viewingClient;
-                                      const currentDocs = currentClient.documents || [];
-                                      const updatedDocs = currentDocs.filter(d => d.id !== doc.id && d.name !== doc.name);
-                                      const updated: Client = {
-                                        ...currentClient,
-                                        documents: updatedDocs,
-                                        documentCount: updatedDocs.length
-                                      };
-                                      updateClient(updated);
-                                      setViewingClient(updated);
-                                      toast.success(`Removed document "${doc.name}"`);
+                                    onClick={async () => {
+                                      try {
+                                        const currentClient = clients.find(c => c.id === viewingClient.id || (viewingClient.id && ensureUUID(c.id) === ensureUUID(viewingClient.id))) || viewingClient;
+                                        const currentDocs = currentClient.documents || [];
+                                        const updatedDocs = currentDocs.filter(d => d.id !== doc.id && d.name !== doc.name);
+                                        const updated: Client = {
+                                          ...currentClient,
+                                          documents: updatedDocs,
+                                          documentCount: updatedDocs.length
+                                        };
+                                        await updateClient(updated);
+                                        setViewingClient(updated);
+                                        toast.success(`Removed document "${doc.name}"`);
+                                      } catch (err) {
+                                        console.error(err);
+                                        toast.error("Failed to delete entry from database. Please try again.");
+                                      }
                                     }}
                                     title="Delete Document (1-Click)"
                                   >

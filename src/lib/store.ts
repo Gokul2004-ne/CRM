@@ -185,67 +185,67 @@ interface AppState {
   // Actions - Clients
   setSelectedFY: (fy: string) => void;
   setSidebarCollapsed: (v: boolean) => void;
-  addClient: (c: Client) => void;
-  updateClient: (c: Client) => void;
-  deleteClient: (id: string) => void;
+  addClient: (c: Client) => Promise<void>;
+  updateClient: (c: Client) => Promise<void>;
+  deleteClient: (id: string) => Promise<void>;
 
   // Actions - Services
-  addService: (s: Service) => void;
-  updateService: (s: Service) => void;
-  deleteService: (id: string) => void;
+  addService: (s: Service) => Promise<void>;
+  updateService: (s: Service) => Promise<void>;
+  deleteService: (id: string) => Promise<void>;
 
   // Actions - SubServices
-  addSubService: (s: SubService) => void;
-  addSubServicesBatch?: (ssList: SubService[]) => void;
-  updateSubService: (s: SubService) => void;
-  deleteSubService: (id: string) => void;
+  addSubService: (s: SubService) => Promise<void>;
+  addSubServicesBatch?: (ssList: SubService[]) => Promise<void>;
+  updateSubService: (s: SubService) => Promise<void>;
+  deleteSubService: (id: string) => Promise<void>;
 
   // Actions - Required Docs
-  addRequiredDoc: (d: RequiredDoc) => void;
-  updateRequiredDoc: (d: RequiredDoc) => void;
-  deleteRequiredDoc: (id: string) => void;
+  addRequiredDoc: (d: RequiredDoc) => Promise<void>;
+  updateRequiredDoc: (d: RequiredDoc) => Promise<void>;
+  deleteRequiredDoc: (id: string) => Promise<void>;
 
   // Actions - Assigned Services
-  addAssignedService: (a: AssignedService) => void;
-  updateAssignedService: (a: AssignedService) => void;
-  deleteAssignedService: (id: string) => void;
+  addAssignedService: (a: AssignedService) => Promise<void>;
+  updateAssignedService: (a: AssignedService) => Promise<void>;
+  deleteAssignedService: (id: string) => Promise<void>;
 
   // Actions - Banking
-  addBankingEntry: (b: BankingEntry) => void;
-  updateBankingEntry: (b: BankingEntry) => void;
-  deleteBankingEntry: (id: string) => void;
+  addBankingEntry: (b: BankingEntry) => Promise<void>;
+  updateBankingEntry: (b: BankingEntry) => Promise<void>;
+  deleteBankingEntry: (id: string) => Promise<void>;
 
   // Actions - Leads
-  addLead: (l: Lead) => void;
-  updateLead: (l: Lead) => void;
-  deleteLead: (id: string) => void;
-  convertLead: (leadId: string, clientId: string) => void;
+  addLead: (l: Lead) => Promise<void>;
+  updateLead: (l: Lead) => Promise<void>;
+  deleteLead: (id: string) => Promise<void>;
+  convertLead: (leadId: string, clientId: string) => Promise<void>;
 
   // Actions - Drafts
-  addDraft: (d: DocumentDraft) => void;
-  updateDraft: (d: DocumentDraft) => void;
-  deleteDraft: (id: string) => void;
+  addDraft: (d: DocumentDraft) => Promise<void>;
+  updateDraft: (d: DocumentDraft) => Promise<void>;
+  deleteDraft: (id: string) => Promise<void>;
 
   // Actions - Collaborations
-  addCollaboration: (c: Collaboration) => void;
-  updateCollaboration: (c: Collaboration) => void;
-  deleteCollaboration: (id: string) => void;
+  addCollaboration: (c: Collaboration) => Promise<void>;
+  updateCollaboration: (c: Collaboration) => Promise<void>;
+  deleteCollaboration: (id: string) => Promise<void>;
 
   // Actions - Invoices (Persisted + Banking Link)
-  addInvoice: (inv: Invoice) => void;
-  updateInvoice: (inv: Invoice) => void;
-  deleteInvoice: (id: string) => void;
+  addInvoice: (inv: Invoice) => Promise<void>;
+  updateInvoice: (inv: Invoice) => Promise<void>;
+  deleteInvoice: (id: string) => Promise<void>;
 
   // Actions - One Time Services
-  addOneTimeService: (ots: OneTimeService) => void;
-  updateOneTimeService: (ots: OneTimeService) => void;
-  deleteOneTimeService: (id: string) => void;
+  addOneTimeService: (ots: OneTimeService) => Promise<void>;
+  updateOneTimeService: (ots: OneTimeService) => Promise<void>;
+  deleteOneTimeService: (id: string) => Promise<void>;
 
   // Actions - Renewals
-  addRenewal: (rn: RenewalItem) => void;
-  updateRenewal: (rn: RenewalItem) => void;
-  deleteRenewal: (id: string) => void;
-  renewService: (id: string) => void;
+  addRenewal: (rn: RenewalItem) => Promise<void>;
+  updateRenewal: (rn: RenewalItem) => Promise<void>;
+  deleteRenewal: (id: string) => Promise<void>;
+  renewService: (id: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>()((set, get) => ({
@@ -476,12 +476,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("clients", next);
       return { clients: next };
     });
-    // 2. Await cloud removal from Supabase
     await removeClientFromSupabase(id);
   },
 
-  // Services Sync (Packages)
-  addService: (sv) => {
+  addService: async (sv) => {
     const svFixed: Service = { ...sv, id: ensureUUID(sv.id) };
     set((s) => {
       const key = getServiceKey(svFixed);
@@ -490,20 +488,19 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("services", next);
       return { services: next };
     });
-    syncServiceToSupabase(svFixed);
+    await syncServiceToSupabase(svFixed);
   },
-  updateService: (sv) => {
+  updateService: async (sv) => {
     set((s) => {
       const next = s.services.map(x => x.id === sv.id ? sv : x);
       saveToLocal("services", next);
       return { services: next };
     });
-    syncServiceToSupabase(sv);
+    await syncServiceToSupabase(sv);
   },
-  deleteService: (id) => {
+  deleteService: async (id) => {
     const target = useAppStore.getState().services.find(s => s.id === id);
     const targetName = target?.name;
-    removeServiceFromSupabase(id, targetName);
     set((s) => {
       const next = s.services.filter(x => {
         if (x.id === id) return false;
@@ -513,10 +510,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("services", next);
       return { services: next };
     });
+    await removeServiceFromSupabase(id, targetName);
   },
 
-  // SubServices Sync (Services)
-  addSubService: (ss) => {
+  addSubService: async (ss) => {
     const ssFixed: SubService = { ...ss, id: ensureUUID(ss.id) };
     set((s) => {
       const key = getSubServiceKey(ssFixed);
@@ -525,9 +522,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("subServices", next);
       return { subServices: next };
     });
-    syncSubServiceToSupabase(ssFixed);
+    await syncSubServiceToSupabase(ssFixed);
   },
-  addSubServicesBatch: (ssList) => {
+  addSubServicesBatch: async (ssList) => {
     const fixedBatch = ssList.map(ss => ({ ...ss, id: ensureUUID(ss.id) }));
     set((s) => {
       const uniqueBatch = fixedBatch.filter(ss => {
@@ -539,20 +536,19 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("subServices", next);
       return { subServices: next };
     });
-    fixedBatch.forEach(ss => syncSubServiceToSupabase(ss));
+    await Promise.all(fixedBatch.map(ss => syncSubServiceToSupabase(ss)));
   },
-  updateSubService: (ss) => {
+  updateSubService: async (ss) => {
     set((s) => {
       const next = s.subServices.map(x => x.id === ss.id ? ss : x);
       saveToLocal("subServices", next);
       return { subServices: next };
     });
-    syncSubServiceToSupabase(ss);
+    await syncSubServiceToSupabase(ss);
   },
-  deleteSubService: (id) => {
+  deleteSubService: async (id) => {
     const target = useAppStore.getState().subServices.find(ss => ss.id === id);
     const targetName = target?.name;
-    removeSubServiceFromSupabase(id, targetName);
     set((s) => {
       const next = s.subServices.filter(x => {
         if (x.id === id) return false;
@@ -562,10 +558,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("subServices", next);
       return { subServices: next };
     });
+    await removeSubServiceFromSupabase(id, targetName);
   },
 
-  // Required Docs Sync
-  addRequiredDoc: (d) => {
+  addRequiredDoc: async (d) => {
     const dFixed: RequiredDoc = {
       ...d,
       id: ensureUUID(d.id),
@@ -579,9 +575,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("requiredDocs", next);
       return { requiredDocs: next };
     });
-    syncRequiredDocToSupabase(dFixed);
+    await syncRequiredDocToSupabase(dFixed);
   },
-  updateRequiredDoc: (d) => {
+  updateRequiredDoc: async (d) => {
     const cleanId = d.id;
     const dFixed: RequiredDoc = { ...d, id: ensureUUID(d.id) };
     set((s) => {
@@ -597,12 +593,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("requiredDocs", finalDocs);
       return { requiredDocs: finalDocs };
     });
-    syncRequiredDocToSupabase(dFixed);
+    await syncRequiredDocToSupabase(dFixed);
   },
-  deleteRequiredDoc: (id) => {
+  deleteRequiredDoc: async (id) => {
     const target = useAppStore.getState().requiredDocs.find(d => d.id === id || (id && ensureUUID(d.id) === ensureUUID(id)));
     const targetName = target?.name;
-    removeRequiredDocFromSupabase(id, targetName);
     set((s) => {
       const next = s.requiredDocs.filter(x => {
         if (x.id === id) return false;
@@ -612,13 +607,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("requiredDocs", next);
       return { requiredDocs: next };
     });
+    await removeRequiredDocFromSupabase(id, targetName);
   },
 
-  // Assigned Services Sync
-  addAssignedService: (a) => {
+  addAssignedService: async (a) => {
     const aFixed: AssignedService = { ...a, id: ensureUUID(a.id) };
     set((s) => {
-      // Check if duplicate assignment exists for client + service/subservice + financial year
       const isDuplicate = s.assignedServices.some(x =>
         x.id === aFixed.id ||
         (
@@ -637,35 +631,34 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("assignedServices", nextAssigned);
       return { assignedServices: nextAssigned };
     });
-    syncAssignedServiceToSupabase(aFixed);
+    await syncAssignedServiceToSupabase(aFixed);
   },
-  updateAssignedService: (a) => {
+  updateAssignedService: async (a) => {
     set((s) => {
       const nextAssigned = s.assignedServices.map(x => x.id === a.id ? a : x);
       saveToLocal("assignedServices", nextAssigned);
       return { assignedServices: nextAssigned };
     });
-    syncAssignedServiceToSupabase(a);
+    await syncAssignedServiceToSupabase(a);
   },
-  deleteAssignedService: (id) => {
+  deleteAssignedService: async (id) => {
     set((s) => {
       const nextAssigned = s.assignedServices.filter(x => x.id !== id);
       saveToLocal("assignedServices", nextAssigned);
       return { assignedServices: nextAssigned };
     });
-    removeAssignedServiceFromSupabase(id);
+    await removeAssignedServiceFromSupabase(id);
   },
 
-  // Banking Sync
-  addBankingEntry: (b) => {
+  addBankingEntry: async (b) => {
     set((s) => {
       const next = [...s.bankingEntries, b];
       saveToLocal("bankingEntries", next);
       return { bankingEntries: next };
     });
-    syncBankingEntryToSupabase(b);
+    await syncBankingEntryToSupabase(b);
   },
-  updateBankingEntry: (b) => {
+  updateBankingEntry: async (b) => {
     set((s) => {
       const updatedAssigned = s.assignedServices.map(a => {
         if (a.id === b.id.replace(/^b-/, "") || (a.clientId === b.clientId && a.serviceId === b.serviceId && a.financialYear === b.financialYear)) {
@@ -701,38 +694,36 @@ export const useAppStore = create<AppState>()((set, get) => ({
         invoices: updatedInvoices
       };
     });
-    syncBankingEntryToSupabase(b);
+    await syncBankingEntryToSupabase(b);
   },
-  deleteBankingEntry: (id) => {
+  deleteBankingEntry: async (id) => {
     set((s) => {
       const next = s.bankingEntries.filter(x => x.id !== id);
       saveToLocal("bankingEntries", next);
       return { bankingEntries: next };
     });
-    removeBankingEntryFromSupabase(id);
+    await removeBankingEntryFromSupabase(id);
   },
 
-  // Leads Sync
-  addLead: (l) => {
+  addLead: async (l) => {
     set((s) => {
       const next = [...s.leads, l];
       saveToLocal("leads", next);
       return { leads: next };
     });
-    syncLeadToSupabase(l);
+    await syncLeadToSupabase(l);
   },
-  updateLead: (l) => {
+  updateLead: async (l) => {
     set((s) => {
       const next = s.leads.map(x => x.id === l.id ? l : x);
       saveToLocal("leads", next);
       return { leads: next };
     });
-    syncLeadToSupabase(l);
+    await syncLeadToSupabase(l);
   },
-  deleteLead: (id) => {
+  deleteLead: async (id) => {
     const target = useAppStore.getState().leads.find(l => l.id === id);
     const targetName = target?.name;
-    removeLeadFromSupabase(id, targetName);
     set((s) => {
       const next = s.leads.filter(x => {
         if (x.id === id) return false;
@@ -742,66 +733,63 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("leads", next);
       return { leads: next };
     });
+    await removeLeadFromSupabase(id, targetName);
   },
-  convertLead: (leadId, clientId) => {
-    set((s) => {
-      const updatedLeads = s.leads.map(x => x.id === leadId ? { ...x, status: "CONVERTED" as const, convertedClientId: clientId } : x);
-      const convertedLead = updatedLeads.find(x => x.id === leadId);
-      if (convertedLead) {
-        syncLeadToSupabase(convertedLead);
-      }
-      saveToLocal("leads", updatedLeads);
-      return { leads: updatedLeads };
-    });
+  convertLead: async (leadId, clientId) => {
+    const currentLeads = useAppStore.getState().leads;
+    const updatedLeads = currentLeads.map(x => x.id === leadId ? { ...x, status: "CONVERTED" as const, convertedClientId: clientId } : x);
+    const convertedLead = updatedLeads.find(x => x.id === leadId);
+    set({ leads: updatedLeads });
+    saveToLocal("leads", updatedLeads);
+    if (convertedLead) {
+      await syncLeadToSupabase(convertedLead);
+    }
   },
 
-  // Drafts Sync
-  addDraft: (d) => {
+  addDraft: async (d) => {
     set((s) => {
       const next = [...s.drafts, d];
       saveToLocal("drafts", next);
       return { drafts: next };
     });
-    syncDraftToSupabase(d);
+    await syncDraftToSupabase(d);
   },
-  updateDraft: (d) => {
+  updateDraft: async (d) => {
     set((s) => {
       const next = s.drafts.map(x => x.id === d.id ? d : x);
       saveToLocal("drafts", next);
       return { drafts: next };
     });
-    syncDraftToSupabase(d);
+    await syncDraftToSupabase(d);
   },
-  deleteDraft: (id) => {
+  deleteDraft: async (id) => {
     set((s) => {
       const next = s.drafts.filter(x => x.id !== id);
       saveToLocal("drafts", next);
       return { drafts: next };
     });
-    removeDraftFromSupabase(id);
+    await removeDraftFromSupabase(id);
   },
 
-  // Collaborations Sync
-  addCollaboration: (c) => {
+  addCollaboration: async (c) => {
     set((s) => {
       const next = [...s.collaborations, c];
       saveToLocal("collaborations", next);
       return { collaborations: next };
     });
-    syncCollaborationToSupabase(c);
+    await syncCollaborationToSupabase(c);
   },
-  updateCollaboration: (c) => {
+  updateCollaboration: async (c) => {
     set((s) => {
       const next = s.collaborations.map(x => x.id === c.id ? c : x);
       saveToLocal("collaborations", next);
       return { collaborations: next };
     });
-    syncCollaborationToSupabase(c);
+    await syncCollaborationToSupabase(c);
   },
-  deleteCollaboration: (id) => {
+  deleteCollaboration: async (id) => {
     const target = useAppStore.getState().collaborations.find(c => c.id === id);
     const targetName = target?.name;
-    removeCollaborationFromSupabase(id, targetName);
     set((s) => {
       const next = s.collaborations.filter(x => {
         if (x.id === id) return false;
@@ -811,10 +799,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("collaborations", next);
       return { collaborations: next };
     });
+    await removeCollaborationFromSupabase(id, targetName);
   },
 
-  // Invoices Sync
-  addInvoice: (inv) => {
+  addInvoice: async (inv) => {
+    let bEntryToSync: BankingEntry | null = null;
     set((s) => {
       const next = [inv, ...s.invoices];
       saveToLocal("invoices", next);
@@ -834,18 +823,22 @@ export const useAppStore = create<AppState>()((set, get) => ({
             paymentStatus: rcv >= billed ? "PAID" : rcv > 0 ? "PARTIAL" : "PENDING",
             remark: `${inv.type} #${inv.invoiceNumber} payment record`
           };
+          bEntryToSync = bEntry;
           const nextBanking = [...s.bankingEntries.filter(b => b.id !== bEntry.id), bEntry];
           saveToLocal("bankingEntries", nextBanking);
-          syncBankingEntryToSupabase(bEntry);
           return { invoices: next, bankingEntries: nextBanking };
         }
       }
 
       return { invoices: next };
     });
-    syncInvoiceToSupabase(inv);
+    await syncInvoiceToSupabase(inv);
+    if (bEntryToSync) {
+      await syncBankingEntryToSupabase(bEntryToSync);
+    }
   },
-  updateInvoice: (inv) => {
+  updateInvoice: async (inv) => {
+    let bEntryToSync: BankingEntry | null = null;
     set((s) => {
       const next = s.invoices.map(x => x.id === inv.id ? inv : x);
       saveToLocal("invoices", next);
@@ -864,34 +857,35 @@ export const useAppStore = create<AppState>()((set, get) => ({
           paymentStatus: rcv >= billed ? "PAID" : rcv > 0 ? "PARTIAL" : "PENDING",
           remark: `${inv.type} #${inv.invoiceNumber} payment record`
         };
+        bEntryToSync = bEntry;
         const nextBanking = [...s.bankingEntries.filter(b => b.id !== bEntry.id), bEntry];
         saveToLocal("bankingEntries", nextBanking);
-        syncBankingEntryToSupabase(bEntry);
         return { invoices: next, bankingEntries: nextBanking };
       }
 
       return { invoices: next };
     });
-    syncInvoiceToSupabase(inv);
+    await syncInvoiceToSupabase(inv);
+    if (bEntryToSync) {
+      await syncBankingEntryToSupabase(bEntryToSync);
+    }
   },
-  deleteInvoice: (id) => {
+  deleteInvoice: async (id) => {
+    const targetBankingId = `b_inv_${id}`;
     set((s) => {
       const nextInvoices = s.invoices.filter(x => x.id !== id);
-      saveToLocal("invoices", nextInvoices);
-
-      const targetBankingId = `b_inv_${id}`;
       const nextBanking = s.bankingEntries.filter(b => b.id !== targetBankingId && b.id !== id);
+      saveToLocal("invoices", nextInvoices);
       saveToLocal("bankingEntries", nextBanking);
-
-      removeBankingEntryFromSupabase(targetBankingId);
-
       return { invoices: nextInvoices, bankingEntries: nextBanking };
     });
-    removeInvoiceFromSupabase(id);
+    await Promise.all([
+      removeInvoiceFromSupabase(id),
+      removeBankingEntryFromSupabase(targetBankingId)
+    ]);
   },
 
-  // Actions - One Time Services
-  addOneTimeService: (ots) => {
+  addOneTimeService: async (ots) => {
     const otsFixed = { ...ots, id: ensureUUID(ots.id) };
     set((s) => {
       const key = getOneTimeKey(otsFixed);
@@ -900,27 +894,26 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("oneTimeServices", next);
       return { oneTimeServices: next };
     });
-    syncOneTimeServiceToSupabase(otsFixed);
+    await syncOneTimeServiceToSupabase(otsFixed);
   },
-  updateOneTimeService: (ots) => {
+  updateOneTimeService: async (ots) => {
     set((s) => {
       const next = s.oneTimeServices.map(x => x.id === ots.id ? ots : x);
       saveToLocal("oneTimeServices", next);
       return { oneTimeServices: next };
     });
-    syncOneTimeServiceToSupabase(ots);
+    await syncOneTimeServiceToSupabase(ots);
   },
-  deleteOneTimeService: (id) => {
+  deleteOneTimeService: async (id) => {
     set((s) => {
       const next = s.oneTimeServices.filter(x => x.id !== id);
       saveToLocal("oneTimeServices", next);
       return { oneTimeServices: next };
     });
-    removeOneTimeServiceFromSupabase(id);
+    await removeOneTimeServiceFromSupabase(id);
   },
 
-  // Actions - Renewals
-  addRenewal: (rn) => {
+  addRenewal: async (rn) => {
     const rnFixed = { ...rn, id: ensureUUID(rn.id) };
     set((s) => {
       const existing = s.renewals || [];
@@ -929,32 +922,32 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("renewals", next);
       return { renewals: next };
     });
-    syncRenewalToSupabase(rnFixed);
+    await syncRenewalToSupabase(rnFixed);
   },
-  updateRenewal: (rn) => {
+  updateRenewal: async (rn) => {
     const rnFixed = { ...rn, id: ensureUUID(rn.id) };
     set((s) => {
       const next = (s.renewals || []).map(x => x.id === rnFixed.id ? rnFixed : x);
       saveToLocal("renewals", next);
       return { renewals: next };
     });
-    syncRenewalToSupabase(rnFixed);
+    await syncRenewalToSupabase(rnFixed);
   },
-  deleteRenewal: (id) => {
+  deleteRenewal: async (id) => {
     const targetId = ensureUUID(id);
     set((s) => {
       const next = (s.renewals || []).filter(x => x.id !== id && x.id !== targetId);
       saveToLocal("renewals", next);
       return { renewals: next };
     });
-    removeRenewalFromSupabase(id);
+    await removeRenewalFromSupabase(id);
   },
-  renewService: (id) => {
+  renewService: async (id) => {
+    let renewedItemToSync: RenewalItem | null = null;
     set((s) => {
       const target = (s.renewals || []).find(x => x.id === id);
       if (!target) return s;
 
-      // 1. Calculate duration in years from existing dates or recurrence period
       let yearsToAdd = 1;
       if (target.fromDate && target.toDate) {
         const yFrom = new Date(target.fromDate).getFullYear();
@@ -969,14 +962,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
         else if (rec.includes("5 year")) yearsToAdd = 5;
       }
 
-      // 2. Next cycle starts from previous cycle's To Date (e.g. 10/08/2029)
       let nextFromDate = target.toDate || target.fromDate;
       let nextToDate = target.toDate;
       let nextDueDate = target.dueDate;
       let nextFY = target.financialYear;
 
       if (nextFromDate) {
-        // Calculate new To Date starting from nextFromDate + yearsToAdd (e.g. 10/08/2029 -> 10/08/2032)
         const dTo = new Date(nextFromDate);
         dTo.setFullYear(dTo.getFullYear() + yearsToAdd);
         nextToDate = dTo.toISOString().split("T")[0];
@@ -992,7 +983,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
         nextDueDate = nextToDate;
       }
 
-      // 3. Compute Financial Year string (e.g. 2029 - 2032 or FY 2029-30)
       if (nextFromDate && nextToDate) {
         const y1 = new Date(nextFromDate).getFullYear();
         const y2 = new Date(nextToDate).getFullYear();
@@ -1010,13 +1000,16 @@ export const useAppStore = create<AppState>()((set, get) => ({
         toDate: nextToDate,
         dueDate: nextDueDate,
         financialYear: nextFY,
-        progress: "To-do", // Reset progress to To-do for the new cycle
+        progress: "To-do",
       };
 
+      renewedItemToSync = renewedItem;
       const next = (s.renewals || []).map(x => x.id === id ? renewedItem : x);
       saveToLocal("renewals", next);
-      syncRenewalToSupabase(renewedItem);
       return { renewals: next };
     });
+    if (renewedItemToSync) {
+      await syncRenewalToSupabase(renewedItemToSync);
+    }
   },
 }));

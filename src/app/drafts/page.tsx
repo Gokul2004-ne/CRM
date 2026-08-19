@@ -178,8 +178,24 @@ export default function DraftsPage() {
                       <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A" }}>{d.title}</div>
                       <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>Updated: {formatDate(d.updatedAt)}</div>
                     </div>
-                    <button className="btn-slds btn-slds-secondary" style={{ padding: "4px 6px", color: "#DC2626", borderColor: "#FCA5A5" }}
-                      onClick={e => { e.stopPropagation(); deleteDraft(d.id); if (selected?.id === d.id) { setSelected(null); } toast.success("Deleted"); }} title="Delete">
+                    <button
+                      className="btn-slds btn-slds-secondary"
+                      style={{ padding: "4px 6px", color: "#DC2626", borderColor: "#FCA5A5" }}
+                      onClick={async e => {
+                        e.stopPropagation();
+                        try {
+                          await deleteDraft(d.id);
+                          if (selected?.id === d.id) {
+                            setSelected(null);
+                          }
+                          toast.success(`Deleted draft "${d.title}"`);
+                        } catch (err) {
+                          console.error(err);
+                          toast.error("Failed to delete entry from database. Please try again.");
+                        }
+                      }}
+                      title="Delete"
+                    >
                       <Trash2 size={12} />
                     </button>
                   </div>
