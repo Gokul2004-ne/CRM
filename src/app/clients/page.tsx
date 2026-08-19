@@ -7,7 +7,7 @@ import {
   Users, Search, Plus, Edit, Pencil, Trash2, Phone, Mail,
   Building, Copy, CheckCircle2, Shield, Eye, EyeOff, Download, MessageCircle, FileText, Share2, Layers, Lock
 } from "lucide-react";
-import { getWhatsAppLink, formatCurrency, formatDate, validatePAN, validateGSTIN, validatePhone, validateEmail, ensureUUID } from "@/lib/utils";
+import { getWhatsAppLink, formatCurrency, formatDate, validatePAN, validateGSTIN, validatePhone, validateEmail, ensureUUID, generateUUID } from "@/lib/utils";
 import { toast } from "sonner";
 
 const INDIAN_STATES = [
@@ -241,7 +241,7 @@ export default function ClientsPage() {
       ];
 
       const newClient: Client = {
-        id: `c_${Date.now()}`,
+        id: generateUUID(),
         name: formData.name?.trim() || "",
         ownerName: formData.name?.trim() || "",
         type: formData.type || "PROPRIETORSHIP",

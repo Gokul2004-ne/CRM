@@ -6,27 +6,11 @@ import {
 export { ensureUUID } from "./utils";
 import { ensureUUID } from "./utils";
 
-// Get user ID from mock localStorage session (fallback for non-Supabase auth)
-function getMockSessionUserId(): string | undefined {
-  if (typeof window === "undefined") return undefined;
-  try {
-    const rawSession = localStorage.getItem("zpluscrm_active_session");
-    if (rawSession) {
-      const parsed = JSON.parse(rawSession);
-      const uid = parsed?.user?.id || parsed?.user?.email;
-      if (uid) return String(uid).replace(/[^a-zA-Z0-9_]/g, "_");
-    }
-  } catch {}
-  return undefined;
-}
-
 async function safeTableFetch(tableName: string, userId?: string) {
   try {
     if (!userId) return [];
-    // Strict isolation: ONLY fetch records matching the current user's userId
     const { data, error } = await supabase.from(tableName).select("*").eq("user_id", userId);
     if (error) {
-      // Suppress noisy warnings for expected mock-auth UUID mismatch (22P02) or missing table schemas (PGRST205)
       if (error.code !== "22P02" && error.code !== "PGRST205") {
         console.warn(`Supabase fetch for table ${tableName} returned error:`, error);
       }
@@ -38,30 +22,110 @@ async function safeTableFetch(tableName: string, userId?: string) {
   }
 }
 
-function checkIsSaivarala(user: any, mockUserId?: string): boolean {
-  if (user?.email?.toLowerCase().includes("saivarala33@gmail.com")) return true;
-  if (mockUserId?.toLowerCase().includes("saivarala33_gmail_com")) return true;
-  if (typeof window !== "undefined") {
-    try {
-      const rawSession = localStorage.getItem("zpluscrm_active_session");
-      if (rawSession && rawSession.toLowerCase().includes("saivarala33@gmail.com")) return true;
-    } catch {}
+export function getUserIdSync(): string {
+  if (typeof window === "undefined") return "usr_default_account";
+  try {
+    const rawSession = localStorage.getItem("zpluscrm_active_session");
+    if (rawSession) {
+      const parsed = JSON.parse(rawSession);
+      const email = parsed?.user?.email || parsed?.email;
+      if (email) {
+        const clean = String(email).toLowerCase().trim();
+        if (clean.includes("saivarala33@gmail.com")) return "usr_saivarala33_gmail_com";
+        return "usr_" + clean.replace(/[^a-z0-9]/gi, "_");
+      }
+      const uid = parsed?.user?.id;
+      if (uid) {
+        const clean = String(uid).toLowerCase().trim();
+        if (clean.includes("saivarala33")) return "usr_saivarala33_gmail_com";
+        return clean.startsWith("usr_") ? clean : `usr_${clean.replace(/[^a-z0-9_]/gi, "_")}`;
+      }
+    }
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith("sb-") || k.includes("auth-token"))) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const email = parsed?.user?.email || parsed?.currentSession?.user?.email;
+          if (email) {
+            const clean = String(email).toLowerCase().trim();
+            if (clean.includes("saivarala33@gmail.com")) return "usr_saivarala33_gmail_com";
+            return "usr_" + clean.replace(/[^a-z0-9]/gi, "_");
+          }
+        }
+      }
+    }
+  } catch {}
+  return "usr_default_account";
+}
+
+export async function getUserId(): Promise<string> {
+  const syncId = getUserIdSync();
+  if (syncId !== "usr_default_account") return syncId;
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.email) {
+      const clean = user.email.toLowerCase().trim();
+      if (clean.includes("saivarala33@gmail.com")) return "usr_saivarala33_gmail_com";
+      return "usr_" + clean.replace(/[^a-z0-9]/gi, "_");
+    }
+    if (user?.id) {
+      return "usr_" + String(user.id).replace(/[^a-zA-Z0-9_]/g, "_");
+    }
+  } catch {}
+
+  return "usr_default_account";
+}
+
+const DEFAULT_PACKAGE_TEMPLATES = [
+  { name: "Income Tax Return & Audit", price: 7500, recurrence: "ANNUAL", months: ["July", "September", "October"] },
+  { name: "GST Compliance & Filing", price: 5000, recurrence: "MONTHLY", months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] },
+  { name: "TDS & Statutory Compliance", price: 4000, recurrence: "QUARTERLY", months: ["April", "July", "October", "January"] },
+  { name: "ROC & Company Secretarial", price: 8500, recurrence: "ANNUAL", months: ["October", "November"] },
+  { name: "Bookkeeping & Accounting", price: 10000, recurrence: "MONTHLY", months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] },
+  { name: "Payroll & Labor Law Compliance", price: 6000, recurrence: "MONTHLY", months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] },
+  { name: "Trademark & Business Registration", price: 5000, recurrence: "CUSTOM", months: ["April"] },
+  { name: "Audit & Assurance Package", price: 15000, recurrence: "ANNUAL", months: ["September", "October"] },
+];
+
+async function seedDefaultPackagesIfEmpty(userId: string, existingServices: any[]) {
+  if (existingServices && existingServices.length > 0) return existingServices;
+  if (!userId || userId === "usr_default_account") return existingServices;
+
+  try {
+    const seeded: any[] = [];
+    for (const tmpl of DEFAULT_PACKAGE_TEMPLATES) {
+      const srvId = ensureUUID(`srv_${userId}_${tmpl.name.toLowerCase().replace(/[^a-z0-9]/g, "_")}`);
+      const row = {
+        id: srvId,
+        user_id: userId,
+        name: tmpl.name,
+        price: tmpl.price,
+        recurrence: tmpl.recurrence,
+        applicable_months: tmpl.months,
+        due_date: null,
+      };
+      await supabase.from("services").upsert(row);
+      seeded.push(row);
+    }
+    return seeded;
+  } catch {
+    return existingServices;
   }
-  return false;
 }
 
 // Fetch all CRM data from Supabase (Scoped to current authenticated user_id)
 export async function fetchAllCRMData() {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    let userId = await getUserId();
-
-    const isSaivarala = checkIsSaivarala(user, userId);
+    const userId = await getUserId();
+    const isSaivarala = userId === "usr_saivarala33_gmail_com";
     const targetSaivaralaId = "usr_saivarala33_gmail_com";
 
     // ── MIGRATION: Re-assign legacy/unassigned records in Supabase to saivarala33@gmail.com ──
     if (isSaivarala) {
-      userId = targetSaivaralaId;
       const tablesToClaim = [
         "clients", "services", "sub_services", "required_docs",
         "assigned_services", "banking_entries", "leads", "drafts",
@@ -77,7 +141,7 @@ export async function fetchAllCRMData() {
       }));
     }
 
-    const [
+    let [
       clients,
       services,
       subServices,
@@ -106,6 +170,9 @@ export async function fetchAllCRMData() {
       safeTableFetch("renewals", userId),
       safeTableFetch("user_settings", userId),
     ]);
+
+    // Auto-seed default packages if user has none configured
+    services = await seedDefaultPackagesIfEmpty(userId, services);
 
     const formattedClients: Client[] = (clients || []).map((c: any) => ({
       id: c.id,
@@ -331,67 +398,6 @@ export async function syncUserSettingsToSupabase(settings: any) {
 }
 
 
-
-function getEmailFromSession(): string | undefined {
-  if (typeof window === "undefined") return undefined;
-  try {
-    const rawSession = localStorage.getItem("zpluscrm_active_session");
-    if (rawSession) {
-      const parsed = JSON.parse(rawSession);
-      const email = parsed?.user?.email || parsed?.email;
-      if (email) return String(email).toLowerCase().trim();
-    }
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && (k.startsWith("sb-") || k.includes("auth-token"))) {
-        const raw = localStorage.getItem(k);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          const email = parsed?.user?.email || parsed?.currentSession?.user?.email;
-          if (email) return String(email).toLowerCase().trim();
-        }
-      }
-    }
-  } catch {}
-  return undefined;
-}
-
-export async function getUserId(): Promise<string> {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    const email = user?.email?.toLowerCase().trim() || getEmailFromSession();
-    const mockId = getMockSessionUserId();
-
-    if (checkIsSaivarala(user, mockId)) {
-      return "usr_saivarala33_gmail_com";
-    }
-
-    if (email) {
-      return "usr_" + email.replace(/[^a-z0-9]/gi, "_");
-    }
-
-    if (mockId) {
-      return mockId.startsWith("usr_") ? mockId : `usr_${mockId}`;
-    }
-
-    if (user?.id) {
-      return "usr_" + String(user.id).replace(/[^a-zA-Z0-9_]/g, "_");
-    }
-
-    return "usr_default_account";
-  } catch {
-    const email = getEmailFromSession();
-    if (email) {
-      return "usr_" + email.replace(/[^a-z0-9]/gi, "_");
-    }
-    const mockId = getMockSessionUserId();
-    if (mockId) {
-      return mockId.startsWith("usr_") ? mockId : `usr_${mockId}`;
-    }
-    return "usr_default_account";
-  }
-}
-
 // Clients Sync
 export async function syncClientToSupabase(c: Client) {
   try {
@@ -514,10 +520,9 @@ export async function syncServiceToSupabase(s: Service) {
 export async function removeServiceFromSupabase(id: string, name?: string) {
   try {
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("services").delete().or(`id.eq.${dbId},id.eq.${id}`);
-    if (error) {
-      console.error("Error removing service from Supabase:", error);
-      throw error;
+    const { error, data } = await supabase.from("services").delete().eq("id", dbId).select("id");
+    if (error || !data || data.length === 0) {
+      await supabase.from("services").delete().eq("id", id);
     }
     return { success: true };
   } catch (err) {
@@ -557,10 +562,9 @@ export async function syncSubServiceToSupabase(ss: SubService) {
 export async function removeSubServiceFromSupabase(id: string, name?: string) {
   try {
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("sub_services").delete().or(`id.eq.${dbId},id.eq.${id}`);
-    if (error) {
-      console.error("Error removing sub-service from Supabase:", error);
-      throw error;
+    const { error, data } = await supabase.from("sub_services").delete().eq("id", dbId).select("id");
+    if (error || !data || data.length === 0) {
+      await supabase.from("sub_services").delete().eq("id", id);
     }
     return { success: true };
   } catch (err) {
@@ -591,10 +595,9 @@ export async function syncRequiredDocToSupabase(rd: RequiredDoc) {
 export async function removeRequiredDocFromSupabase(id: string, name?: string) {
   try {
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("required_docs").delete().or(`id.eq.${dbId},id.eq.${id}`);
-    if (error) {
-      console.error("Error removing required doc from Supabase:", error);
-      throw error;
+    const { error, data } = await supabase.from("required_docs").delete().eq("id", dbId).select("id");
+    if (error || !data || data.length === 0) {
+      await supabase.from("required_docs").delete().eq("id", id);
     }
     return { success: true };
   } catch (err) {
@@ -631,10 +634,9 @@ export async function syncAssignedServiceToSupabase(a: AssignedService) {
 export async function removeAssignedServiceFromSupabase(id: string) {
   try {
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("assigned_services").delete().or(`id.eq.${dbId},id.eq.${id}`);
-    if (error) {
-      console.error("Error removing assigned service from Supabase:", error);
-      throw error;
+    const { error, data } = await supabase.from("assigned_services").delete().eq("id", dbId).select("id");
+    if (error || !data || data.length === 0) {
+      await supabase.from("assigned_services").delete().eq("id", id);
     }
     return { success: true };
   } catch (err) {
@@ -668,10 +670,9 @@ export async function syncBankingEntryToSupabase(b: BankingEntry) {
 export async function removeBankingEntryFromSupabase(id: string) {
   try {
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("banking_entries").delete().or(`id.eq.${dbId},id.eq.${id}`);
-    if (error) {
-      console.error("Error removing banking entry from Supabase:", error);
-      throw error;
+    const { error, data } = await supabase.from("banking_entries").delete().eq("id", dbId).select("id");
+    if (error || !data || data.length === 0) {
+      await supabase.from("banking_entries").delete().eq("id", id);
     }
     return { success: true };
   } catch (err) {
@@ -710,10 +711,9 @@ export async function syncLeadToSupabase(l: Lead) {
 export async function removeLeadFromSupabase(id: string, name?: string) {
   try {
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("leads").delete().or(`id.eq.${dbId},id.eq.${id}`);
-    if (error) {
-      console.error("Error removing lead from Supabase:", error);
-      throw error;
+    const { error, data } = await supabase.from("leads").delete().eq("id", dbId).select("id");
+    if (error || !data || data.length === 0) {
+      await supabase.from("leads").delete().eq("id", id);
     }
     return { success: true };
   } catch (err) {
@@ -745,10 +745,9 @@ export async function syncDraftToSupabase(d: DocumentDraft) {
 export async function removeDraftFromSupabase(id: string) {
   try {
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("drafts").delete().or(`id.eq.${dbId},id.eq.${id}`);
-    if (error) {
-      console.error("Error removing draft from Supabase:", error);
-      throw error;
+    const { error, data } = await supabase.from("drafts").delete().eq("id", dbId).select("id");
+    if (error || !data || data.length === 0) {
+      await supabase.from("drafts").delete().eq("id", id);
     }
     return { success: true };
   } catch (err) {
@@ -781,10 +780,9 @@ export async function syncCollaborationToSupabase(c: Collaboration) {
 export async function removeCollaborationFromSupabase(id: string, name?: string) {
   try {
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("collaborations").delete().or(`id.eq.${dbId},id.eq.${id}`);
-    if (error) {
-      console.error("Error removing collaboration from Supabase:", error);
-      throw error;
+    const { error, data } = await supabase.from("collaborations").delete().eq("id", dbId).select("id");
+    if (error || !data || data.length === 0) {
+      await supabase.from("collaborations").delete().eq("id", id);
     }
     return { success: true };
   } catch (err) {
@@ -827,10 +825,9 @@ export async function syncInvoiceToSupabase(inv: any) {
 export async function removeInvoiceFromSupabase(id: string) {
   try {
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("invoices").delete().or(`id.eq.${dbId},id.eq.${id}`);
-    if (error) {
-      console.error("Error removing invoice from Supabase:", error);
-      throw error;
+    const { error, data } = await supabase.from("invoices").delete().eq("id", dbId).select("id");
+    if (error || !data || data.length === 0) {
+      await supabase.from("invoices").delete().eq("id", id);
     }
     return { success: true };
   } catch (err) {
@@ -863,10 +860,9 @@ export async function syncOneTimeServiceToSupabase(ots: any) {
 export async function removeOneTimeServiceFromSupabase(id: string) {
   try {
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("one_time_services").delete().or(`id.eq.${dbId},id.eq.${id}`);
-    if (error) {
-      console.error("Error removing one-time service from Supabase:", error);
-      throw error;
+    const { error, data } = await supabase.from("one_time_services").delete().eq("id", dbId).select("id");
+    if (error || !data || data.length === 0) {
+      await supabase.from("one_time_services").delete().eq("id", id);
     }
     return { success: true };
   } catch (err) {
@@ -904,10 +900,9 @@ export async function syncRenewalToSupabase(rn: any) {
 export async function removeRenewalFromSupabase(id: string) {
   try {
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("renewals").delete().or(`id.eq.${dbId},id.eq.${id}`);
-    if (error) {
-      console.error("Error removing renewal from Supabase:", error);
-      throw error;
+    const { error, data } = await supabase.from("renewals").delete().eq("id", dbId).select("id");
+    if (error || !data || data.length === 0) {
+      await supabase.from("renewals").delete().eq("id", id);
     }
     return { success: true };
   } catch (err) {
@@ -945,3 +940,4 @@ export async function purgeAllUserDataFromSupabase(userId?: string) {
     console.error("Error purging all user data from Supabase:", err);
   }
 }
+
