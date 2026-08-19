@@ -9,6 +9,7 @@ export interface ClientDocument {
   id: string;
   clientId: string;
   name: string;
+  fileName?: string;
   type: string;
   category?: string;
   uploadDate: string;
