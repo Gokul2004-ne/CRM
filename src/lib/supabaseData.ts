@@ -345,7 +345,7 @@ function getEmailFromSession(): string | undefined {
   return undefined;
 }
 
-export async function getUserId(): Promise<string | undefined> {
+export async function getUserId(): Promise<string> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     const email = user?.email?.toLowerCase().trim() || getEmailFromSession();
@@ -359,17 +359,25 @@ export async function getUserId(): Promise<string | undefined> {
       return "usr_" + email.replace(/[^a-z0-9]/gi, "_");
     }
 
-    return user?.id ? String(user.id).replace(/[^a-zA-Z0-9_]/g, "_") : mockId;
+    if (mockId) {
+      return mockId.startsWith("usr_") ? mockId : `usr_${mockId}`;
+    }
+
+    if (user?.id) {
+      return "usr_" + String(user.id).replace(/[^a-zA-Z0-9_]/g, "_");
+    }
+
+    return "usr_default_account";
   } catch {
     const email = getEmailFromSession();
     if (email) {
       return "usr_" + email.replace(/[^a-z0-9]/gi, "_");
     }
     const mockId = getMockSessionUserId();
-    if (checkIsSaivarala(null, mockId)) {
-      return "usr_saivarala33_gmail_com";
+    if (mockId) {
+      return mockId.startsWith("usr_") ? mockId : `usr_${mockId}`;
     }
-    return mockId;
+    return "usr_default_account";
   }
 }
 

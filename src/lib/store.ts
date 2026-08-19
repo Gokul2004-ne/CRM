@@ -414,7 +414,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
 
   // Clients Sync
-  addClient: (c) => {
+  addClient: async (c) => {
     // Auto-provision initial portal credentials if missing
     const panId = (c.pan || c.panNo || "").trim();
     const gstId = (c.gstNo || c.gstin || "").trim();
@@ -433,9 +433,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       portalCredentials,
     };
 
-    // Cloud-First Execution: Await/Trigger Supabase write, then commit to local state
-    syncClientToSupabase(preparedClient);
-
+    // 1. Instantly update in-memory state and user-scoped localStorage
     set((s) => {
       const key = getClientKey(preparedClient);
       if (s.clients.some(x => x.id === preparedClient.id || (key && getClientKey(x) === key))) return s;
@@ -443,10 +441,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("clients", next);
       return { clients: next };
     });
+
+    // 2. Await cloud synchronization to Supabase
+    await syncClientToSupabase(preparedClient);
   },
-  updateClient: (c) => {
+  updateClient: async (c) => {
     const cleanId = c.id;
-    syncClientToSupabase(c);
     set((s) => {
       let found = false;
       const next = s.clients.map(x => {
@@ -463,6 +463,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       saveToLocal("clients", finalClients);
       return { clients: finalClients };
     });
+    await syncClientToSupabase(c);
   },
   deleteClient: async (id) => {
     // 1. Instantly update local store and user-scoped localStorage

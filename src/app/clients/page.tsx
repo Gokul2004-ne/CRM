@@ -129,7 +129,7 @@ export default function ClientsPage() {
     setActiveTab("360");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const phoneVal = (formData.phone || formData.mobile || "").trim();
     let cleanPhone = phoneVal.replace(/\D/g, "");
@@ -219,7 +219,7 @@ export default function ClientsPage() {
     }
 
     if (editingClient) {
-      updateClient({
+      await updateClient({
         ...editingClient,
         ...formData,
         name: formData.name.trim(),
@@ -263,7 +263,7 @@ export default function ClientsPage() {
         status: formData.status || "ACTIVE",
         createdAt: new Date().toISOString().split("T")[0]
       };
-      addClient(newClient);
+      await addClient(newClient);
       toast.success("New Client account created successfully!");
     }
     setIsModalOpen(false);
