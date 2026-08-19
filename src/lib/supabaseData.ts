@@ -341,6 +341,17 @@ function getEmailFromSession(): string | undefined {
       const email = parsed?.user?.email || parsed?.email;
       if (email) return String(email).toLowerCase().trim();
     }
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith("sb-") || k.includes("auth-token"))) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const email = parsed?.user?.email || parsed?.currentSession?.user?.email;
+          if (email) return String(email).toLowerCase().trim();
+        }
+      }
+    }
   } catch {}
   return undefined;
 }
@@ -441,21 +452,20 @@ export async function syncClientToSupabase(c: Client) {
 
 export async function removeClientFromSupabase(id: string, name?: string) {
   try {
-    const userId = await getUserId();
     const dbId = ensureUUID(id);
 
-    // 1. Delete parent client row FIRST so any concurrent fetchAllCRMData immediately sees zero rows
-    const { error } = await supabase.from("clients").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    // 1. Delete parent client row by exact ID / UUID directly from Supabase Cloud
+    const { error } = await supabase.from("clients").delete().or(`id.eq.${dbId},id.eq.${id}`);
     if (error) {
       console.error("Error deleting client from Supabase:", error);
       throw error;
     }
     // 2. Purge linked child records
     await Promise.all([
-      supabase.from("assigned_services").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`).eq("user_id", userId),
-      supabase.from("banking_entries").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`).eq("user_id", userId),
-      supabase.from("invoices").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`).eq("user_id", userId),
-      supabase.from("drafts").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`).eq("user_id", userId),
+      supabase.from("assigned_services").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`),
+      supabase.from("banking_entries").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`),
+      supabase.from("invoices").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`),
+      supabase.from("drafts").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`),
     ]);
     return { success: true };
   } catch (err) {
@@ -486,9 +496,8 @@ export async function syncServiceToSupabase(s: Service) {
 
 export async function removeServiceFromSupabase(id: string, name?: string) {
   try {
-    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("services").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    const { error } = await supabase.from("services").delete().or(`id.eq.${dbId},id.eq.${id}`);
     if (error) {
       console.error("Error removing service from Supabase:", error);
       throw error;
@@ -530,9 +539,8 @@ export async function syncSubServiceToSupabase(ss: SubService) {
 
 export async function removeSubServiceFromSupabase(id: string, name?: string) {
   try {
-    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("sub_services").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    const { error } = await supabase.from("sub_services").delete().or(`id.eq.${dbId},id.eq.${id}`);
     if (error) {
       console.error("Error removing sub-service from Supabase:", error);
       throw error;
@@ -565,9 +573,8 @@ export async function syncRequiredDocToSupabase(rd: RequiredDoc) {
 
 export async function removeRequiredDocFromSupabase(id: string, name?: string) {
   try {
-    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("required_docs").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    const { error } = await supabase.from("required_docs").delete().or(`id.eq.${dbId},id.eq.${id}`);
     if (error) {
       console.error("Error removing required doc from Supabase:", error);
       throw error;
@@ -606,9 +613,8 @@ export async function syncAssignedServiceToSupabase(a: AssignedService) {
 
 export async function removeAssignedServiceFromSupabase(id: string) {
   try {
-    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("assigned_services").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    const { error } = await supabase.from("assigned_services").delete().or(`id.eq.${dbId},id.eq.${id}`);
     if (error) {
       console.error("Error removing assigned service from Supabase:", error);
       throw error;
@@ -644,9 +650,8 @@ export async function syncBankingEntryToSupabase(b: BankingEntry) {
 
 export async function removeBankingEntryFromSupabase(id: string) {
   try {
-    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("banking_entries").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    const { error } = await supabase.from("banking_entries").delete().or(`id.eq.${dbId},id.eq.${id}`);
     if (error) {
       console.error("Error removing banking entry from Supabase:", error);
       throw error;
@@ -687,9 +692,8 @@ export async function syncLeadToSupabase(l: Lead) {
 
 export async function removeLeadFromSupabase(id: string, name?: string) {
   try {
-    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("leads").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    const { error } = await supabase.from("leads").delete().or(`id.eq.${dbId},id.eq.${id}`);
     if (error) {
       console.error("Error removing lead from Supabase:", error);
       throw error;
@@ -723,9 +727,8 @@ export async function syncDraftToSupabase(d: DocumentDraft) {
 
 export async function removeDraftFromSupabase(id: string) {
   try {
-    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("drafts").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    const { error } = await supabase.from("drafts").delete().or(`id.eq.${dbId},id.eq.${id}`);
     if (error) {
       console.error("Error removing draft from Supabase:", error);
       throw error;
@@ -760,9 +763,8 @@ export async function syncCollaborationToSupabase(c: Collaboration) {
 
 export async function removeCollaborationFromSupabase(id: string, name?: string) {
   try {
-    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("collaborations").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    const { error } = await supabase.from("collaborations").delete().or(`id.eq.${dbId},id.eq.${id}`);
     if (error) {
       console.error("Error removing collaboration from Supabase:", error);
       throw error;
@@ -807,9 +809,8 @@ export async function syncInvoiceToSupabase(inv: any) {
 
 export async function removeInvoiceFromSupabase(id: string) {
   try {
-    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("invoices").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    const { error } = await supabase.from("invoices").delete().or(`id.eq.${dbId},id.eq.${id}`);
     if (error) {
       console.error("Error removing invoice from Supabase:", error);
       throw error;
@@ -844,9 +845,8 @@ export async function syncOneTimeServiceToSupabase(ots: any) {
 
 export async function removeOneTimeServiceFromSupabase(id: string) {
   try {
-    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("one_time_services").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    const { error } = await supabase.from("one_time_services").delete().or(`id.eq.${dbId},id.eq.${id}`);
     if (error) {
       console.error("Error removing one-time service from Supabase:", error);
       throw error;
@@ -886,9 +886,8 @@ export async function syncRenewalToSupabase(rn: any) {
 
 export async function removeRenewalFromSupabase(id: string) {
   try {
-    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    const { error } = await supabase.from("renewals").delete().or(`id.eq.${dbId},id.eq.${id}`).eq("user_id", userId);
+    const { error } = await supabase.from("renewals").delete().or(`id.eq.${dbId},id.eq.${id}`);
     if (error) {
       console.error("Error removing renewal from Supabase:", error);
       throw error;
