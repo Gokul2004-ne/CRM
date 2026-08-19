@@ -128,7 +128,7 @@ export async function runStoreTests() {
   assert(isDuplicateCollabEmail === true, "Collaboration identifies duplicate email across partners");
 
   const clientList = [{ id: "c1", name: "Client Corp", email: "client@corp.com" }] as Client[];
-  const isCrossDirectoryEmailUsed = clientList.some(c => c.email.toLowerCase() === "client@corp.com");
+  const isCrossDirectoryEmailUsed = clientList.some(c => c.email && c.email.toLowerCase() === "client@corp.com");
   assert(isCrossDirectoryEmailUsed === true, "Cross-directory check identifies email already registered to client");
 
   console.log(`\nSummary: ${passed} Passed, ${failed} Failed`);

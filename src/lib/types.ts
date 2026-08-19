@@ -1,6 +1,6 @@
 // Shared TypeScript types for the entire application
 
-export type Recurrence = "MONTHLY" | "QUARTERLY" | "ANNUAL" | "CUSTOM";
+export type Recurrence = "MONTHLY" | "QUARTERLY" | "ANNUAL" | "ANNUALLY" | "CUSTOM";
 export type LeadStatus = "LEAD" | "CONTACTED" | "QUALIFIED" | "CONVERTED" | "LOST";
 export type LeadSource = "WHATSAPP" | "WEBSITE" | "REFERRAL" | "DIRECT_CALL" | "CAMPAIGN" | "WALK_IN" | "SOCIAL_MEDIA" | "EMAIL" | "OTHER";
 export type ServiceStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "OVERDUE";
