@@ -433,22 +433,31 @@ export async function syncClientToSupabase(c: Client) {
 
 export async function removeClientFromSupabase(id: string, name?: string) {
   try {
+    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    // Purge linked child records first
-    await supabase.from("assigned_services").delete().eq("client_id", dbId);
-    await supabase.from("banking_entries").delete().eq("client_id", dbId);
-    await supabase.from("invoices").delete().eq("client_id", dbId);
-    await supabase.from("drafts").delete().eq("client_id", dbId);
-    if (id && id !== dbId) {
-      await supabase.from("assigned_services").delete().eq("client_id", id);
-      await supabase.from("banking_entries").delete().eq("client_id", id);
-      await supabase.from("invoices").delete().eq("client_id", id);
-      await supabase.from("drafts").delete().eq("client_id", id);
-      await supabase.from("clients").delete().eq("id", id);
-    }
-    await supabase.from("clients").delete().eq("id", dbId);
-    if (name && name.trim()) {
-      await supabase.from("clients").delete().ilike("name", name.trim());
+
+    if (userId) {
+      await supabase.from("assigned_services").delete().eq("client_id", dbId).eq("user_id", userId);
+      await supabase.from("banking_entries").delete().eq("client_id", dbId).eq("user_id", userId);
+      await supabase.from("invoices").delete().eq("client_id", dbId).eq("user_id", userId);
+      await supabase.from("drafts").delete().eq("client_id", dbId).eq("user_id", userId);
+      if (id && id !== dbId) {
+        await supabase.from("assigned_services").delete().eq("client_id", id).eq("user_id", userId);
+        await supabase.from("banking_entries").delete().eq("client_id", id).eq("user_id", userId);
+        await supabase.from("invoices").delete().eq("client_id", id).eq("user_id", userId);
+        await supabase.from("drafts").delete().eq("client_id", id).eq("user_id", userId);
+        await supabase.from("clients").delete().eq("id", id).eq("user_id", userId);
+      }
+      await supabase.from("clients").delete().eq("id", dbId).eq("user_id", userId);
+    } else {
+      await supabase.from("assigned_services").delete().eq("client_id", dbId);
+      await supabase.from("banking_entries").delete().eq("client_id", dbId);
+      await supabase.from("invoices").delete().eq("client_id", dbId);
+      await supabase.from("drafts").delete().eq("client_id", dbId);
+      if (id && id !== dbId) {
+        await supabase.from("clients").delete().eq("id", id);
+      }
+      await supabase.from("clients").delete().eq("id", dbId);
     }
   } catch (err) {
     console.error("Error removing client from Supabase:", err);
@@ -658,13 +667,18 @@ export async function syncLeadToSupabase(l: Lead) {
 
 export async function removeLeadFromSupabase(id: string, name?: string) {
   try {
+    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    if (id && id !== dbId) {
-      await supabase.from("leads").delete().eq("id", id);
-    }
-    await supabase.from("leads").delete().eq("id", dbId);
-    if (name && name.trim()) {
-      await supabase.from("leads").delete().ilike("name", name.trim());
+    if (userId) {
+      if (id && id !== dbId) {
+        await supabase.from("leads").delete().eq("id", id).eq("user_id", userId);
+      }
+      await supabase.from("leads").delete().eq("id", dbId).eq("user_id", userId);
+    } else {
+      if (id && id !== dbId) {
+        await supabase.from("leads").delete().eq("id", id);
+      }
+      await supabase.from("leads").delete().eq("id", dbId);
     }
   } catch (err) {
     console.error("Error removing lead from Supabase:", err);
@@ -726,13 +740,18 @@ export async function syncCollaborationToSupabase(c: Collaboration) {
 
 export async function removeCollaborationFromSupabase(id: string, name?: string) {
   try {
+    const userId = await getUserId();
     const dbId = ensureUUID(id);
-    if (id && id !== dbId) {
-      await supabase.from("collaborations").delete().eq("id", id);
-    }
-    await supabase.from("collaborations").delete().eq("id", dbId);
-    if (name && name.trim()) {
-      await supabase.from("collaborations").delete().ilike("name", name.trim());
+    if (userId) {
+      if (id && id !== dbId) {
+        await supabase.from("collaborations").delete().eq("id", id).eq("user_id", userId);
+      }
+      await supabase.from("collaborations").delete().eq("id", dbId).eq("user_id", userId);
+    } else {
+      if (id && id !== dbId) {
+        await supabase.from("collaborations").delete().eq("id", id);
+      }
+      await supabase.from("collaborations").delete().eq("id", dbId);
     }
   } catch (err) {
     console.error("Error removing collaboration from Supabase:", err);

@@ -54,8 +54,7 @@ export default function ClientsPage() {
     if (viewingClient) {
       const match = clients.find(c =>
         c.id === viewingClient.id ||
-        (viewingClient.id && ensureUUID(c.id) === ensureUUID(viewingClient.id)) ||
-        (c.name && viewingClient.name && c.name.toLowerCase().trim() === viewingClient.name.toLowerCase().trim())
+        (viewingClient.id && ensureUUID(c.id) === ensureUUID(viewingClient.id))
       );
       if (match) {
         setViewingClient(match);

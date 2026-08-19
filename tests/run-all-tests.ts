@@ -7,6 +7,7 @@ import { runUATTests } from "./uat/user-acceptance.test";
 import { runBlackBoxTests } from "./blackbox/black-box.test";
 import { runRecursiveTests } from "./recursive/recursive.test";
 import { runDuplicateAndFileTests } from "./integration/duplicate-service-and-files.test";
+import { runClientIsolationTests } from "./integration/client-isolation.test";
 
 async function runAllTests() {
   const startTime = Date.now();
@@ -37,27 +38,32 @@ async function runAllTests() {
   totalPassed += apiRes.passed;
   totalFailed += apiRes.failed;
 
-  // 5. Run Authentication & Cross-Device Sync Tests
+  // 5. Run Client Isolation & Deletion Scoping Tests
+  const isoRes = await runClientIsolationTests();
+  totalPassed += isoRes.passed;
+  totalFailed += isoRes.failed;
+
+  // 6. Run Authentication & Cross-Device Sync Tests
   const authRes = await runAuthTests();
   totalPassed += authRes.passed;
   totalFailed += authRes.failed;
 
-  // 5. Run User Acceptance Testing (UAT) Scenarios
+  // 7. Run User Acceptance Testing (UAT) Scenarios
   const uatRes = await runUATTests();
   totalPassed += uatRes.passed;
   totalFailed += uatRes.failed;
 
-  // 6. Run Black Box Testing (Input/Output & Boundary Values)
+  // 8. Run Black Box Testing (Input/Output & Boundary Values)
   const bbRes = await runBlackBoxTests();
   totalPassed += bbRes.passed;
   totalFailed += bbRes.failed;
 
-  // 7. Run Recursive Testing (Multi-Level Relational & Roll-Forward Iterations)
+  // 9. Run Recursive Testing (Multi-Level Relational & Roll-Forward Iterations)
   const recRes = await runRecursiveTests();
   totalPassed += recRes.passed;
   totalFailed += recRes.failed;
 
-  // 8. Run Duplicate Service Prevention & File Storage Tests
+  // 10. Run Duplicate Service Prevention & File Storage Tests
   const dupRes = await runDuplicateAndFileTests();
   totalPassed += dupRes.passed;
   totalFailed += dupRes.failed;
