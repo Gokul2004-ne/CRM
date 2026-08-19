@@ -471,15 +471,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
     pendingDeletes.add(id);
     pendingDeletes.add(dbId);
 
-    // 1. Instantly remove from store and localStorage
-    set((s) => {
-      const next = s.clients.filter(x => {
-        if (x.id === id) return false;
-        if (ensureUUID(x.id) === dbId) return false;
-        return true;
-      });
-      return { clients: next };
-    });
+    // 1. Instantly remove from store along with all linked records
+    set((s) => ({
+      clients: s.clients.filter(x => x.id !== id && ensureUUID(x.id) !== dbId),
+      assignedServices: s.assignedServices.filter(a => a.clientId !== id && a.clientId !== dbId && (!a.clientId || ensureUUID(a.clientId) !== dbId)),
+      bankingEntries: s.bankingEntries.filter(b => b.clientId !== id && b.clientId !== dbId && (!b.clientId || ensureUUID(b.clientId) !== dbId)),
+      invoices: s.invoices.filter(inv => inv.clientId !== id && inv.clientId !== dbId && (!inv.clientId || ensureUUID(inv.clientId) !== dbId)),
+      drafts: s.drafts.filter(d => (d as any).clientId !== id && (d as any).clientId !== dbId && (!(d as any).clientId || ensureUUID((d as any).clientId) !== dbId)),
+      subServices: s.subServices.filter(ss => ss.clientId !== id && ss.clientId !== dbId && (!ss.clientId || ensureUUID(ss.clientId) !== dbId)),
+    }));
 
     try {
       await removeClientFromSupabase(id);
@@ -511,16 +511,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
     await syncServiceToSupabase(sv);
   },
   deleteService: async (id) => {
-    const target = useAppStore.getState().services.find(s => s.id === id);
+    const dbId = ensureUUID(id);
+    const target = useAppStore.getState().services.find(s => s.id === id || ensureUUID(s.id) === dbId);
     const targetName = target?.name;
-    set((s) => {
-      const next = s.services.filter(x => {
-        if (x.id === id) return false;
-        if (targetName && x.name?.toLowerCase().trim() === targetName.toLowerCase().trim()) return false;
-        return true;
-      });
-      return { services: next };
-    });
+    set((s) => ({
+      services: s.services.filter(x => x.id !== id && ensureUUID(x.id) !== dbId && (!targetName || x.name?.toLowerCase().trim() !== targetName.toLowerCase().trim())),
+      subServices: s.subServices.filter(ss => ss.serviceId !== id && ss.serviceId !== dbId && (!ss.serviceId || ensureUUID(ss.serviceId) !== dbId)),
+      assignedServices: s.assignedServices.filter(a => a.serviceId !== id && a.serviceId !== dbId && (!a.serviceId || ensureUUID(a.serviceId) !== dbId)),
+      bankingEntries: s.bankingEntries.filter(b => b.serviceId !== id && b.serviceId !== dbId && (!b.serviceId || ensureUUID(b.serviceId) !== dbId)),
+    }));
     await removeServiceFromSupabase(id, targetName);
   },
 
@@ -555,16 +554,13 @@ export const useAppStore = create<AppState>()((set, get) => ({
     await syncSubServiceToSupabase(ss);
   },
   deleteSubService: async (id) => {
-    const target = useAppStore.getState().subServices.find(ss => ss.id === id);
+    const dbId = ensureUUID(id);
+    const target = useAppStore.getState().subServices.find(ss => ss.id === id || ensureUUID(ss.id) === dbId);
     const targetName = target?.name;
-    set((s) => {
-      const next = s.subServices.filter(x => {
-        if (x.id === id) return false;
-        if (targetName && x.name?.toLowerCase().trim() === targetName.toLowerCase().trim()) return false;
-        return true;
-      });
-      return { subServices: next };
-    });
+    set((s) => ({
+      subServices: s.subServices.filter(x => x.id !== id && ensureUUID(x.id) !== dbId && (!targetName || x.name?.toLowerCase().trim() !== targetName.toLowerCase().trim())),
+      requiredDocs: s.requiredDocs.filter(d => d.subServiceId !== id && d.subServiceId !== dbId && (!d.subServiceId || ensureUUID(d.subServiceId) !== dbId)),
+    }));
     await removeSubServiceFromSupabase(id, targetName);
   },
 
@@ -852,15 +848,17 @@ export const useAppStore = create<AppState>()((set, get) => ({
     }
   },
   deleteInvoice: async (id) => {
+    const dbId = ensureUUID(id);
     const targetBankingId = `b_inv_${id}`;
-    set((s) => {
-      const nextInvoices = s.invoices.filter(x => x.id !== id);
-      const nextBanking = s.bankingEntries.filter(b => b.id !== targetBankingId && b.id !== id);
-      return { invoices: nextInvoices, bankingEntries: nextBanking };
-    });
+    const targetBankingDbId = `b_inv_${dbId}`;
+    set((s) => ({
+      invoices: s.invoices.filter(x => x.id !== id && ensureUUID(x.id) !== dbId),
+      bankingEntries: s.bankingEntries.filter(b => b.id !== targetBankingId && b.id !== targetBankingDbId && b.id !== id && b.id !== dbId),
+    }));
     await Promise.all([
       removeInvoiceFromSupabase(id),
-      removeBankingEntryFromSupabase(targetBankingId)
+      removeBankingEntryFromSupabase(targetBankingId),
+      removeBankingEntryFromSupabase(targetBankingDbId)
     ]);
   },
 

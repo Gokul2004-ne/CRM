@@ -466,29 +466,17 @@ export async function removeClientFromSupabase(id: string, name?: string) {
 
     // 1. Delete parent client row by exact UUID
     const { error, data } = await supabase.from("clients").delete().eq("id", dbId).select("id");
-    if (error) {
-      console.error("[CRM DELETE] ❌ delete by dbId failed:", error.code, error.message);
-      // Try with original id as fallback
-      const { error: err2, data: data2 } = await supabase.from("clients").delete().eq("id", id).select("id");
-      if (err2) {
-        console.error("[CRM DELETE] ❌ delete by originalId also failed:", err2.code, err2.message);
-        throw err2;
-      }
-      console.log("[CRM DELETE] ✅ deleted by originalId, rows:", (data2 as any[])?.length);
-    } else {
-      console.log("[CRM DELETE] ✅ deleted by dbId, rows affected:", (data as any[])?.length);
-      if ((data as any[])?.length === 0) {
-        console.warn("[CRM DELETE] ⚠️ 0 rows deleted — trying originalId");
-        const { data: data2 } = await supabase.from("clients").delete().eq("id", id).select("id");
-        console.log("[CRM DELETE] originalId delete result:", (data2 as any[])?.length, "rows");
-      }
+    if (error || !data || data.length === 0) {
+      await supabase.from("clients").delete().eq("id", id);
     }
-    // 2. Purge linked child records
+    
+    // 2. Purge linked child records across all dependent tables
     await Promise.all([
       supabase.from("assigned_services").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`),
       supabase.from("banking_entries").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`),
       supabase.from("invoices").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`),
       supabase.from("drafts").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`),
+      supabase.from("sub_services").delete().or(`client_id.eq.${dbId},client_id.eq.${id}`),
     ]);
     return { success: true };
   } catch (err) {
@@ -524,6 +512,12 @@ export async function removeServiceFromSupabase(id: string, name?: string) {
     if (error || !data || data.length === 0) {
       await supabase.from("services").delete().eq("id", id);
     }
+    // Purge linked sub_services, assigned_services, and banking_entries
+    await Promise.all([
+      supabase.from("sub_services").delete().or(`service_id.eq.${dbId},service_id.eq.${id}`),
+      supabase.from("assigned_services").delete().or(`service_id.eq.${dbId},service_id.eq.${id}`),
+      supabase.from("banking_entries").delete().or(`service_id.eq.${dbId},service_id.eq.${id}`),
+    ]);
     return { success: true };
   } catch (err) {
     console.error("Error removing service from Supabase:", err);
@@ -566,6 +560,8 @@ export async function removeSubServiceFromSupabase(id: string, name?: string) {
     if (error || !data || data.length === 0) {
       await supabase.from("sub_services").delete().eq("id", id);
     }
+    // Purge linked required_docs
+    await supabase.from("required_docs").delete().or(`sub_service_id.eq.${dbId},sub_service_id.eq.${id}`);
     return { success: true };
   } catch (err) {
     console.error("Error removing sub-service from Supabase:", err);
