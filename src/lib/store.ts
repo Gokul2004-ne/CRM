@@ -446,15 +446,13 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
   updateClient: (c) => {
     const cleanId = c.id;
-    const targetName = c.name?.toLowerCase().trim();
     syncClientToSupabase(c);
     set((s) => {
       let found = false;
       const next = s.clients.map(x => {
         if (
           x.id === cleanId ||
-          (cleanId && ensureUUID(x.id) === ensureUUID(cleanId)) ||
-          (targetName && x.name?.toLowerCase().trim() === targetName)
+          (cleanId && ensureUUID(x.id) === ensureUUID(cleanId))
         ) {
           found = true;
           return { ...x, ...c };
@@ -467,14 +465,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
     });
   },
   deleteClient: (id) => {
-    const target = useAppStore.getState().clients.find(c => c.id === id || (id && ensureUUID(c.id) === ensureUUID(id)));
-    const targetName = target?.name;
-    removeClientFromSupabase(id, targetName);
+    removeClientFromSupabase(id);
     set((s) => {
       const next = s.clients.filter(x => {
         if (x.id === id) return false;
         if (id && ensureUUID(x.id) === ensureUUID(id)) return false;
-        if (targetName && x.name?.toLowerCase().trim() === targetName.toLowerCase().trim()) return false;
         return true;
       });
       saveToLocal("clients", next);
