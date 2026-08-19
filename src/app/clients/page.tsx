@@ -1221,6 +1221,7 @@ export default function ClientsPage() {
                                   id: `cd_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
                                   clientId: viewingClient.id,
                                   name: file.name,
+                                  fileName: file.name,
                                   type: file.name.split(".").pop()?.toUpperCase() || "PDF",
                                   category: "Taxation & Compliance",
                                   uploadDate: new Date().toISOString().split("T")[0],

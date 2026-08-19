@@ -373,7 +373,16 @@ export default function ServicesPage() {
                           {parentService?.name || "-"}
                         </span>
                       </td>
-                      <td style={{ fontWeight: 700, color: "#0F172A" }}>{ss.name}</td>
+                      <td style={{ fontWeight: 700, color: "#0F172A" }}>
+                        <div>{ss.name}</div>
+                        {(ss.clientName || (ss.clientId && clients.find(c => c.id === ss.clientId)?.name)) && (
+                          <div style={{ marginTop: 3 }}>
+                            <span className="chip" style={{ background: "#F0FDF4", color: "#166534", fontSize: 10, fontWeight: 700 }}>
+                              👤 {ss.clientName || clients.find(c => c.id === ss.clientId)?.name}
+                            </span>
+                          </div>
+                        )}
+                      </td>
                       <td>
                         <span className="badge" style={{ background: colors.bg, color: colors.color }}>
                           <RefreshCw size={10} style={{ marginRight: 4 }} />
@@ -551,6 +560,24 @@ export default function ServicesPage() {
                 >
                   <option value="">Select a main Package</option>
                   {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+
+              {/* 1.1 Client Assignment (Optional) */}
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 700, fontSize: 13 }}>Client (Optional)</label>
+                <select
+                  className="form-select"
+                  style={{ fontSize: 13, padding: 10 }}
+                  value={form.clientId || ""}
+                  onChange={e => {
+                    const cId = e.target.value;
+                    const cObj = clients.find(c => c.id === cId || (cId && ensureUUID(c.id) === ensureUUID(cId)));
+                    setForm(f => ({ ...f, clientId: cId || undefined, clientName: cObj?.name || undefined }));
+                  }}
+                >
+                  <option value="">All Clients (General Package Default)</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
 

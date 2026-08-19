@@ -6,6 +6,7 @@ import { runAuthTests } from "./integration/auth.test";
 import { runUATTests } from "./uat/user-acceptance.test";
 import { runBlackBoxTests } from "./blackbox/black-box.test";
 import { runRecursiveTests } from "./recursive/recursive.test";
+import { runDuplicateAndFileTests } from "./integration/duplicate-service-and-files.test";
 
 async function runAllTests() {
   const startTime = Date.now();
@@ -55,6 +56,11 @@ async function runAllTests() {
   const recRes = await runRecursiveTests();
   totalPassed += recRes.passed;
   totalFailed += recRes.failed;
+
+  // 8. Run Duplicate Service Prevention & File Storage Tests
+  const dupRes = await runDuplicateAndFileTests();
+  totalPassed += dupRes.passed;
+  totalFailed += dupRes.failed;
 
   const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 

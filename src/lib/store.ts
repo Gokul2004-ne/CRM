@@ -643,8 +643,21 @@ export const useAppStore = create<AppState>()((set, get) => ({
   addAssignedService: (a) => {
     const aFixed: AssignedService = { ...a, id: ensureUUID(a.id) };
     set((s) => {
-      const key = getAssignedServiceKey(aFixed);
-      if (s.assignedServices.some(x => x.id === aFixed.id || (key && getAssignedServiceKey(x) === key))) return s;
+      // Check if duplicate assignment exists for client + service/subservice + financial year
+      const isDuplicate = s.assignedServices.some(x =>
+        x.id === aFixed.id ||
+        (
+          (x.clientId === aFixed.clientId || (aFixed.clientId && ensureUUID(x.clientId) === ensureUUID(aFixed.clientId))) &&
+          (x.serviceId === aFixed.serviceId || (aFixed.serviceId && ensureUUID(x.serviceId) === ensureUUID(aFixed.serviceId))) &&
+          x.financialYear === aFixed.financialYear &&
+          (
+            (!x.subServiceIds || x.subServiceIds.length === 0) ||
+            (!aFixed.subServiceIds || aFixed.subServiceIds.length === 0) ||
+            x.subServiceIds.some(sid => aFixed.subServiceIds?.some(asid => asid === sid || (sid && ensureUUID(asid) === ensureUUID(sid))))
+          )
+        )
+      );
+      if (isDuplicate) return s;
       const nextAssigned = [...s.assignedServices, aFixed];
       saveToLocal("assignedServices", nextAssigned);
       return { assignedServices: nextAssigned };
