@@ -526,43 +526,8 @@ export default function LeadsPage() {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>
-                    Lead Source / Category *
-                  </label>
-                  <select
-                    className="form-select"
-                    style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #CBD5E1", fontSize: 13, fontWeight: 600 }}
-                    value={form.source || "WHATSAPP"}
-                    onChange={e => setForm(f => ({ ...f, source: e.target.value }))}
-                  >
-                    {LEAD_SOURCES.map(src => (
-                      <option key={src.value} value={src.value}>
-                        {src.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
 
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>
-                    Pipeline Stage / Status *
-                  </label>
-                  <select
-                    className="form-select"
-                    style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #CBD5E1", fontSize: 13, fontWeight: 600 }}
-                    value={form.status || "LEAD"}
-                    onChange={e => setForm(f => ({ ...f, status: e.target.value as LeadStatus }))}
-                  >
-                    {LEAD_STATUSES.map(st => (
-                      <option key={st.value} value={st.value}>
-                        {st.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+
 
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>

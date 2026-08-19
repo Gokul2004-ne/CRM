@@ -53,6 +53,7 @@ export default function InvoicePage() {
   });
 
   const printRef = useRef<HTMLDivElement>(null);
+  const isSavingRef = useRef(false);
 
   const invoiceCount = useMemo(() => invoices.filter(i => i.type === "INVOICE").length, [invoices]);
   const proformaCount = useMemo(() => invoices.filter(i => i.type === "PROFORMA").length, [invoices]);
@@ -123,10 +124,12 @@ export default function InvoicePage() {
   const balanceDue = useMemo(() => Math.max(0, total - (form.amountReceived || 0)), [total, form.amountReceived]);
 
   const handleSave = (status: "DRAFT" | "SENT" | "PAID") => {
+    if (isSavingRef.current) return; // Prevent double submission
     if (!form.clientId) {
       toast.error("Please select a client");
       return;
     }
+    isSavingRef.current = true;
     const clientObj = clients.find(c => c.id === form.clientId || (form.clientId && ensureUUID(c.id) === ensureUUID(form.clientId)));
     const finalAmountReceived = status === "PAID" ? total : (form.amountReceived || 0);
 
@@ -143,23 +146,33 @@ export default function InvoicePage() {
       createdAt: form.createdAt || new Date().toISOString(),
     };
 
+    // Close modal immediately to prevent re-entry
+    setModal(null);
+
     if (modal?.isEditing || form.id) {
       updateInvoice(invoiceRecord);
       toast.success(`🎉 ${invoiceRecord.type} #${invoiceRecord.invoiceNumber} updated & saved successfully!`);
     } else {
-      addInvoice(invoiceRecord);
-      if (invoiceRecord.type === "PROFORMA") {
-        toast.success(`🎉 Pro Forma #${invoiceRecord.invoiceNumber} created successfully!`);
+      // Guard: Check if invoice number already exists in state
+      const duplicate = invoices.find(i => i.invoiceNumber === invoiceRecord.invoiceNumber && i.type === invoiceRecord.type);
+      if (!duplicate) {
+        addInvoice(invoiceRecord);
+        if (invoiceRecord.type === "PROFORMA") {
+          toast.success(`🎉 Pro Forma #${invoiceRecord.invoiceNumber} created successfully!`);
+        } else {
+          toast.success(`🎉 Tax Invoice #${invoiceRecord.invoiceNumber} created! Redirecting to Banking Ledger...`);
+          setTimeout(() => {
+            window.location.href = "/banking";
+          }, 800);
+        }
       } else {
-        toast.success(`🎉 Tax Invoice #${invoiceRecord.invoiceNumber} created! Redirecting to Banking Ledger...`);
-        setTimeout(() => {
-          window.location.href = "/banking";
-        }, 800);
+        toast.info(`Invoice #${invoiceRecord.invoiceNumber} already exists.`);
       }
     }
 
-    setModal(null);
+    setTimeout(() => { isSavingRef.current = false; }, 1000);
   };
+
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter(inv => {

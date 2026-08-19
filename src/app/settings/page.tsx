@@ -40,11 +40,11 @@ export default function SettingsPage() {
   const invoices = useAppStore(state => state.invoices);
 
   // ─── Firm Details ─────────────────────────────────────────────────────────
-  const [firmName, setFirmName] = useState("zpluscrm Advisory LLP");
-  const [ownerName, setOwnerName] = useState("CA Gokulnath");
-  const [email, setEmail] = useState("info@zpluscrm.com");
-  const [mobile, setMobile] = useState("9876543210");
-  const [address, setAddress] = useState("Mumbai, Maharashtra");
+  const [firmName, setFirmName] = useState("");
+  const [ownerName, setOwnerName] = useState("");
+  const [email, setEmail] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [address, setAddress] = useState("");
   const [gstin, setGstin] = useState("");
   const [pan, setPan] = useState("");
   const [regNo, setRegNo] = useState("");
@@ -54,8 +54,8 @@ export default function SettingsPage() {
   const [signatureUrl, setSignatureUrl] = useState("");
 
   // ─── Profile ──────────────────────────────────────────────────────────────
-  const [fullName, setFullName] = useState("CA Gokulnath");
-  const [designation, setDesignation] = useState("Chartered Accountant");
+  const [fullName, setFullName] = useState("");
+  const [designation, setDesignation] = useState("");
   const [bio, setBio] = useState("");
 
   // ─── Preferences ─────────────────────────────────────────────────────────
