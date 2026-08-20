@@ -2,7 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { useAppStore } from "@/lib/store";
 import { useState, useMemo } from "react";
-import { formatCurrency, ensureUUID } from "@/lib/utils";
+import { formatCurrency, ensureUUID, getCurrentFY } from "@/lib/utils";
 import { Pencil, Check, X, Download, Search, CheckCircle2, Clock, AlertCircle, IndianRupee } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,14 +23,18 @@ export default function BankingPage() {
 
   const filtered = useMemo(() => {
     // Only show banking entries from Invoices (exclude assigned service auto-derivations)
-    const list = [...bankingEntries.filter(b => b.financialYear === selectedFY && b.remark !== "Assigned service billing record")];
+    const list = [...bankingEntries.filter(b => (b.financialYear === selectedFY || (!b.financialYear && selectedFY === getCurrentFY())) && b.remark !== "Assigned service billing record")];
 
     // Apply search filter
     return list.filter(b => {
       const client = clients.find(c => c.id === b.clientId || (b.clientId && ensureUUID(c.id) === ensureUUID(b.clientId)));
       const service = services.find(s => s.id === b.serviceId || (b.serviceId && ensureUUID(s.id) === ensureUUID(b.serviceId)));
       const q = search.toLowerCase();
-      return (client?.name || "").toLowerCase().includes(q) || (service?.name || "").toLowerCase().includes(q);
+      return (
+        (client?.name || "").toLowerCase().includes(q) ||
+        (service?.name || "").toLowerCase().includes(q) ||
+        (b.remark || "").toLowerCase().includes(q)
+      );
     });
   }, [bankingEntries, selectedFY, clients, services, search]);
 
@@ -59,9 +63,10 @@ export default function BankingPage() {
   const exportCSV = () => {
     const headers = ["Client", "Package", "Amount Billed", "Amount Received", "Amount Pending", "Payment Status", "Remark"];
     const rows = filtered.map(b => {
-      const client = clients.find(c => c.id === b.clientId);
-      const service = services.find(s => s.id === b.serviceId);
-      return [client?.name, service?.name, b.amountBilled, b.amountReceived, b.amountPending, b.paymentStatus || "PENDING", b.remark || ""];
+      const client = clients.find(c => c.id === b.clientId || (b.clientId && ensureUUID(c.id) === ensureUUID(b.clientId)));
+      const service = services.find(s => s.id === b.serviceId || (b.serviceId && ensureUUID(s.id) === ensureUUID(b.serviceId)));
+      const pkgName = service?.name || (b.remark?.includes("INVOICE #") ? "Tax Invoice" : "General Billing");
+      return [client?.name, pkgName, b.amountBilled, b.amountReceived, b.amountPending, b.paymentStatus || "PENDING", b.remark || ""];
     });
     const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -150,8 +155,8 @@ export default function BankingPage() {
             </thead>
             <tbody>
               {filtered.map((b, i) => {
-                const client = clients.find(c => c.id === b.clientId);
-                const service = services.find(s => s.id === b.serviceId);
+                const client = clients.find(c => c.id === b.clientId || (b.clientId && ensureUUID(c.id) === ensureUUID(b.clientId)));
+                const service = services.find(s => s.id === b.serviceId || (b.serviceId && ensureUUID(s.id) === ensureUUID(b.serviceId)));
                 const isEditing = editId === b.id;
                 const numEditReceived = parseFloat(editReceived) || 0;
                 const currentReceived = isEditing ? numEditReceived : b.amountReceived;
@@ -159,12 +164,13 @@ export default function BankingPage() {
                 const currentStatus = (currentReceived >= b.amountBilled && b.amountBilled > 0 ? "PAID" : currentReceived > 0 ? "PARTIAL" : "PENDING") as PaymentStatus;
                 const cfg = paymentStatusConfig[currentStatus];
                 const StatusIcon = cfg.icon;
+                const pkgDisplay = service?.name || (b.remark?.includes("INVOICE #") ? "Tax Invoice / Billing" : b.remark || "-");
 
                 return (
                   <tr key={b.id} style={{ background: isEditing ? "#FFFBEB" : undefined }}>
                     <td className="col-num">{i + 1}</td>
                     <td style={{ fontWeight: 700, color: "#0F172A" }}>{client?.name || "-"}</td>
-                    <td style={{ color: "#0176D3", fontWeight: 600 }}>{service?.name || "-"}</td>
+                    <td style={{ color: "#0176D3", fontWeight: 600 }}>{pkgDisplay}</td>
                     <td>
                       <div style={{
                         display: "inline-flex",
