@@ -21,8 +21,6 @@ const LEAD_SOURCES: { value: LeadSource; label: string; badgeClass: string }[] =
 
 const LEAD_STATUSES: { value: LeadStatus; label: string; badgeClass: string }[] = [
   { value: "LEAD", label: "🔥 New Lead", badgeClass: "badge-pending" },
-  { value: "CONTACTED", label: "📞 Contacted", badgeClass: "badge-info" },
-  { value: "QUALIFIED", label: "⭐ Qualified", badgeClass: "badge-primary" },
   { value: "CONVERTED", label: "✅ Converted", badgeClass: "badge-converted" },
   { value: "LOST", label: "❌ Lost", badgeClass: "badge-danger" },
 ];

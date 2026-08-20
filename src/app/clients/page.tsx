@@ -1239,7 +1239,8 @@ export default function ClientsPage() {
                                 const updated: Client = {
                                   ...currentClient,
                                   documents: updatedDocs,
-                                  documentCount: updatedDocs.length
+                                  documentCount: updatedDocs.length,
+                                  documentUrl: fileUrl || currentClient.documentUrl || updatedDocs[0]?.fileUrl
                                 };
                                 await updateClient(updated);
                                 setViewingClient(updated);
