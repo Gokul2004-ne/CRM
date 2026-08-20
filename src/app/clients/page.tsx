@@ -20,11 +20,13 @@ const INDIAN_STATES = [
 ];
 
 export default function ClientsPage() {
-  const { clients, collaborations, services, subServices, requiredDocs, assignedServices, invoices, oneTimeServices, addClient, updateClient, deleteClient } = useAppStore();
+  const { clients, collaborations, services, subServices, requiredDocs, assignedServices, invoices, oneTimeServices, addClient, updateClient, deleteClient, addLead, addCollaboration } = useAppStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<string>("ALL");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [alsoAddLead, setAlsoAddLead] = useState(false);
+  const [alsoAddCollab, setAlsoAddCollab] = useState(false);
   const [viewingClient, setViewingClient] = useState<Client | null>(null);
   const [activeTab, setActiveTab] = useState<"details" | "credentials" | "documents" | "services" | "360">("details");
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
@@ -64,6 +66,8 @@ export default function ClientsPage() {
 
   const handleOpenAdd = () => {
     setEditingClient(null);
+    setAlsoAddLead(false);
+    setAlsoAddCollab(false);
     setFormData({
       name: "",
       type: "PROPRIETORSHIP",
@@ -200,12 +204,6 @@ export default function ClientsPage() {
       return;
     }
 
-    const existingCollabEmail = (collaborations || []).find(collab => emailVal && collab.email?.trim().toLowerCase() === emailVal.toLowerCase());
-    if (existingCollabEmail) {
-      toast.error(`❌ Email already used! "${emailVal}" is already registered to collaboration partner "${existingCollabEmail.name}".`);
-      return;
-    }
-
     const existingPan = clients.find(c => (!editingClient || c.id !== editingClient.id) && panVal && ((c.pan && c.pan.trim().toUpperCase() === panVal) || (c.panNo && c.panNo.trim().toUpperCase() === panVal)));
     if (existingPan) {
       toast.error("❌ Client already exists with this PAN Number.");
@@ -222,8 +220,8 @@ export default function ClientsPage() {
       await updateClient({
         ...editingClient,
         ...formData,
-        name: formData.name.trim(),
-        ownerName: formData.name.trim(),
+        name: formData.name!.trim(),
+        ownerName: formData.name!.trim(),
         pan: panVal,
         gstin: gstinVal,
         phone: cleanPhone,
@@ -264,7 +262,37 @@ export default function ClientsPage() {
         createdAt: new Date().toISOString().split("T")[0]
       };
       await addClient(newClient);
-      toast.success("New Client account created successfully!");
+
+      if (alsoAddLead) {
+        addLead({
+          id: `l_${Date.now()}`,
+          name: formData.name!.trim(),
+          phone: cleanPhone,
+          mobile: cleanPhone,
+          email: emailVal || undefined,
+          source: "WHATSAPP",
+          status: "LEAD",
+          notes: formData.notes?.trim() || "Multi-added from Client form",
+          createdAt: new Date().toISOString().split("T")[0]
+        });
+      }
+
+      if (alsoAddCollab) {
+        addCollaboration({
+          id: `collab_${Date.now()}`,
+          name: formData.name!.trim(),
+          number: cleanPhone,
+          email: emailVal || `${formData.name!.trim().toLowerCase().replace(/\s+/g, "")}@collab.com`,
+          notes: formData.notes?.trim() || "Multi-added from Client form",
+          createdAt: new Date().toISOString().split("T")[0]
+        });
+      }
+
+      const addedParts = ["Client Directory"];
+      if (alsoAddLead) addedParts.push("WhatsApp Lead");
+      if (alsoAddCollab) addedParts.push("Collaboration Partner");
+
+      toast.success(`Successfully created ${formData.name} in ${addedParts.join(", ")}!`);
     }
     setIsModalOpen(false);
   };
@@ -682,6 +710,30 @@ export default function ClientsPage() {
                   autoComplete="new-password"
                 />
               </div>
+
+              {!editingClient && (
+                <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, padding: 12, display: "grid", gap: 8, marginTop: 4 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#334155" }}>⚡ Multi-Category Sync Options (Optional):</div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer", color: "#0F172A" }}>
+                    <input
+                      type="checkbox"
+                      checked={alsoAddLead}
+                      onChange={e => setAlsoAddLead(e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: "#0176D3" }}
+                    />
+                    <span>Also add as <strong>WhatsApp Lead</strong></span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer", color: "#0F172A" }}>
+                    <input
+                      type="checkbox"
+                      checked={alsoAddCollab}
+                      onChange={e => setAlsoAddCollab(e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: "#0176D3" }}
+                    />
+                    <span>Also add as <strong>Collaboration Partner</strong></span>
+                  </label>
+                </div>
+              )}
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 10 }}>
                 {editingClient ? (
