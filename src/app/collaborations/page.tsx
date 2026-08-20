@@ -19,10 +19,12 @@ const emptyCollaboration = (): Collaboration => ({
 });
 
 export default function CollaborationsPage() {
-  const { clients, collaborations, addCollaboration, updateCollaboration, deleteCollaboration } = useAppStore();
+  const { clients, collaborations, addCollaboration, updateCollaboration, deleteCollaboration, addLead, addClient } = useAppStore();
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<{ open: boolean; editing: boolean }>({ open: false, editing: false });
   const [form, setForm] = useState<Collaboration>(emptyCollaboration());
+  const [alsoAddLead, setAlsoAddLead] = useState(false);
+  const [alsoAddClient, setAlsoAddClient] = useState(false);
 
   const filtered = (collaborations || []).filter((c) => {
     const s = search.toLowerCase();
@@ -36,6 +38,8 @@ export default function CollaborationsPage() {
 
   const handleOpenAdd = () => {
     setForm(emptyCollaboration());
+    setAlsoAddLead(false);
+    setAlsoAddClient(false);
     setModal({ open: true, editing: false });
   };
 
@@ -68,16 +72,7 @@ export default function CollaborationsPage() {
       return;
     }
 
-    // 2. Check duplicate email in Clients
-    const existingClientEmail = (clients || []).find(
-      (cl) => cl.email?.trim().toLowerCase() === emailClean
-    );
-    if (existingClientEmail) {
-      toast.error(`❌ Email already used! "${form.email.trim()}" is already registered to client "${existingClientEmail.name}".`);
-      return;
-    }
-
-    // 3. Check duplicate phone in Collaborations
+    // 2. Check duplicate phone in Collaborations
     const rawNum = phoneClean.replace(/\D/g, "");
     if (rawNum.length >= 10) {
       const existingCollabPhone = (collaborations || []).find(
@@ -102,7 +97,41 @@ export default function CollaborationsPage() {
         createdAt: new Date().toISOString().split("T")[0],
       };
       addCollaboration(newCollab);
-      toast.success("New Collaboration created successfully!");
+
+      if (alsoAddLead) {
+        addLead({
+          id: `l_${Date.now()}`,
+          name: nameClean,
+          phone: phoneClean,
+          mobile: phoneClean,
+          email: emailClean,
+          source: "WHATSAPP",
+          status: "LEAD",
+          notes: form.notes?.trim() || "Multi-added from Collaboration form",
+          createdAt: new Date().toISOString().split("T")[0]
+        });
+      }
+
+      if (alsoAddClient) {
+        addClient({
+          id: `c_${Date.now()}`,
+          name: nameClean,
+          phone: phoneClean,
+          mobile: phoneClean,
+          email: emailClean,
+          city: "Mumbai",
+          documentCount: 0,
+          status: "ACTIVE",
+          notes: form.notes?.trim() || "Multi-added from Collaboration form",
+          createdAt: new Date().toISOString().split("T")[0]
+        });
+      }
+
+      const addedParts = ["Collaboration Partner"];
+      if (alsoAddLead) addedParts.push("WhatsApp Lead");
+      if (alsoAddClient) addedParts.push("Client Directory");
+
+      toast.success(`Successfully created ${nameClean} in ${addedParts.join(", ")}!`);
     }
 
     setModal({ open: false, editing: false });
@@ -418,6 +447,30 @@ export default function CollaborationsPage() {
                   placeholder="e.g. Joint agreement signed for joint project deliveries."
                 />
               </div>
+
+              {!modal.editing && (
+                <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, padding: 12, display: "grid", gap: 8, marginTop: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#334155" }}>⚡ Multi-Category Sync Options (Optional):</div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer", color: "#0F172A" }}>
+                    <input
+                      type="checkbox"
+                      checked={alsoAddLead}
+                      onChange={(e) => setAlsoAddLead(e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: "#0176D3" }}
+                    />
+                    <span>Also add as <strong>WhatsApp Lead</strong></span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer", color: "#0F172A" }}>
+                    <input
+                      type="checkbox"
+                      checked={alsoAddClient}
+                      onChange={(e) => setAlsoAddClient(e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: "#0176D3" }}
+                    />
+                    <span>Also add as <strong>Active Client Account</strong></span>
+                  </label>
+                </div>
+              )}
             </div>
 
             {/* Fixed Modal Action Buttons Footer */}

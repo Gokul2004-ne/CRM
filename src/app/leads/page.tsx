@@ -40,13 +40,15 @@ const emptyLead = (): Lead => ({
 });
 
 export default function LeadsPage() {
-  const { leads, clients, collaborations, addLead, updateLead, deleteLead, convertLead, addClient } = useAppStore();
+  const { leads, clients, collaborations, addLead, updateLead, deleteLead, convertLead, addClient, addCollaboration } = useAppStore();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [modal, setModal] = useState<{ open: boolean; editing: Lead | null }>({ open: false, editing: null });
   const [isSyncing, setIsSyncing] = useState(false);
   const [form, setForm] = useState<Lead>(emptyLead());
+  const [alsoAddClient, setAlsoAddClient] = useState(false);
+  const [alsoAddCollab, setAlsoAddCollab] = useState(false);
 
   const filtered = (leads || []).filter(l => {
     const phoneNum = l.phone || l.mobile || "";
@@ -64,6 +66,8 @@ export default function LeadsPage() {
 
   const openAdd = () => {
     setForm(emptyLead());
+    setAlsoAddClient(false);
+    setAlsoAddCollab(false);
     setModal({ open: true, editing: null });
   };
 
@@ -115,18 +119,6 @@ export default function LeadsPage() {
         toast.error(`❌ Email already used! "${emailVal}" is already registered to lead "${existingLeadEmail.name}".`);
         return;
       }
-
-      const existingClientEmail = clients.find(c => c.email?.trim().toLowerCase() === emailVal);
-      if (existingClientEmail) {
-        toast.error(`❌ Email already used! "${emailVal}" is already registered to client "${existingClientEmail.name}".`);
-        return;
-      }
-
-      const existingCollabEmail = (collaborations || []).find(col => col.email?.trim().toLowerCase() === emailVal);
-      if (existingCollabEmail) {
-        toast.error(`❌ Email already used! "${emailVal}" is already registered to collaboration partner "${existingCollabEmail.name}".`);
-        return;
-      }
     }
 
     const payload: Lead = {
@@ -151,7 +143,38 @@ export default function LeadsPage() {
         id: `l_${Date.now()}`
       };
       addLead(newLead);
-      toast.success("New lead created and stored in cloud database!");
+
+      if (alsoAddClient) {
+        addClient({
+          id: `c_${Date.now()}`,
+          name: nameClean,
+          phone: phoneVal,
+          mobile: phoneVal,
+          email: emailVal || undefined,
+          city: form.city?.trim() || "Mumbai",
+          documentCount: 0,
+          status: "ACTIVE",
+          notes: form.notes?.trim() || "Multi-added from WhatsApp Lead form",
+          createdAt: new Date().toISOString().split("T")[0]
+        });
+      }
+
+      if (alsoAddCollab) {
+        addCollaboration({
+          id: `collab_${Date.now()}`,
+          name: nameClean,
+          number: phoneVal,
+          email: emailVal || `${nameClean.toLowerCase().replace(/\s+/g, "")}@collab.com`,
+          notes: form.notes?.trim() || "Multi-added from WhatsApp Lead form",
+          createdAt: new Date().toISOString().split("T")[0]
+        });
+      }
+
+      const addedParts = ["WhatsApp Lead"];
+      if (alsoAddClient) addedParts.push("Client Directory");
+      if (alsoAddCollab) addedParts.push("Collaboration Partner");
+
+      toast.success(`Successfully created ${nameClean} in ${addedParts.join(", ")}!`);
     }
 
     setModal({ open: false, editing: null });
@@ -557,6 +580,30 @@ export default function LeadsPage() {
                   placeholder="e.g. Interested in GST Registration + Monthly Filing package"
                 />
               </div>
+
+              {!modal.editing && (
+                <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, padding: 12, display: "grid", gap: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#334155" }}>⚡ Multi-Category Sync Options (Optional):</div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer", color: "#0F172A" }}>
+                    <input
+                      type="checkbox"
+                      checked={alsoAddClient}
+                      onChange={e => setAlsoAddClient(e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: "#0176D3" }}
+                    />
+                    <span>Also add as <strong>Active Client Account</strong></span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer", color: "#0F172A" }}>
+                    <input
+                      type="checkbox"
+                      checked={alsoAddCollab}
+                      onChange={e => setAlsoAddCollab(e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: "#0176D3" }}
+                    />
+                    <span>Also add as <strong>Collaboration Partner</strong></span>
+                  </label>
+                </div>
+              )}
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 6 }}>
                 <button
