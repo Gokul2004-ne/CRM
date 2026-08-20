@@ -1,7 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { useEffect, useState } from "react";
-import { Save, Building2, User, Bell, Shield, Palette, CreditCard, Database, Download, Trash2, KeyRound, LogOut, CheckCircle, Eye, EyeOff, RefreshCw, PenTool, UploadCloud, Check } from "lucide-react";
+import { Save, Building2, User, Bell, Shield, Palette, CreditCard, Database, Download, Trash2, KeyRound, LogOut, CheckCircle, Eye, EyeOff, RefreshCw, PenTool, UploadCloud, Check, Landmark } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { useAppStore, purgeUserLocalData } from "@/lib/store";
@@ -53,6 +53,14 @@ export default function SettingsPage() {
   const [currency, setCurrency] = useState("INR");
   const [signatureUrl, setSignatureUrl] = useState("");
 
+  // ─── Bank Details ─────────────────────────────────────────────────────────
+  const [bankName, setBankName] = useState("");
+  const [accountHolder, setAccountHolder] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [ifscCode, setIfscCode] = useState("");
+  const [branchName, setBranchName] = useState("");
+  const [upiId, setUpiId] = useState("");
+
   // ─── Profile ──────────────────────────────────────────────────────────────
   const [fullName, setFullName] = useState("");
   const [designation, setDesignation] = useState("");
@@ -91,6 +99,12 @@ export default function SettingsPage() {
     if (s.fyStart) setFyStart(s.fyStart);
     if (s.currency) setCurrency(s.currency);
     if (s.signatureUrl) setSignatureUrl(s.signatureUrl);
+    if (s.bankName) setBankName(s.bankName);
+    if (s.accountHolder) setAccountHolder(s.accountHolder);
+    if (s.accountNumber) setAccountNumber(s.accountNumber);
+    if (s.ifscCode) setIfscCode(s.ifscCode);
+    if (s.branchName) setBranchName(s.branchName);
+    if (s.upiId) setUpiId(s.upiId);
     if (s.fullName) setFullName(s.fullName);
     if (s.designation) setDesignation(s.designation);
     if (s.bio) setBio(s.bio);
@@ -122,8 +136,12 @@ export default function SettingsPage() {
   };
 
   const handleSaveFirm = () => {
-    saveSettings({ ...loadSettings(), firmName, ownerName, email, mobile, address, gstin, pan, regNo, website, fyStart, currency, signatureUrl });
-    toast.success("Firm details & signature saved!");
+    saveSettings({
+      ...loadSettings(),
+      firmName, ownerName, email, mobile, address, gstin, pan, regNo, website, fyStart, currency, signatureUrl,
+      bankName, accountHolder, accountNumber, ifscCode, branchName, upiId
+    });
+    toast.success("Firm & Bank details saved successfully!");
   };
   const handleSaveProfile = () => {
     saveSettings({ ...loadSettings(), fullName, designation, bio });
@@ -452,6 +470,43 @@ export default function SettingsPage() {
                       </label>
                     </>
                   )}
+                </div>
+              </div>
+
+              {/* Bank Account Details Block */}
+              <div style={{ marginTop: 24, marginBottom: 20, padding: 20, border: "1px solid #E2E8F0", borderRadius: 12, background: "#F8FAFC" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <Landmark size={18} color="#E8520A" />
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>Bank Account Details (For Invoices)</div>
+                </div>
+                <p style={{ fontSize: 12, color: "#64748B", marginBottom: 16 }}>
+                  Enter your firm's bank and UPI details. These details will automatically be displayed in the Bank Details section on all generated Tax Invoices, Proforma Invoices, and receipts.
+                </p>
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Bank Name</label>
+                    <input className="form-input" value={bankName} onChange={e => setBankName(e.target.value)} placeholder="e.g. Bank of India / HDFC Bank" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Account Holder Name</label>
+                    <input className="form-input" value={accountHolder} onChange={e => setAccountHolder(e.target.value)} placeholder="e.g. Registered Firm Name" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Account Number</label>
+                    <input className="form-input" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} placeholder="e.g. 605616510000067" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">IFSC Code</label>
+                    <input className="form-input" value={ifscCode} onChange={e => setIfscCode(e.target.value)} placeholder="e.g. BKID0006056" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Branch Name</label>
+                    <input className="form-input" value={branchName} onChange={e => setBranchName(e.target.value)} placeholder="e.g. ROHINI C AND P / Central Branch" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">UPI ID / VPA (Optional)</label>
+                    <input className="form-input" value={upiId} onChange={e => setUpiId(e.target.value)} placeholder="e.g. yourfirm@upi or 9876543210@paytm" />
+                  </div>
                 </div>
               </div>
 

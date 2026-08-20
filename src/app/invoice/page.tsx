@@ -665,6 +665,13 @@ export default function InvoicePage() {
         const practiceMobile = firmSettings.mobile || userMeta.phone || userMeta.mobile || "";
         const practiceEmail = firmSettings.email || user?.email || "";
 
+        const bankName = firmSettings.bankName || "Bank of India";
+        const accountHolder = firmSettings.accountHolder || practiceName;
+        const accountNumber = firmSettings.accountNumber || "605616510000067";
+        const ifscCode = firmSettings.ifscCode || "BKID0006056";
+        const branchName = firmSettings.branchName || "ROHINI C AND P";
+        const upiId = firmSettings.upiId || "";
+
         const itemsList = viewInvoice.items || [];
         const totalItemsCount = itemsList.length;
         const totalQtyCount = itemsList.reduce((s, i) => s + Number(i.quantity || 1), 0);
@@ -866,21 +873,26 @@ export default function InvoicePage() {
                     </div>
                   )}
 
-                  {/* Bank Account Details (For Tax Invoice) */}
-                  {isTaxInvoice ? (
-                    <div style={{ fontSize: 11.5, color: "#334155" }}>
-                      <div style={{ fontWeight: 800, color: "#0F172A", marginBottom: 4 }}>Bank Details:</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "100px 1fr", gap: "2px 8px" }}>
-                        <span style={{ color: "#64748B" }}>Bank:</span> <strong>Bank of India</strong>
-                        <span style={{ color: "#64748B" }}>Account Holder:</span> <strong>{practiceName}</strong>
-                        <span style={{ color: "#64748B" }}>Account #:</span> <strong>605616510000067</strong>
-                        <span style={{ color: "#64748B" }}>IFSC Code:</span> <strong>BKID0006056</strong>
-                        <span style={{ color: "#64748B" }}>Branch:</span> <strong>ROHINI C AND P</strong>
-                      </div>
+                  {/* Bank Account Details */}
+                  <div style={{ fontSize: 11.5, color: "#334155" }}>
+                    <div style={{ fontWeight: 800, color: "#0F172A", marginBottom: 4 }}>Bank Details:</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "100px 1fr", gap: "2px 8px" }}>
+                      <span style={{ color: "#64748B" }}>Bank:</span> <strong>{bankName}</strong>
+                      <span style={{ color: "#64748B" }}>Account Holder:</span> <strong>{accountHolder}</strong>
+                      <span style={{ color: "#64748B" }}>Account #:</span> <strong>{accountNumber}</strong>
+                      <span style={{ color: "#64748B" }}>IFSC Code:</span> <strong>{ifscCode}</strong>
+                      {branchName && (
+                        <>
+                          <span style={{ color: "#64748B" }}>Branch:</span> <strong>{branchName}</strong>
+                        </>
+                      )}
+                      {upiId && (
+                        <>
+                          <span style={{ color: "#64748B" }}>UPI ID:</span> <strong>{upiId}</strong>
+                        </>
+                      )}
                     </div>
-                  ) : (
-                    <div />
-                  )}
+                  </div>
 
                   {/* Stamp / Authorized Signatory Box */}
                   <div style={{ textAlign: "right" }}>
