@@ -54,6 +54,7 @@ export interface Client {
   pincode?: string;
   notes?: string;
   documentCount?: number;
+  documentUrl?: string;
   documents?: ClientDocument[];
   createdAt?: string;
 }
@@ -90,6 +91,7 @@ export interface RequiredDoc {
   isMandatory: boolean;
   fileName?: string;
   fileUrl?: string;
+  docUrl?: string;
   fileType?: string;
 }
 

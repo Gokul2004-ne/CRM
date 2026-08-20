@@ -164,9 +164,10 @@ export async function fetchAllCRMData() {
         uploadDate: d.uploadDate || d.upload_date || new Date().toISOString().split("T")[0],
         size: d.size || "",
         status: d.status || "RECEIVED",
-        fileUrl: d.fileUrl || d.file_url || "",
+        fileUrl: d.fileUrl || d.file_url || c.document_url || "",
       })),
       documentCount: Number(c.document_count || (Array.isArray(c.documents) ? c.documents.length : 0)),
+      documentUrl: c.document_url || (Array.isArray(c.documents) && c.documents[0] ? (c.documents[0].fileUrl || c.documents[0].file_url) : undefined),
       contactPerson: c.contact_person,
       city: c.city,
       status: c.status,
@@ -206,7 +207,8 @@ export async function fetchAllCRMData() {
       name: rd.name,
       isMandatory: rd.is_mandatory ?? true,
       fileName: rd.file_name || undefined,
-      fileUrl: rd.file_url || undefined,
+      fileUrl: rd.file_url || rd.doc_url || undefined,
+      docUrl: rd.doc_url || rd.file_url || undefined,
       fileType: rd.file_type || undefined,
     }));
 
@@ -371,6 +373,21 @@ export async function syncClientToSupabase(c: Client) {
     const gstPortalId = gstCred?.portalId || c.gstPortalId || null;
     const gstPortalPassword = (gstCred !== undefined ? gstCred.password : c.gstPortalPassword) || null;
 
+    const docList = Array.isArray(c.documents) ? c.documents.map((d: any) => ({
+      id: d.id,
+      clientId: d.clientId || c.id,
+      name: d.name || d.fileName || "Document",
+      fileName: d.fileName || d.name || "Document",
+      type: d.type || "PDF",
+      category: d.category || "General",
+      uploadDate: d.uploadDate || d.upload_date || new Date().toISOString().split("T")[0],
+      size: d.size || "",
+      status: d.status || "RECEIVED",
+      fileUrl: d.fileUrl || d.file_url || "",
+    })) : [];
+
+    const extractedDocUrl = c.documentUrl || (docList.length > 0 ? (docList[0].fileUrl || (docList[0] as any).file_url) : null);
+
     const { error, data } = await supabase.from("clients").upsert({
       id: dbId,
       user_id: userId,
@@ -387,19 +404,9 @@ export async function syncClientToSupabase(c: Client) {
       gst_no: c.gstNo,
       gst_portal_id: gstPortalId,
       gst_portal_password: gstPortalPassword,
-      documents: Array.isArray(c.documents) ? c.documents.map((d: any) => ({
-        id: d.id,
-        clientId: d.clientId || c.id,
-        name: d.name || d.fileName || "Document",
-        fileName: d.fileName || d.name || "Document",
-        type: d.type || "PDF",
-        category: d.category || "General",
-        uploadDate: d.uploadDate || d.upload_date || new Date().toISOString().split("T")[0],
-        size: d.size || "",
-        status: d.status || "RECEIVED",
-        fileUrl: d.fileUrl || d.file_url || "",
-      })) : [],
-      document_count: Array.isArray(c.documents) ? c.documents.length : (c.documentCount || 0),
+      documents: docList,
+      document_url: extractedDocUrl,
+      document_count: docList.length,
       contact_person: c.contactPerson,
       city: c.city,
       status: c.status,
@@ -542,6 +549,7 @@ export async function syncRequiredDocToSupabase(rd: RequiredDoc) {
     is_mandatory: rd.isMandatory ?? true,
     file_name: rd.fileName || null,
     file_url: rd.fileUrl || null,
+    doc_url: rd.docUrl || rd.fileUrl || null,
     file_type: rd.fileType || null,
   });
   if (error) {

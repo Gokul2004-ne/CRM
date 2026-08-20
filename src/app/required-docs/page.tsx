@@ -42,8 +42,12 @@ export default function RequiredDocsPage() {
 
   const handleSave = () => {
     if (!form.name || !form.subServiceId) { toast.error("Sub-service and document name are required"); return; }
-    if (modal.editing) { updateRequiredDoc(form); toast.success("Document updated"); }
-    else { addRequiredDoc({ ...form, id: `d${Date.now()}` }); toast.success("Document added"); }
+    const docData: RequiredDoc = {
+      ...form,
+      docUrl: form.fileUrl || form.docUrl
+    };
+    if (modal.editing) { updateRequiredDoc(docData); toast.success("Document updated"); }
+    else { addRequiredDoc({ ...docData, id: `d${Date.now()}` }); toast.success("Document added"); }
     setModal({ open: false, editing: null });
   };
 
