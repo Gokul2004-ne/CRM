@@ -298,9 +298,32 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const oneTimeRes = deduplicateItems(rawOneTime, getOneTimeKey);
     const renewalsRes = deduplicateItems(rawRenewals, renewalKey);
 
+    // Ensure all Tax Invoices have a corresponding banking entry
+    const existingBanking = [...bankingRes.unique];
+    invoicesRes.unique.forEach((inv: Invoice) => {
+      if (inv.type !== "PROFORMA" && inv.clientId) {
+        const bEntryId = ensureUUID(`binv_${inv.id}`);
+        const exists = existingBanking.some(b => b.id === bEntryId || ensureUUID(b.id) === bEntryId || (inv.invoiceNumber && b.remark?.includes(`#${inv.invoiceNumber} `)));
+        if (!exists) {
+          const rcv = Number(inv.amountReceived || (inv.status === "PAID" ? inv.total : 0));
+          const billed = Number(inv.total || 0);
+          const bEntry: BankingEntry = {
+            id: bEntryId,
+            financialYear: inv.financialYear || getCurrentFY(),
+            clientId: inv.clientId,
+            serviceId: servicesRes.unique[0]?.id || "00000000-0000-0000-0000-000000000000",
+            amountBilled: billed,
+            amountReceived: rcv,
+            amountPending: Math.max(0, billed - rcv),
+            paymentStatus: rcv >= billed && billed > 0 ? "PAID" : rcv > 0 ? "PARTIAL" : "PENDING",
+            remark: `${inv.type} #${inv.invoiceNumber} payment record`
+          };
+          existingBanking.push(bEntry);
+        }
+      }
+    });
 
-    const finalBanking = deduplicateItems(bankingRes.unique, getBankingEntryKey).unique;
-
+    const finalBanking = deduplicateItems(existingBanking, getBankingEntryKey).unique;
 
     set({
       clients: clientsRes.unique,

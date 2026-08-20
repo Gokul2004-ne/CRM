@@ -151,7 +151,14 @@ export default function InvoicePage() {
 
     if (modal?.isEditing || form.id) {
       updateInvoice(invoiceRecord);
-      toast.success(`🎉 ${invoiceRecord.type} #${invoiceRecord.invoiceNumber} updated & saved successfully!`);
+      if (invoiceRecord.type === "PROFORMA") {
+        toast.success(`🎉 Pro Forma #${invoiceRecord.invoiceNumber} updated & saved successfully!`);
+      } else {
+        toast.success(`🎉 Tax Invoice #${invoiceRecord.invoiceNumber} updated! Redirecting to Banking Ledger...`);
+        setTimeout(() => {
+          window.location.href = "/banking";
+        }, 800);
+      }
     } else {
       // Guard: Check if invoice number already exists in state
       const duplicate = invoices.find(i => i.invoiceNumber === invoiceRecord.invoiceNumber && i.type === invoiceRecord.type);
@@ -388,7 +395,10 @@ export default function InvoicePage() {
                                   status: "SENT"
                                 };
                                 updateInvoice(converted);
-                                toast.success(`Proforma ${inv.invoiceNumber} converted to Tax Invoice ${nextInvNum}!`);
+                                toast.success(`🎉 Proforma ${inv.invoiceNumber} converted to Tax Invoice ${nextInvNum}! Redirecting to Banking Ledger...`);
+                                setTimeout(() => {
+                                  window.location.href = "/banking";
+                                }, 800);
                               }}
                               title="Convert Proforma to Tax Invoice"
                             >
