@@ -67,15 +67,11 @@ function deduplicateItems<T extends { id: string }>(
   return { unique, duplicateIds };
 }
 
-const getClientKey = (c: Client) => {
-  const name = (c.name || '').toLowerCase().trim();
-  const detail = (c.pan || c.panNo || c.gstin || c.gstNo || c.email || c.mobile || c.phone || '').toLowerCase().trim();
-  return detail ? `${name}_${detail}` : `${name}_${c.id}`;
-};
+const getClientKey = (c: Client) => c.id;
 const getServiceKey = (s: Service) => s.id;
 const getSubServiceKey = (ss: SubService) => `${(ss.serviceId || (ss.serviceIds && ss.serviceIds[0]) || '').trim()}_${(ss.name || '').toLowerCase().trim()}`;
 const getRequiredDocKey = (rd: RequiredDoc) => `${(rd.subServiceId || '').trim()}_${(rd.name || '').toLowerCase().trim()}`;
-const getAssignedServiceKey = (a: AssignedService) => `${(a.clientId || '').trim()}_${(a.serviceId || '').trim()}_${(a.financialYear || '').trim()}_${(a.dueDate || '').trim()}`;
+const getAssignedServiceKey = (a: AssignedService) => a.id;
 const getBankingEntryKey = (b: BankingEntry) => {
   if (b.remark && b.remark.includes("#")) {
     const match = b.remark.match(/#([^\s]+)/);
@@ -388,8 +384,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
     // 1. Instantly update in-memory state and user-scoped localStorage
     set((s) => {
-      const key = getClientKey(preparedClient);
-      if (s.clients.some(x => x.id === preparedClient.id || (key && getClientKey(x) === key))) return s;
+      if (s.clients.some(x => x.id === preparedClient.id)) return s;
       const next = [...s.clients, preparedClient];
       return { clients: next };
     });
@@ -564,20 +559,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   addAssignedService: async (a) => {
     const aFixed: AssignedService = { ...a, id: ensureUUID(a.id) };
     set((s) => {
-      const isDuplicate = s.assignedServices.some(x =>
-        x.id === aFixed.id ||
-        (
-          (x.clientId === aFixed.clientId || (aFixed.clientId && ensureUUID(x.clientId) === ensureUUID(aFixed.clientId))) &&
-          (x.serviceId === aFixed.serviceId || (aFixed.serviceId && ensureUUID(x.serviceId) === ensureUUID(aFixed.serviceId))) &&
-          x.financialYear === aFixed.financialYear &&
-          (
-            (!x.subServiceIds || x.subServiceIds.length === 0) ||
-            (!aFixed.subServiceIds || aFixed.subServiceIds.length === 0) ||
-            x.subServiceIds.some(sid => aFixed.subServiceIds?.some(asid => asid === sid || (sid && ensureUUID(asid) === ensureUUID(sid))))
-          )
-        )
-      );
-      if (isDuplicate) return s;
+      if (s.assignedServices.some(x => x.id === aFixed.id)) return s;
       const nextAssigned = [...s.assignedServices, aFixed];
       return { assignedServices: nextAssigned };
     });

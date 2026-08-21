@@ -190,32 +190,6 @@ export default function ClientsPage() {
 
     const formattedAddress = addrParts.join("; ");
 
-    // Strict uniqueness validation across primary identifiers (Phone, Email, PAN, GSTIN)
-    // Note: Multiple clients / branch offices are allowed to share the same physical address
-    const existingPhone = clients.find(c => (!editingClient || c.id !== editingClient.id) && cleanPhone && (c.phone === cleanPhone || c.mobile === cleanPhone));
-    if (existingPhone) {
-      toast.error("❌ Client already exists with this Phone Number.");
-      return;
-    }
-
-    const existingEmail = clients.find(c => (!editingClient || c.id !== editingClient.id) && emailVal && c.email?.trim().toLowerCase() === emailVal.toLowerCase());
-    if (existingEmail) {
-      toast.error(`❌ Email already used! "${emailVal}" is already registered to client "${existingEmail.name}".`);
-      return;
-    }
-
-    const existingPan = clients.find(c => (!editingClient || c.id !== editingClient.id) && panVal && ((c.pan && c.pan.trim().toUpperCase() === panVal) || (c.panNo && c.panNo.trim().toUpperCase() === panVal)));
-    if (existingPan) {
-      toast.error("❌ Client already exists with this PAN Number.");
-      return;
-    }
-
-    const existingGstin = clients.find(c => (!editingClient || c.id !== editingClient.id) && gstinVal && ((c.gstin && c.gstin.trim().toUpperCase() === gstinVal) || (c.gstNo && c.gstNo.trim().toUpperCase() === gstinVal)));
-    if (existingGstin) {
-      toast.error("❌ Client already exists with this GST Number (GSTIN).");
-      return;
-    }
-
     if (editingClient) {
       await updateClient({
         ...editingClient,
