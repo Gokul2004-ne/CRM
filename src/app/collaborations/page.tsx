@@ -30,8 +30,8 @@ export default function CollaborationsPage() {
     const s = search.toLowerCase();
     return (
       c.name.toLowerCase().includes(s) ||
-      c.number.includes(search) ||
-      c.email.toLowerCase().includes(s) ||
+      (c.number && c.number.includes(search)) ||
+      (c.email && c.email.toLowerCase().includes(s)) ||
       (c.type && c.type.toLowerCase().includes(s))
     );
   });
@@ -51,25 +51,27 @@ export default function CollaborationsPage() {
   const handleSave = () => {
     const nameClean = form.name.trim();
     const phoneClean = form.number.trim();
-    const emailClean = form.email.trim().toLowerCase();
+    const emailClean = form.email ? form.email.trim().toLowerCase() : "";
 
-    if (!nameClean || !phoneClean || !emailClean) {
-      toast.error("Please fill in Name, Number, and Email ID fields.");
+    if (!nameClean || !phoneClean) {
+      toast.error("Please fill in Name and Number fields.");
       return;
     }
 
-    if (!validateEmail(emailClean)) {
+    if (emailClean && !validateEmail(emailClean)) {
       toast.error("❌ Invalid Email Address! Please enter a valid email address (e.g. partner@agency.com).");
       return;
     }
 
-    // 1. Check duplicate email in Collaborations
-    const existingCollabEmail = (collaborations || []).find(
-      (c) => (!modal.editing || c.id !== form.id) && c.email?.trim().toLowerCase() === emailClean
-    );
-    if (existingCollabEmail) {
-      toast.error(`❌ Email already used! "${form.email.trim()}" is already registered for collaboration partner "${existingCollabEmail.name}".`);
-      return;
+    // 1. Check duplicate email in Collaborations if provided
+    if (emailClean) {
+      const existingCollabEmail = (collaborations || []).find(
+        (c) => (!modal.editing || c.id !== form.id) && c.email?.trim().toLowerCase() === emailClean
+      );
+      if (existingCollabEmail) {
+        toast.error(`❌ Email already used! "${form.email.trim()}" is already registered for collaboration partner "${existingCollabEmail.name}".`);
+        return;
+      }
     }
 
     // 2. Check duplicate phone in Collaborations
@@ -204,7 +206,7 @@ export default function CollaborationsPage() {
             </div>
           </div>
           <div className="kpi-value">
-            {collaborations?.filter((c) => c.email.includes("@")).length || 0}
+            {collaborations?.filter((c) => c.email && c.email.includes("@")).length || 0}
           </div>
           <div className="kpi-trend up">Active email addresses</div>
         </div>
@@ -280,12 +282,16 @@ export default function CollaborationsPage() {
                       </div>
                     </td>
                     <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#475569" }}>
-                        <Mail size={13} color="#64748B" />
-                        <a href={`mailto:${collab.email}`} style={{ color: "#2563EB", textDecoration: "none" }}>
-                          {collab.email}
-                        </a>
-                      </div>
+                      {collab.email ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#475569" }}>
+                          <Mail size={13} color="#64748B" />
+                          <a href={`mailto:${collab.email}`} style={{ color: "#2563EB", textDecoration: "none" }}>
+                            {collab.email}
+                          </a>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: 13, color: "#94A3B8" }}>—</span>
+                      )}
                     </td>
                     <td>
                       <span className="badge-slds badge-new" style={{ background: "#EEF2FF", color: "#4338CA", border: "1px solid #C7D2FE" }}>
@@ -408,7 +414,7 @@ export default function CollaborationsPage() {
               {/* Section 3: Email ID */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>
-                  Email ID *
+                  Email ID (Optional)
                 </label>
                 <input
                   type="email"

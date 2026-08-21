@@ -126,44 +126,19 @@ export default function AssignPage() {
       updateAssignedService({ ...form, id: form.id });
       toast.success("Assignment updated successfully!");
     } else {
-      // 1. Strict Duplicate Service Validation: A client can only have ONE instance of a service package / sub-service per FY
-      const alreadyAssigned = assignedServices.filter(a =>
-        (a.clientId === form.clientId || (form.clientId && ensureUUID(a.clientId) === ensureUUID(form.clientId))) &&
-        a.financialYear === targetFY
-      );
-
       if (targetSubIds.length === 0) {
-        const duplicatePkg = alreadyAssigned.find(a =>
-          a.serviceId === form.serviceId ||
-          (form.serviceId && ensureUUID(a.serviceId) === ensureUUID(form.serviceId))
-        );
-        if (duplicatePkg) {
-          const pkgObj = services.find(s => s.id === form.serviceId || (form.serviceId && ensureUUID(s.id) === ensureUUID(form.serviceId)));
-          toast.error(`❌ Duplicate Service! "${pkgObj?.name || 'This package'}" is already assigned to ${clientName} for FY ${targetFY}.`);
-          return;
-        }
+        const pkgObj = services.find(s => s.id === form.serviceId || (form.serviceId && ensureUUID(s.id) === ensureUUID(form.serviceId)));
+        const newRecord: AssignedService = {
+          id: `as_${Date.now()}_${Math.random().toString(36).substring(2,6)}`,
+          clientId: form.clientId, serviceId: form.serviceId, subServiceIds: [],
+          financialYear: targetFY,
+          amountBilled: pkgObj?.price || 0, amountReceived: 0, amountPending: pkgObj?.price || 0,
+          status: "PENDING", dueDate: new Date().toISOString().split("T")[0]
+        };
+        addAssignedService(newRecord);
+        toast.success(`Package "${pkgObj?.name || 'Package'}" assigned to ${clientName}!`);
       } else {
-        const duplicateSubIds = targetSubIds.filter((ssId: string) =>
-          alreadyAssigned.some(a =>
-            a.subServiceIds?.some(sid => sid === ssId || (sid && ensureUUID(sid) === ensureUUID(ssId))) ||
-            ((a.serviceId === form.serviceId || (form.serviceId && ensureUUID(a.serviceId) === ensureUUID(form.serviceId))) && (!a.subServiceIds || a.subServiceIds.length === 0))
-          )
-        );
-
-        if (duplicateSubIds.length === targetSubIds.length) {
-          const firstDup = subServices.find(s => s.id === duplicateSubIds[0]);
-          toast.error(`❌ Duplicate Service! "${firstDup?.name || 'Selected service'}" is already assigned to ${clientName} for FY ${targetFY}. A client cannot have duplicate services.`);
-          return;
-        }
-
-        // Filter out any already-assigned sub-services so only non-duplicate services are added
-        const validNewSubIds = targetSubIds.filter((ssId: string) => !duplicateSubIds.includes(ssId));
-        if (validNewSubIds.length === 0) {
-          toast.error(`❌ All selected services are already assigned to ${clientName} for FY ${targetFY}.`);
-          return;
-        }
-
-        validNewSubIds.forEach((ssId: string, idx: number) => {
+        targetSubIds.forEach((ssId: string, idx: number) => {
           const ssObj = subServices.find(s => s.id === ssId || (ssId && ensureUUID(s.id) === ensureUUID(ssId)));
           const targetDay = ssObj?.dueDateDay || 15;
           const monthsList = ssObj?.applicableMonths && ssObj.applicableMonths.length > 0 ? ssObj.applicableMonths : ALL_MONTHS;
@@ -181,21 +156,8 @@ export default function AssignPage() {
           };
           addAssignedService(newRecord);
         });
-        toast.success(`Assigned ${validNewSubIds.length} service(s) to ${clientName} without duplicates!`);
-        setModal({ open: false, editing: null });
-        return;
+        toast.success(`Assigned ${targetSubIds.length} service(s) to ${clientName}!`);
       }
-
-      const pkgObj = services.find(s => s.id === form.serviceId || (form.serviceId && ensureUUID(s.id) === ensureUUID(form.serviceId)));
-      const newRecord: AssignedService = {
-        id: `as_${Date.now()}_${Math.random().toString(36).substring(2,6)}`,
-        clientId: form.clientId, serviceId: form.serviceId, subServiceIds: [],
-        financialYear: targetFY,
-        amountBilled: pkgObj?.price || 0, amountReceived: 0, amountPending: pkgObj?.price || 0,
-        status: "PENDING", dueDate: new Date().toISOString().split("T")[0]
-      };
-      addAssignedService(newRecord);
-      toast.success(`Package "${pkgObj?.name || 'Package'}" assigned to ${clientName}!`);
     }
     setModal({ open: false, editing: null });
   };
@@ -502,31 +464,24 @@ export default function AssignPage() {
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4, padding: 10, background: "#F8FAFC", borderRadius: 8, border: "1px solid #CBD5E1" }}>
                   {availableSubServices.map(ss => {
-                    const isAlreadyAssigned = !modal.editing && !!form.clientId && assignedServices.some(a =>
-                      (a.clientId === form.clientId || (form.clientId && ensureUUID(a.clientId) === ensureUUID(form.clientId))) &&
-                      a.financialYear === (selectedFY || getCurrentFY()) &&
-                      a.subServiceIds?.some(sid => sid === ss.id || (sid && ensureUUID(sid) === ensureUUID(ss.id)))
-                    );
                     const isSelected = (form.subServiceIds || []).includes(ss.id);
                     return (
                       <button
                         key={ss.id} type="button"
-                        disabled={isAlreadyAssigned}
-                        className={`btn-slds ${isAlreadyAssigned ? "btn-slds-secondary" : isSelected ? "btn-slds-primary" : "btn-slds-secondary"}`}
+                        className={`btn-slds ${isSelected ? "btn-slds-primary" : "btn-slds-secondary"}`}
                         style={{
                           padding: "6px 12px",
                           fontSize: 12,
                           fontWeight: 700,
-                          background: isAlreadyAssigned ? "#F1F5F9" : isSelected ? "#0176D3" : "#FFFFFF",
-                          color: isAlreadyAssigned ? "#94A3B8" : isSelected ? "#FFFFFF" : "#334155",
+                          background: isSelected ? "#0176D3" : "#FFFFFF",
+                          color: isSelected ? "#FFFFFF" : "#334155",
                           border: isSelected ? "1px solid #0176D3" : "1px solid #CBD5E1",
-                          cursor: isAlreadyAssigned ? "not-allowed" : "pointer"
+                          cursor: "pointer"
                         }}
-                        onClick={() => !isAlreadyAssigned && toggleSubService(ss.id)}
-                        title={isAlreadyAssigned ? "Already assigned to this client for this FY" : undefined}
+                        onClick={() => toggleSubService(ss.id)}
                       >
-                        {isAlreadyAssigned ? "🔒 " : isSelected ? "✓ " : "+ "}
-                        {ss.name} {isAlreadyAssigned ? "(Already Assigned)" : ""}
+                        {isSelected ? "✓ " : "+ "}
+                        {ss.name}
                       </button>
                     );
                   })}
