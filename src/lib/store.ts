@@ -79,11 +79,7 @@ const getBankingEntryKey = (b: BankingEntry) => {
   }
   return b.id;
 };
-const getLeadKey = (l: Lead) => {
-  const name = (l.name || '').toLowerCase().trim();
-  const contact = (l.mobile || l.phone || l.email || '').toLowerCase().trim();
-  return contact ? `${name}_${contact}` : `${name}_${l.id}`;
-};
+const getLeadKey = (l: Lead) => l.id || `${(l.name || '').toLowerCase().trim()}_${l.id}`;
 const getDraftKey = (d: DocumentDraft) => `${(d as any).clientId || ''}_${(d.title || '').toLowerCase().trim()}`;
 const getCollabKey = (c: Collaboration) => {
   const name = (c.name || '').toLowerCase().trim();
@@ -656,17 +652,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
     await syncLeadToSupabase(l);
   },
   deleteLead: async (id) => {
-    const target = useAppStore.getState().leads.find(l => l.id === id);
-    const targetName = target?.name;
     set((s) => {
-      const next = s.leads.filter(x => {
-        if (x.id === id) return false;
-        if (targetName && x.name?.toLowerCase().trim() === targetName.toLowerCase().trim()) return false;
-        return true;
-      });
+      const next = s.leads.filter(x => x.id !== id);
       return { leads: next };
     });
-    await removeLeadFromSupabase(id, targetName);
+    await removeLeadFromSupabase(id);
   },
   convertLead: async (leadId, clientId) => {
     const currentLeads = useAppStore.getState().leads;

@@ -8,7 +8,7 @@ import {
   Users, Layers, Package, Search, MessageCircle, Mail,
   Grid, List, Sparkles
 } from "lucide-react";
-import { formatDate, getWhatsAppLink } from "@/lib/utils";
+import { formatDate, getWhatsAppLink, getDaysUntilDue } from "@/lib/utils";
 import { toast } from "sonner";
 
 type DeliveryStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED";
@@ -43,7 +43,7 @@ interface ServiceMappingItem {
   dueDate?: string;
   status: DeliveryStatus;
   assignmentId?: string;
-  isOneTime?: boolean;
+  isOneTime: boolean;
 }
 
 export default function ServiceClientsPage() {
@@ -134,23 +134,32 @@ export default function ServiceClientsPage() {
     return items;
   }, [assignedServices, oneTimeServices, clients, services, subServices, selectedFY]);
 
-  // 2. Filter mappings by search, selected package, and delivery status
+  // 2. Filter mappings by search, selected package, and delivery status (sorted service-wise first, then due date nearest first)
   const filteredMappings = useMemo(() => {
-    return allMappings.filter(item => {
-      const q = search.toLowerCase();
-      const matchesSearch =
-        item.serviceName.toLowerCase().includes(q) ||
-        item.packageName.toLowerCase().includes(q) ||
-        item.clientName.toLowerCase().includes(q);
+    return allMappings
+      .filter(item => {
+        const q = search.toLowerCase();
+        const matchesSearch =
+          item.serviceName.toLowerCase().includes(q) ||
+          item.packageName.toLowerCase().includes(q) ||
+          item.clientName.toLowerCase().includes(q);
 
-      const matchesPackage = selectedPackageFilter === "ALL" || item.packageId === selectedPackageFilter || item.packageName === selectedPackageFilter;
-      const matchesStatus = statusFilter === "ALL" || item.status === statusFilter;
+        const matchesPackage = selectedPackageFilter === "ALL" || item.packageId === selectedPackageFilter || item.packageName === selectedPackageFilter;
+        const matchesStatus = statusFilter === "ALL" || item.status === statusFilter;
 
-      return matchesSearch && matchesPackage && matchesStatus;
-    });
+        return matchesSearch && matchesPackage && matchesStatus;
+      })
+      .sort((a, b) => {
+        const sComp = a.serviceName.localeCompare(b.serviceName, undefined, { sensitivity: "base" });
+        if (sComp !== 0) return sComp;
+        const daysA = a.dueDate ? getDaysUntilDue(a.dueDate) : 999;
+        const daysB = b.dueDate ? getDaysUntilDue(b.dueDate) : 999;
+        if (daysA !== daysB) return daysA - daysB;
+        return a.clientName.localeCompare(b.clientName);
+      });
   }, [allMappings, search, selectedPackageFilter, statusFilter]);
 
-  // 3. Group by Service Name
+  // 3. Group by Service Name (sorted service groups, and items within each group sorted by nearest due date first)
   const groupedByService = useMemo(() => {
     const map = new Map<string, { serviceName: string; packageName: string; items: ServiceMappingItem[] }>();
 
@@ -166,8 +175,18 @@ export default function ServiceClientsPage() {
       map.get(groupKey)!.items.push(item);
     });
 
-    // Sort service groups alphabetically
-    return Array.from(map.values()).sort((a, b) => a.serviceName.localeCompare(b.serviceName));
+    // Sort service groups alphabetically and sort items inside each group by nearest due date first
+    return Array.from(map.values())
+      .sort((a, b) => a.serviceName.localeCompare(b.serviceName, undefined, { sensitivity: "base" }))
+      .map(group => ({
+        ...group,
+        items: group.items.sort((a, b) => {
+          const daysA = a.dueDate ? getDaysUntilDue(a.dueDate) : 999;
+          const daysB = b.dueDate ? getDaysUntilDue(b.dueDate) : 999;
+          if (daysA !== daysB) return daysA - daysB;
+          return a.clientName.localeCompare(b.clientName);
+        })
+      }));
   }, [filteredMappings]);
 
   // 4. Group by Package Name

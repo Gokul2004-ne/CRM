@@ -105,14 +105,6 @@ export default function LeadsPage() {
       return;
     }
 
-    // Duplicate checks across other leads
-    const cleanPhoneDigits = phoneVal.replace(/\D/g, "");
-    const existingLeadPhone = leads.find(l => (!modal.editing || l.id !== modal.editing.id) && (l.phone?.replace(/\D/g, "") === cleanPhoneDigits || l.mobile?.replace(/\D/g, "") === cleanPhoneDigits));
-    if (existingLeadPhone) {
-      toast.error(`❌ Phone number already used! This phone number is already registered to lead "${existingLeadPhone.name}".`);
-      return;
-    }
-
     if (emailVal) {
       const existingLeadEmail = leads.find(l => (!modal.editing || l.id !== modal.editing.id) && l.email?.trim().toLowerCase() === emailVal);
       if (existingLeadEmail) {

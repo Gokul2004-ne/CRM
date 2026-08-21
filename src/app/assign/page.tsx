@@ -51,6 +51,39 @@ const empty = () => ({
   financialYear: getCurrentFY(), amountBilled: 0, amountReceived: 0, amountPending: 0, dueDate: new Date().toISOString().split("T")[0]
 });
 
+function getAssignedServiceMeta(a: AssignedService, subServices: SubService[], services: any[]) {
+  const service = services.find(s => s.id === a.serviceId || (a.serviceId && ensureUUID(s.id) === ensureUUID(a.serviceId)));
+  const foundSubs = subServices.filter(ss => a.subServiceIds?.some(sid => sid === ss.id || (sid && ensureUUID(sid) === ensureUUID(ss.id))));
+  const defaultSubs = DEFAULT_SUB_SERVICES.filter(ss => a.subServiceIds?.some(sid => sid === ss.id || (sid && ensureUUID(sid) === ensureUUID(ss.id))));
+  const subs = foundSubs.length > 0 ? foundSubs : defaultSubs;
+  
+  const serviceDisplayName = subs.length > 0
+    ? subs.map(s => s.name).join(", ")
+    : (service?.name || (a as any).serviceName || (a.subServiceIds && a.subServiceIds[0]) || "Service");
+
+  const serviceNameStr = (subs[0]?.name || (a as any).serviceName || "").toLowerCase();
+  const subObj = subs[0]
+    || subServices.find(ss => serviceNameStr && ss.name.toLowerCase().includes(serviceNameStr.split(" ")[0]))
+    || DEFAULT_SUB_SERVICES.find(ss => serviceNameStr && ss.name.toLowerCase().includes(serviceNameStr.split(" ")[0]));
+
+  let effectiveDueDateStr = a.dueDate;
+  if (subObj) {
+    if (subObj.dueDateDay) {
+      const monthsList = subObj.applicableMonths && subObj.applicableMonths.length > 0 ? subObj.applicableMonths : ALL_MONTHS;
+      effectiveDueDateStr = getNextUpcomingDueDate(monthsList, subObj.dueDateDay);
+    } else if (subObj.dueDate) {
+      effectiveDueDateStr = subObj.dueDate;
+    }
+  }
+
+  return {
+    service,
+    subs,
+    serviceDisplayName,
+    effectiveDueDateStr: effectiveDueDateStr || ""
+  };
+}
+
 export default function AssignPage() {
   const { clients, services, subServices, assignedServices, selectedFY, addAssignedService, updateAssignedService, deleteAssignedService } = useAppStore();
   const [search, setSearch] = useState("");
@@ -88,9 +121,26 @@ export default function AssignPage() {
     return list
       .filter(a => statusFilter === "ALL" || (a.status || "PENDING") === statusFilter)
       .sort((a, b) => {
-        const daysA = getDueStatus(a.dueDate).days;
-        const daysB = getDueStatus(b.dueDate).days;
-        return daysA - daysB;
+        const metaA = getAssignedServiceMeta(a, subServices, services);
+        const metaB = getAssignedServiceMeta(b, subServices, services);
+
+        // 1. Sort service-wise first (alphabetical by service display name)
+        const nameComparison = metaA.serviceDisplayName.localeCompare(metaB.serviceDisplayName, undefined, { sensitivity: "base" });
+        if (nameComparison !== 0) {
+          return nameComparison;
+        }
+
+        // 2. Within each service, sort by due days ascending (nearest due dates first)
+        const daysA = getDueStatus(metaA.effectiveDueDateStr).days;
+        const daysB = getDueStatus(metaB.effectiveDueDateStr).days;
+        if (daysA !== daysB) {
+          return daysA - daysB;
+        }
+
+        // 3. Client Name fallback
+        const clientA = clients.find(c => c.id === a.clientId || (a.clientId && ensureUUID(c.id) === ensureUUID(a.clientId)))?.name || "";
+        const clientB = clients.find(c => c.id === b.clientId || (b.clientId && ensureUUID(c.id) === ensureUUID(b.clientId)))?.name || "";
+        return clientA.localeCompare(clientB);
       });
   }, [assignedServices, clients, services, subServices, search, selectedFY, statusFilter]);
 
@@ -248,25 +298,9 @@ export default function AssignPage() {
             </thead>
             <tbody>
               {filtered.map((a, i) => {
-                const client = clients.find(c => c.id === a.clientId);
-                const service = services.find(s => s.id === a.serviceId);
-                const subs = subServices.filter(ss => a.subServiceIds?.includes(ss.id));
-                const serviceNameStr = (subs[0]?.name || (a as any).serviceName || "").toLowerCase();
-                const subObj = subServices.find(ss => a.subServiceIds?.includes(ss.id)) 
-                  || subServices.find(ss => serviceNameStr && ss.name.toLowerCase().includes(serviceNameStr.split(" ")[0]))
-                  || DEFAULT_SUB_SERVICES.find(ss => a.subServiceIds?.includes(ss.id))
-                  || DEFAULT_SUB_SERVICES.find(ss => serviceNameStr && ss.name.toLowerCase().includes(serviceNameStr.split(" ")[0]));
-
-                let effectiveDueDateStr = a.dueDate;
-                if (subObj) {
-                  if (subObj.dueDateDay) {
-                    const monthsList = subObj.applicableMonths && subObj.applicableMonths.length > 0 ? subObj.applicableMonths : ALL_MONTHS;
-                    effectiveDueDateStr = getNextUpcomingDueDate(monthsList, subObj.dueDateDay);
-                  } else if (subObj.dueDate) {
-                    effectiveDueDateStr = subObj.dueDate;
-                  }
-                }
-
+                const client = clients.find(c => c.id === a.clientId || (a.clientId && ensureUUID(c.id) === ensureUUID(a.clientId)));
+                const meta = getAssignedServiceMeta(a, subServices, services);
+                const effectiveDueDateStr = meta.effectiveDueDateStr;
                 const status = getDueStatus(effectiveDueDateStr);
                 const deliveryStatus = (a.status as DeliveryStatus) || "PENDING";
                 const cfg = statusConfig[deliveryStatus];
@@ -286,14 +320,17 @@ export default function AssignPage() {
                     <td className="col-num">{i + 1}</td>
                     <td>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                        {(() => {
-                          const foundSubs = subServices.filter(ss => a.subServiceIds?.includes(ss.id));
-                          if (foundSubs.length > 0) return foundSubs.map(ss => (<span key={ss.id} className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700, fontSize: 12 }}>{ss.name}</span>));
-                          const defaultSubs = DEFAULT_SUB_SERVICES.filter(ss => a.subServiceIds?.includes(ss.id));
-                          if (defaultSubs.length > 0) return defaultSubs.map(ss => (<span key={ss.id} className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700, fontSize: 12 }}>{ss.name}</span>));
-                          const pkgName = service?.name || (a as any).serviceName || (a.subServiceIds && a.subServiceIds[0]) || "Service";
-                          return (<span className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700, fontSize: 12 }}>{pkgName}</span>);
-                        })()}
+                        {meta.subs.length > 0 ? (
+                          meta.subs.map(ss => (
+                            <span key={ss.id} className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700, fontSize: 12 }}>
+                              {ss.name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="chip" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 700, fontSize: 12 }}>
+                            {meta.serviceDisplayName}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td style={{ fontWeight: 800, color: "#0F172A" }}>{client?.name || "-"}</td>

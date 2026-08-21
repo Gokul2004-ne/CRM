@@ -15,11 +15,7 @@ const getSubServiceKey = (ss: SubService) => `${(ss.serviceId || '').trim()}_${(
 const getRequiredDocKey = (rd: RequiredDoc) => `${(rd.subServiceId || '').trim()}_${(rd.name || '').toLowerCase().trim()}`;
 const getAssignedServiceKey = (a: AssignedService) => `${(a.clientId || '').trim()}_${(a.serviceId || '').trim()}_${(a.financialYear || '').trim()}_${(a.dueDate || '').trim()}`;
 const getBankingEntryKey = (b: BankingEntry) => b.id || `${(b.clientId || '').trim()}_${(b.serviceId || '').trim()}_${(b.financialYear || '').trim()}_${b.amountBilled || 0}_${b.amountReceived || 0}`;
-const getLeadKey = (l: Lead) => {
-  const name = (l.name || '').toLowerCase().trim();
-  const contact = (l.mobile || l.phone || '').toLowerCase().trim();
-  return name ? `${name}_${contact}` : '';
-};
+const getLeadKey = (l: Lead) => l.id || `${(l.name || '').toLowerCase().trim()}_${l.id}`;
 const getDraftKey = (d: DocumentDraft) => (d.title || '').toLowerCase().trim();
 const getCollabKey = (c: Collaboration) => {
   const name = (c.name || '').toLowerCase().trim();
@@ -109,9 +105,13 @@ export async function runStoreTests() {
   const bankA = { id: "b1", clientId: "c1", serviceId: "s1", financialYear: "2025-26", amountBilled: 5000, amountReceived: 2000 } as BankingEntry;
   assert(getBankingEntryKey(bankA) === "b1", "getBankingEntryKey generates unique billing key");
 
-  // 7. Lead & Collaboration Key Generation
+  // 7. Lead & Collaboration Key Generation (Allows multiple leads with same phone number)
   const leadA = { id: "l1", name: "John Doe", mobile: "9988776655" } as Lead;
-  assert(getLeadKey(leadA) === "john doe_9988776655", "getLeadKey lowercases lead name and mobile");
+  const leadB = { id: "l2", name: "Jane Smith", mobile: "9988776655" } as Lead;
+  assert(getLeadKey(leadA) === "l1", "getLeadKey returns unique id for leadA");
+  assert(getLeadKey(leadB) === "l2", "getLeadKey returns unique id for leadB");
+  const leadDedup = deduplicateItems([leadA, leadB], getLeadKey);
+  assert(leadDedup.unique.length === 2, "deduplicateItems preserves both leads with same phone number");
   const collabA = { id: "col1", name: "Partner CA", email: "ca@partner.com" } as Collaboration;
   assert(getCollabKey(collabA) === "partner ca_ca@partner.com", "getCollabKey formats partner name and email");
 

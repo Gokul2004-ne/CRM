@@ -10,6 +10,7 @@ import { runDuplicateAndFileTests } from "./integration/duplicate-service-and-fi
 import { runClientIsolationTests } from "./integration/client-isolation.test";
 import { runDeletePersistenceTests } from "./integration/delete-persistence.test";
 import { runFullCrudLifecycleTests } from "./integration/full-crud-lifecycle.test";
+import { runAssignedServicesSortingTest } from "./unit/assigned-services-sorting.test";
 
 async function runAllTests() {
   const startTime = Date.now();
@@ -29,6 +30,11 @@ async function runAllTests() {
   const storeRes = await runStoreTests();
   totalPassed += storeRes.passed;
   totalFailed += storeRes.failed;
+
+  // 2b. Run Assigned Services Sorting & Lead Phone Tests
+  const sortRes = runAssignedServicesSortingTest();
+  totalPassed += sortRes.passed;
+  totalFailed += sortRes.failed;
 
   // 3. Run Supabase Cloud Database Integration Tests
   const dbRes = await runDatabaseTests();
