@@ -124,20 +124,20 @@ export default function AssignPage() {
         const metaA = getAssignedServiceMeta(a, subServices, services);
         const metaB = getAssignedServiceMeta(b, subServices, services);
 
-        // 1. Sort service-wise first (alphabetical by service display name)
-        const nameComparison = metaA.serviceDisplayName.localeCompare(metaB.serviceDisplayName, undefined, { sensitivity: "base" });
-        if (nameComparison !== 0) {
-          return nameComparison;
-        }
-
-        // 2. Within each service, sort by due days ascending (nearest due dates first)
+        // 1. First preference: Due days in ascending order (nearest due dates / approaching & overdue items first)
         const daysA = getDueStatus(metaA.effectiveDueDateStr).days;
         const daysB = getDueStatus(metaB.effectiveDueDateStr).days;
         if (daysA !== daysB) {
           return daysA - daysB;
         }
 
-        // 3. Client Name fallback
+        // 2. Second preference: Service name alphabetically
+        const nameComparison = metaA.serviceDisplayName.localeCompare(metaB.serviceDisplayName, undefined, { sensitivity: "base" });
+        if (nameComparison !== 0) {
+          return nameComparison;
+        }
+
+        // 3. Fallback: Client Name alphabetically
         const clientA = clients.find(c => c.id === a.clientId || (a.clientId && ensureUUID(c.id) === ensureUUID(a.clientId)))?.name || "";
         const clientB = clients.find(c => c.id === b.clientId || (b.clientId && ensureUUID(c.id) === ensureUUID(b.clientId)))?.name || "";
         return clientA.localeCompare(clientB);

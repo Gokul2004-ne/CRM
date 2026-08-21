@@ -150,11 +150,11 @@ export default function ServiceClientsPage() {
         return matchesSearch && matchesPackage && matchesStatus;
       })
       .sort((a, b) => {
-        const sComp = a.serviceName.localeCompare(b.serviceName, undefined, { sensitivity: "base" });
-        if (sComp !== 0) return sComp;
         const daysA = a.dueDate ? getDaysUntilDue(a.dueDate) : 999;
         const daysB = b.dueDate ? getDaysUntilDue(b.dueDate) : 999;
         if (daysA !== daysB) return daysA - daysB;
+        const sComp = a.serviceName.localeCompare(b.serviceName, undefined, { sensitivity: "base" });
+        if (sComp !== 0) return sComp;
         return a.clientName.localeCompare(b.clientName);
       });
   }, [allMappings, search, selectedPackageFilter, statusFilter]);

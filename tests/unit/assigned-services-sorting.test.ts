@@ -11,13 +11,13 @@ function assert(condition: boolean, msg: string) {
 
 export function runAssignedServicesSortingTest() {
   console.log("\n============================================================");
-  console.log("🧪 TESTING ASSIGNED SERVICES SORTING & LEAD PHONE UNRESTRICTED");
+  console.log("🧪 TESTING ASSIGNED SERVICES SORTING (DUE DAYS FIRST, THEN SERVICE)");
   console.log("============================================================\n");
 
   let passed = 0;
   let failed = 0;
 
-  // Test 1: Sorting service-wise first, then due date nearest first
+  // Test 1: Sorting due days ascending first (nearest due dates first), then service name alphabetically
   try {
     const mockServices: Service[] = [
       { id: "s1", name: "Income Tax Package", price: 5000, recurrence: "ANNUALLY" },
@@ -30,17 +30,19 @@ export function runAssignedServicesSortingTest() {
       { id: "ss_gstr1", serviceId: "s2", name: "GSTR 1 Return", recurrence: "MONTHLY" },
     ];
 
-    const mockAssigned: (AssignedService & { expectedOrder?: number })[] = [
-      // Income Tax Return - Due in 30 days
+    const mockAssigned: AssignedService[] = [
+      // Income Tax Return - Due 2026-09-30 (furthest)
       { id: "a1", clientId: "c1", serviceId: "s1", subServiceIds: ["ss_itr"], financialYear: "2026-27", dueDate: "2026-09-30", amountBilled: 0, amountReceived: 0, amountPending: 0 },
-      // Advance Tax Payment - Due in 20 days
+      // Advance Tax Payment - Due 2026-06-15
       { id: "a2", clientId: "c2", serviceId: "s1", subServiceIds: ["ss_adv_tax"], financialYear: "2026-27", dueDate: "2026-06-15", amountBilled: 0, amountReceived: 0, amountPending: 0 },
-      // GSTR 1 Return - Due in 10 days
+      // GSTR 1 Return - Due 2026-04-11
       { id: "a3", clientId: "c3", serviceId: "s2", subServiceIds: ["ss_gstr1"], financialYear: "2026-27", dueDate: "2026-04-11", amountBilled: 0, amountReceived: 0, amountPending: 0 },
-      // Advance Tax Payment - Due in 5 days (Overdue or closer)
+      // Advance Tax Payment - Due 2026-03-15 (nearest/earliest)
       { id: "a4", clientId: "c4", serviceId: "s1", subServiceIds: ["ss_adv_tax"], financialYear: "2026-27", dueDate: "2026-03-15", amountBilled: 0, amountReceived: 0, amountPending: 0 },
-      // GSTR 1 Return - Due in 2 days
+      // GSTR 1 Return - Due 2026-04-01
       { id: "a5", clientId: "c5", serviceId: "s2", subServiceIds: ["ss_gstr1"], financialYear: "2026-27", dueDate: "2026-04-01", amountBilled: 0, amountReceived: 0, amountPending: 0 },
+      // GSTR 1 Return - Same date as a2 (2026-06-15) to test secondary alphabetical sort
+      { id: "a6", clientId: "c6", serviceId: "s2", subServiceIds: ["ss_gstr1"], financialYear: "2026-27", dueDate: "2026-06-15", amountBilled: 0, amountReceived: 0, amountPending: 0 },
     ];
 
     function getAssignedServiceMeta(a: AssignedService) {
@@ -57,31 +59,34 @@ export function runAssignedServicesSortingTest() {
       const metaA = getAssignedServiceMeta(a);
       const metaB = getAssignedServiceMeta(b);
 
-      // 1. Service wise sorting first
+      // 1. Primary preference: Due days ascending order (nearest due dates first)
+      const daysA = metaA.effectiveDueDateStr ? getDaysUntilDue(metaA.effectiveDueDateStr) : 999;
+      const daysB = metaB.effectiveDueDateStr ? getDaysUntilDue(metaB.effectiveDueDateStr) : 999;
+      if (daysA !== daysB) {
+        return daysA - daysB;
+      }
+
+      // 2. Secondary preference: Service name alphabetically
       const nameComparison = metaA.serviceDisplayName.localeCompare(metaB.serviceDisplayName, undefined, { sensitivity: "base" });
       if (nameComparison !== 0) {
         return nameComparison;
       }
 
-      // 2. In each service, nearest due dates first (ascending days until due)
-      const daysA = metaA.effectiveDueDateStr ? getDaysUntilDue(metaA.effectiveDueDateStr) : 999;
-      const daysB = metaB.effectiveDueDateStr ? getDaysUntilDue(metaB.effectiveDueDateStr) : 999;
-      return daysA - daysB;
+      return 0;
     });
 
-    // Check that Advance Tax Payment is first (2 items: a4 then a2)
-    assert(getAssignedServiceMeta(sorted[0]).serviceDisplayName === "Advance Tax Payment", "Group 1 is Advance Tax Payment");
-    assert(sorted[0].id === "a4", "Nearest due date in Advance Tax is first (a4)");
-    assert(sorted[1].id === "a2", "Later due date in Advance Tax is second (a2)");
-
-    // Check that GSTR 1 Return is second (2 items: a5 then a3)
-    assert(getAssignedServiceMeta(sorted[2]).serviceDisplayName === "GSTR 1 Return", "Group 2 is GSTR 1 Return");
-    assert(sorted[2].id === "a5", "Nearest due date in GSTR 1 Return is first (a5)");
-    assert(sorted[3].id === "a3", "Later due date in GSTR 1 Return is second (a3)");
-
-    // Check that Income Tax Return is third
-    assert(getAssignedServiceMeta(sorted[4]).serviceDisplayName === "Income Tax Return", "Group 3 is Income Tax Return");
-    assert(sorted[4].id === "a1", "Income Tax Return item is a1");
+    // Check order:
+    // 1. a4 (2026-03-15 - Advance Tax)
+    assert(sorted[0].id === "a4", "1st is a4 (nearest due date 2026-03-15)");
+    // 2. a5 (2026-04-01 - GSTR 1)
+    assert(sorted[1].id === "a5", "2nd is a5 (due date 2026-04-01)");
+    // 3. a3 (2026-04-11 - GSTR 1)
+    assert(sorted[2].id === "a3", "3rd is a3 (due date 2026-04-11)");
+    // 4 & 5. Same due date 2026-06-15 -> 'Advance Tax Payment' (a2) comes before 'GSTR 1 Return' (a6)
+    assert(sorted[3].id === "a2", "4th is a2 (due 2026-06-15, Advance Tax before GSTR 1)");
+    assert(sorted[4].id === "a6", "5th is a6 (due 2026-06-15, GSTR 1)");
+    // 6. a1 (2026-09-30 - Income Tax Return)
+    assert(sorted[5].id === "a1", "6th is a1 (due 2026-09-30)");
 
     passed += 6;
   } catch (err: any) {
