@@ -58,40 +58,32 @@ This diagram breaks down the entire application stack into four clear, distinct 
 
 ```mermaid
 flowchart TD
-    %% TIER 1: CLIENT FRONTEND
-    subgraph TIER1["🖥️ TIER 1: USER INTERFACE & BROWSER CLIENT (Next.js 16 + React 19)"]
+    subgraph TIER1["TIER 1: USER INTERFACE AND BROWSER CLIENT (Next.js 16 + React 19)"]
         direction TB
-        UI_Entry["User (Chartered Accountant / Tax Staff / Partner)"]
+        UI_Entry["User: Chartered Accountant / Tax Staff / Partner"]
         
         subgraph UI_Components["Visual Presentation Layer (Tailwind CSS v4 + Radix UI)"]
             AppShell["AppShell Component (Master Layout, Topbar, Sidebar, Contexts)"]
-            PagesGrid["18 Interactive App Pages (/clients, /services, /invoice, /due-dates, /banking...)"]
+            PagesGrid["18 Interactive App Pages (Clients, Services, Invoices, Due Dates, Banking...)"]
             RichWidgets["Productivity Tools: Global Search (Ctrl+K), Floating Notes, AI Copilot Widget"]
         end
         
-        UI_Entry -->|Interacts with UI| AppShell
+        UI_Entry --> AppShell
         AppShell --> PagesGrid
         AppShell --> RichWidgets
     end
 
-    %% TIER 2: LOCAL-FIRST CACHE ENGINE
-    subgraph TIER2["⚡ TIER 2: ZERO-LATENCY LOCAL-FIRST ENGINE (Zustand In-Memory Store)"]
+    subgraph TIER2["TIER 2: ZERO-LATENCY LOCAL-FIRST ENGINE (Zustand In-Memory Store)"]
         direction TB
         ZStore["Zustand Store (src/lib/store.ts)
-* Instant in-memory state mutation (< 1ms)
-* Zero loading spinners for data entry"]
+- Instant in-memory state mutation
+- Zero loading spinners for data entry"]
         
-        subgraph StoreHelpers["In-Memory Optimization & Data Guards"]
-            Deduplicator["deduplicateItems()
-Eliminates duplicate keys in memory"]
-            UUIDFormatter["ensureUUID()
-Forces deterministic UUIDv4 formats"]
-            AuthExtractor["getUserIdSync()
-Synchronously scopes tenant session"]
-            BusinessUtils["src/lib/utils.ts
-* Indian Number-to-Words INR Converter
-* GSTIN / PAN Statutory Regex Validators
-* Financial Year (FY) Date Calculators"]
+        subgraph StoreHelpers["In-Memory Optimization and Data Guards"]
+            Deduplicator["deduplicateItems: Eliminates duplicate keys in memory"]
+            UUIDFormatter["ensureUUID: Forces deterministic UUIDv4 formats"]
+            AuthExtractor["getUserIdSync: Synchronously scopes tenant session"]
+            BusinessUtils["src/lib/utils.ts: Number-to-Words INR, GSTIN/PAN Validators, FY Calculators"]
         end
         
         ZStore --> Deduplicator
@@ -100,41 +92,34 @@ Synchronously scopes tenant session"]
         ZStore --> BusinessUtils
     end
 
-    %% TIER 3: SERVER & EDGE ROUTE LAYER
-    subgraph TIER3["🛡️ TIER 3: NEXT.JS SERVER & EDGE PROXY LAYER (Node.js / Edge Runtime)"]
+    subgraph TIER3["TIER 3: NEXT.JS SERVER AND EDGE PROXY LAYER (Node.js / Edge Runtime)"]
         direction TB
-        ProxyGate["src/proxy.ts & next.config.ts
-* Strict HSTS & CSP Headers
-* X-Frame-Options: DENY
-* Request Validation & Security Proxy"]
+        ProxyGate["Security Proxy and Headers (src/proxy.ts & next.config.ts)
+- Strict HSTS and CSP Headers
+- X-Frame-Options: DENY
+- Request Validation and Security Proxy"]
         
         subgraph ServerAPIs["Next.js Serverless Route Handlers (/api/*)"]
-            API_Clients["/api/clients & /api/clients/[id]
-(GET, POST, PUT, DELETE with Tenant Isolation)"]
-            API_Services["/api/services
-(Package Master CRUD Operations)"]
-            API_OTP["/api/send-otp
-(Nodemailer Programmatic SMTP Gateway)"]
+            API_Clients["/api/clients and /api/clients/[id] (Tenant-Isolated CRUD)"]
+            API_Services["/api/services (Package Master Operations)"]
+            API_OTP["/api/send-otp (Nodemailer Programmatic SMTP Gateway)"]
         end
         
         ProxyGate --> ServerAPIs
     end
 
-    %% TIER 4: CLOUD DATABASE & INTEGRATIONS
-    subgraph TIER4["☁️ TIER 4: SUPABASE CLOUD & EXTERNAL SERVICES"]
+    subgraph TIER4["TIER 4: SUPABASE CLOUD AND EXTERNAL SERVICES"]
         direction TB
         
         subgraph CloudDB["Supabase PostgreSQL 15 Instance"]
             PostgREST_Gate["PostgREST RESTful API Gateway"]
-            RLS_Engine["Row-Level Security (RLS) Engine
-(Enforces user_id Data Partitioning)"]
-            RelationalTables[("13 Strongly-Typed PostgreSQL Tables
-* clients, services, sub_services, required_docs
-* assigned_services, invoices, banking_entries
-* leads, renewals, one_time_services, drafts
-* collaborations, user_settings")]
-            RealtimeEngine["Supabase Realtime WebSockets
-(Broadcasts live DB mutations)"]
+            RLS_Engine["Row-Level Security (RLS) Engine (user_id Data Partitioning)"]
+            RelationalTables["13 Strongly-Typed PostgreSQL Tables:
+clients, services, sub_services, required_docs,
+assigned_services, invoices, banking_entries,
+leads, renewals, one_time_services, drafts,
+collaborations, user_settings"]
+            RealtimeEngine["Supabase Realtime WebSockets (Live DB Change Broadcasts)"]
             
             PostgREST_Gate --> RLS_Engine
             RLS_Engine --> RelationalTables
@@ -142,29 +127,25 @@ Synchronously scopes tenant session"]
         end
         
         subgraph ExternalAPIs["Third-Party Communication APIs"]
-            WhatsAppAPI["WhatsApp URI Scheme (api.whatsapp.com/send)
-Direct 1-Click Reminder Generation"]
-            SMTPService["Transactional SMTP Server
-6-Digit OTP Email Dispatch"]
-            ExcelEngine["SheetJS (xlsx) Engine
-UTF-8 BOM CSV & Excel Export"]
+            WhatsAppAPI["WhatsApp Action Protocol (api.whatsapp.com/send)"]
+            SMTPService["Transactional SMTP Server (6-Digit OTP Email Dispatch)"]
+            ExcelEngine["SheetJS xlsx Engine (UTF-8 CSV and Excel Export)"]
         end
     end
 
-    %% INTER-TIER DATA FLOW ARROWS
-    PagesGrid -->|1. Trigger Action (Add/Edit/Delete)| ZStore
-    ZStore -->|2. Instant UI Re-render (0ms)| PagesGrid
+    PagesGrid -->|"1. User triggers action"| ZStore
+    ZStore -->|"2. Instant local UI re-render"| PagesGrid
     
-    ZStore -.->|3. Async Background PostgREST Push| PostgREST_Gate
-    ZStore -.->|4. Server Route Request| ProxyGate
+    ZStore -.->|"3. Async background push"| PostgREST_Gate
+    ZStore -.->|"4. Server route request"| ProxyGate
     
-    API_Clients -->|5. Scoped SQL Query| PostgREST_Gate
-    API_Services -->|5. Scoped SQL Query| PostgREST_Gate
-    API_OTP -->|6. Send Verification Email| SMTPService
+    API_Clients -->|"5. Scoped SQL query"| PostgREST_Gate
+    API_Services -->|"5. Scoped SQL query"| PostgREST_Gate
+    API_OTP -->|"6. Send verification email"| SMTPService
     
-    PagesGrid -.->|Generate Client WhatsApp Reminder Link| WhatsAppAPI
-    PagesGrid -.->|Export Compliance / Ledger Spreadsheets| ExcelEngine
-    RealtimeEngine -.->|7. Live Cloud Refresh Notification| ZStore
+    PagesGrid -.->|"Generate WhatsApp reminder link"| WhatsAppAPI
+    PagesGrid -.->|"Export spreadsheets"| ExcelEngine
+    RealtimeEngine -.->|"7. Live sync notification"| ZStore
 ```
 
 ---
@@ -175,45 +156,34 @@ This diagram illustrates step-by-step what happens when an accountant enters or 
 
 ```mermaid
 flowchart LR
-    %% Step Nodes
-    Step1["📝 Step 1: User Action
+    Step1["Step 1: User Action
 Accountant submits form in UI
-(e.g., Client, Invoice, Task)"]
-    Step2["🔒 Step 2: Normalization
-ensureUUID() normalizes ID
-Zod & Regex validate PAN/GST"]
-    Step3["⚡ Step 3: Local Mutation
+(Client, Invoice, or Task)"]
+    Step2["Step 2: Normalization
+ensureUUID normalizes ID
+Zod and Regex validate PAN and GSTIN"]
+    Step3["Step 3: Local Mutation
 Zustand store updates in-memory
-UI updates in < 1ms (0ms latency)"]
-    Step4["🔄 Step 4: Auto-Derivation
+UI updates in under 1ms"]
+    Step4["Step 4: Auto-Derivation
 If Tax Invoice: auto-derives
-b_inv_<id> Banking Ledger entry"]
-    Step5["☁️ Step 5: Async Cloud Push
+b_inv banking ledger entry"]
+    Step5["Step 5: Async Cloud Push
 Payload sent to Supabase PostgREST
 with x-user-id multi-tenant header"]
-    Step6["🗄️ Step 6: PostgreSQL Commit
+    Step6["Step 6: PostgreSQL Commit
 Supabase executes ACID write
-Row-Level Security (RLS) checked"]
-    Step7["✅ Step 7: Final Sync
+Row-Level Security checked"]
+    Step7["Step 7: Final Sync
 Postgres confirms write
-UI state is 100% cloud-consistent"]
+State is 100% cloud-consistent"]
 
-    %% Flow connections
-    Step1 ==>|Form Submit| Step2
-    Step2 ==>|Validated Data| Step3
-    Step3 ==>|Instant Re-render| Step4
-    Step4 ==>|Async Background Worker| Step5
-    Step5 ==>|PostgREST Execution| Step6
-    Step6 ==>|201 Created / 200 OK| Step7
-
-    %% Styling
-    classDef highlight fill:#0284c7,stroke:#0369a1,stroke-width:2px,color:#ffffff;
-    classDef cloud fill:#059669,stroke:#047857,stroke-width:2px,color:#ffffff;
-    classDef local fill:#d97706,stroke:#b45309,stroke-width:2px,color:#ffffff;
-    
-    class Step1,Step2 highlight;
-    class Step3,Step4 local;
-    class Step5,Step6,Step7 cloud;
+    Step1 -->|"Form Submit"| Step2
+    Step2 -->|"Validated Data"| Step3
+    Step3 -->|"Instant Re-render"| Step4
+    Step4 -->|"Async Worker"| Step5
+    Step5 -->|"PostgREST Execution"| Step6
+    Step6 -->|"201 Created or 200 OK"| Step7
 ```
 
 ---
@@ -224,29 +194,29 @@ Every table, primary key, foreign key, and cascade relationship active in Postgr
 
 ```mermaid
 erDiagram
-    CLIENTS ||--o{ ASSIGNED_SERVICES : "enrolled in (client_id)"
-    CLIENTS ||--o{ INVOICES : "billed to (client_id)"
-    CLIENTS ||--o{ DRAFTS : "subject of (client_id)"
-    CLIENTS ||--o{ BANKING_ENTRIES : "ledger for (client_id)"
+    CLIENTS ||--o{ ASSIGNED_SERVICES : "enrolled in"
+    CLIENTS ||--o{ INVOICES : "billed to"
+    CLIENTS ||--o{ DRAFTS : "subject of"
+    CLIENTS ||--o{ BANKING_ENTRIES : "ledger for"
     
-    SERVICES ||--|{ SUB_SERVICES : "decomposed into (service_id)"
-    SERVICES ||--o{ ASSIGNED_SERVICES : "package mapping (service_id)"
+    SERVICES ||--|{ SUB_SERVICES : "decomposed into"
+    SERVICES ||--o{ ASSIGNED_SERVICES : "package mapping"
     
-    SUB_SERVICES ||--o{ REQUIRED_DOCS : "compliance checklist (sub_service_id)"
+    SUB_SERVICES ||--o{ REQUIRED_DOCS : "compliance checklist"
     
     ASSIGNED_SERVICES ||--o{ BANKING_ENTRIES : "reconciliation link"
     
-    LEADS ||--o| CLIENTS : "1-click converts to (converted_client_id)"
+    LEADS ||--o| CLIENTS : "converts to"
     
-    SERVICES ||--o{ RENEWALS : "annual recurring template"
-    SERVICES ||--o{ ONE_TIME_SERVICES : "ad-hoc assignment template"
+    SERVICES ||--o{ RENEWALS : "recurring template"
+    SERVICES ||--o{ ONE_TIME_SERVICES : "ad-hoc template"
 
     CLIENTS {
         text id PK "UUIDv4 Primary Key"
         text user_id "Tenant partition"
-        text name "Legal Business / Individual Name"
-        text owner_name "Proprietor / Director Name"
-        text type "PROPRIETORSHIP / PRIVATE_LIMITED / LLP / INDIVIDUAL"
+        text name "Legal Business or Individual Name"
+        text owner_name "Proprietor or Director Name"
+        text type "PROPRIETORSHIP or PRIVATE_LIMITED or LLP or INDIVIDUAL"
         text mobile "Sanitized 10-digit mobile"
         text email "Contact email address"
         text pan "10-character PAN (Validated)"
@@ -254,25 +224,25 @@ erDiagram
         text city "City"
         text state "State"
         text pincode "PIN Code"
-        jsonb portal_credentials "Encrypted GST/ITD/TRACES credentials"
-        jsonb documents "Uploaded file metadata & URLs"
+        jsonb portal_credentials "Encrypted GST, ITD, TRACES credentials"
+        jsonb documents "Uploaded file metadata and URLs"
         text created_at "ISO timestamp"
     }
 
     SERVICES {
         text id PK "UUIDv4 Primary Key"
         text user_id "Tenant partition"
-        text name "Package Title (e.g. Monthly GST Compliance)"
+        text name "Package Title"
         numeric price "Base billing amount in INR"
-        text recurrence "MONTHLY / QUARTERLY / ANNUAL / CUSTOM"
-        int due_date_day "Statutory monthly due day (e.g. 20)"
+        text recurrence "MONTHLY or QUARTERLY or ANNUAL"
+        int due_date_day "Statutory monthly due day"
     }
 
     SUB_SERVICES {
         text id PK "UUIDv4 Primary Key"
         text service_id FK "Parent Package ID"
         text user_id "Tenant partition"
-        text name "Task Title (e.g. GSTR-3B Return Filing)"
+        text name "Task Title"
         text due_date "Filing deadline rule"
         text recurrence "Recurrence cycle"
     }
@@ -281,7 +251,7 @@ erDiagram
         text id PK "UUIDv4 Primary Key"
         text sub_service_id FK "Parent Sub-Service Task ID"
         text user_id "Tenant partition"
-        text name "Document Requirement (e.g. Bank Statement)"
+        text name "Document Requirement"
         boolean is_mandatory "Mandatory requirement flag"
         text file_url "Uploaded file reference"
     }
@@ -291,43 +261,43 @@ erDiagram
         text client_id FK "Enrolled Client ID"
         text service_id FK "Assigned Package ID"
         text user_id "Tenant partition"
-        text financial_year "Financial Year (e.g. 2025-26)"
+        text financial_year "Financial Year"
         text due_date "Scheduled target date"
         numeric amount_billed "Total package billing amount"
-        numeric amount_received "Advance / Collected amount"
+        numeric amount_received "Collected amount"
         numeric amount_pending "Outstanding receivables"
-        text status "PENDING / IN_PROGRESS / COMPLETED / OVERDUE"
+        text status "PENDING or IN_PROGRESS or COMPLETED or OVERDUE"
     }
 
     INVOICES {
         text id PK "UUIDv4 Primary Key"
         text client_id FK "Billed Client ID"
         text user_id "Tenant partition"
-        text invoice_number "INV/YYYY/XXX or PRO/YYYY/XXX"
-        text type "PROFORMA / INVOICE"
+        text invoice_number "INV or PRO Series Number"
+        text type "PROFORMA or INVOICE"
         text date "Invoice Date"
         text financial_year "Billing Financial Year"
-        jsonb items "Itemized line items with SAC & Rates"
+        jsonb items "Itemized line items with SAC and Rates"
         numeric subtotal "Taxable amount"
-        numeric gst_rate "18.00%"
-        numeric gst_amount "Calculated 18% GST"
+        numeric gst_rate "18 percent GST Rate"
+        numeric gst_amount "Calculated 18 percent GST"
         numeric total "Gross Invoice Total in INR"
         numeric amount_received "Payment collected"
         numeric balance_due "Balance outstanding"
-        text status "DRAFT / SENT / PAID"
+        text status "DRAFT or SENT or PAID"
     }
 
     BANKING_ENTRIES {
-        text id PK "b_inv_<id> UUID Key"
+        text id PK "b_inv UUID Key"
         text client_id FK "Linked Client ID"
         text user_id "Tenant partition"
         text financial_year "Financial Year"
-        text service_id "Linked Service / Invoice Ref"
+        text service_id "Linked Service or Invoice Ref"
         numeric amount_billed "Billed amount"
         numeric amount_received "Received amount"
         numeric amount_pending "Pending amount"
-        text payment_status "PAID / PARTIAL / OVERDUE"
-        text remark "Transaction reference or Invoice #"
+        text payment_status "PAID or PARTIAL or OVERDUE"
+        text remark "Transaction reference or Invoice Number"
     }
 
     LEADS {
@@ -336,30 +306,30 @@ erDiagram
         text name "Prospect Name"
         text mobile "Contact Number"
         text email "Email"
-        text source "WHATSAPP / WEBSITE / REFERRAL / DIRECT_CALL"
+        text source "WHATSAPP or WEBSITE or REFERRAL or DIRECT_CALL"
         text city "City"
-        text status "LEAD / CONTACTED / QUALIFIED / CONVERTED / LOST"
-        text converted_client_id "FK -> clients.id upon conversion"
+        text status "LEAD or CONTACTED or QUALIFIED or CONVERTED or LOST"
+        text converted_client_id "Converted Client Reference"
     }
 
     RENEWALS {
         text id PK "UUIDv4 Primary Key"
         text user_id "Tenant partition"
         text client_name "Client Name"
-        text service_name "Statutory License / Job Title"
-        text due_date "Expiry / Due Date"
+        text service_name "Statutory License or Job Title"
+        text due_date "Expiry or Due Date"
         text from_date "Validity start date"
         text to_date "Validity end date"
-        text progress "To-do / In-progress / Completed"
+        text progress "Todo or In-Progress or Completed"
     }
 
     ONE_TIME_SERVICES {
         text id PK "UUIDv4 Primary Key"
         text user_id "Tenant partition"
-        text client_name "Client / Applicant Name"
+        text client_name "Client or Applicant Name"
         text service_name "Ad-hoc Assignment Title"
         text due_date "Target completion date"
-        text progress "To-do / In-progress / Completed"
+        text progress "Todo or In-Progress or Completed"
         text notes "Assignment notes"
     }
 
@@ -367,17 +337,17 @@ erDiagram
         text id PK "UUIDv4 Primary Key"
         text user_id "Tenant partition"
         text title "Document Title"
-        text content "TipTap HTML / ProseMirror document payload"
+        text content "TipTap HTML document payload"
         text updated_at "Last updated timestamp"
     }
 
     COLLABORATIONS {
         text id PK "UUIDv4 Primary Key"
         text user_id "Tenant partition"
-        text name "Partner / Associate Name"
-        text number "WhatsApp / Mobile Number"
+        text name "Partner or Associate Name"
+        text number "WhatsApp or Mobile Number"
         text email "Email"
-        text type "CA / ADVOCATE / VALUER / VENDOR"
+        text type "CA or ADVOCATE or VALUER or VENDOR"
         text notes "Specialization notes"
     }
 
@@ -393,28 +363,40 @@ erDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> DraftState: Click '+ Create Invoice'
-    DraftState --> LineItemCalculations: Add Descriptions, SAC Codes & Rates
-    LineItemCalculations --> SubtotalApplied: Compute Subtotal = Sum(Qty * Rate)
-    SubtotalApplied --> GSTApplied: Calculate 18% GST (CGST 9% + SGST 9% or IGST 18%)
-    GSTApplied --> WordsGenerated: Run numberToWords(Total) -> INR Text
+    [*] --> DraftState: Click Create Invoice
+    DraftState --> LineItemCalculations: Add Descriptions SAC Codes and Rates
+    LineItemCalculations --> SubtotalApplied: Compute Subtotal from Qty and Rate
+    SubtotalApplied --> GSTApplied: Calculate 18 percent GST
+    GSTApplied --> WordsGenerated: Run numberToWords to produce INR Text
     WordsGenerated --> SaveInvoice: Submit Invoice Form
 
     state ForkNode <<fork>>
     SaveInvoice --> ForkNode
-    ForkNode --> SaveInvoiceCloud: syncInvoiceToSupabase(inv)
-    ForkNode --> AutoDeriveBanking: Generate b_inv_<id> Banking Ledger Entry
+    ForkNode --> SaveInvoiceCloud: syncInvoiceToSupabase
+    ForkNode --> AutoDeriveBanking: Generate b_inv Banking Ledger Entry
     
-    AutoDeriveBanking --> SaveBankingCloud: syncBankingEntryToSupabase(b_inv)
+    AutoDeriveBanking --> SaveBankingCloud: syncBankingEntryToSupabase
 
     state JoinNode <<join>>
     SaveInvoiceCloud --> JoinNode
     SaveBankingCloud --> JoinNode
 
-    JoinNode --> SyncedState: Zero-Latency UI & Cloud Consistency
+    JoinNode --> SyncedState: Zero Latency UI and Cloud Consistency
     SyncedState --> [*]
 ```
 
+
+---
+
+## 2. The Genesis: Real Pain Points & Architectural Resolutions
+
+| # | Real Practice Operational Pain Point | Conventional Method Vulnerability | Zplus CRM Engineering Resolution |
+| :-: | :--- | :--- | :--- |
+| **1** | **Missed Statutory Deadlines & Late Fees** | Staff track filing dates in personal paper diaries or Excel sheets that lack automated reminders. | **Dynamic Statutory Radar & Due Date Engine**: Automatically computes statutory dates based on client service enrollments with color-coded countdowns and 1-click WhatsApp alerts. |
+| **2** | **Scattered Government Portal Passwords** | Credentials for ITD, GSTN, TRACES, and MCA21 stored in unsecured plaintext notes or shared WhatsApp groups. | **Encrypted Portal Credential Vault**: Directly bound to client entity profiles with 1-click clipboard copying and masked visibility. |
+| **3** | **Unbilled Compliance Work & Revenue Leakage** | CAs perform periodic returns and ad-hoc advisory but forget to bill clients due to disconnect between operational teams and billing staff. | **1-Click 18% GST Tax Invoicing Studio**: Pre-populates billed services from completed compliance records, auto-computes CGST/SGST/IGST, translates totals to Indian words, and auto-posts to the banking ledger. |
+| **4** | **Manual & Disconnected Bank Reconciliation** | Accountants cross-check bank statements against separate Excel billing sheets at month-end, creating reconciliation bottlenecks. | **Automated Dual-Entry Banking Sync**: Every invoice automatically creates a linked `b_inv_<id>` banking record, ensuring real-time fee tracking and zero ledger discrepancy. |
+| **5** | **Repetitive Legal & Statutory Drafting** | Staff re-type Board Resolutions, Engagement Letters, and Show Cause Notice replies manually in MS Word without standardized templates. | **TipTap Statutory Document Drafter**: Headless WYSIWYG editor with live client variable tag interpolation (CIN, PAN, Director Name, Address) and instant PDF export. |
 
 ---
 
@@ -490,11 +472,11 @@ The command center for partners and managers. It displays real-time practice met
 
 ```text
 +----------------------------------------------------------------------------------------------------+
-|  [Zplus CRM]  Q Search clients, services, filings (Ctrl+K)           [🔔 3] [📋 Notes] [👤 CA Partner] |
+|  [Zplus CRM]  Q Search clients, services, filings (Ctrl+K)           [Alerts: 3] [Notes] [CA Partner] |
 +----------------------------------------------------------------------------------------------------+
 | [DASHBOARD]     | STATUTORY COMPLIANCE RADAR & PRACTICE OVERVIEW                                   |
 | Clients         +----------------------------------------------------------------------------------+
-| Services        | [ 🏢 Active Clients ]  [ ⏳ Pending Tasks ]  [ ⚠️ Overdue Filings ] [ 💰 Monthly Rev ] |
+| Services        | [ Active Clients ]     [ Pending Tasks ]     [ Overdue Filings ] [ Monthly Rev ] |
 | Sub-Services    |        142                     38                     3                ₹ 4,85,000    |
 | Assign Package  +----------------------------------------------------------------------------------+
 | Due Dates       | URGENT STATUTORY DEADLINES (NEXT 7 DAYS)                     [ + Quick Assign ]  |
@@ -521,15 +503,15 @@ The single source of truth for all corporate and individual clients. Stores stat
 
 ```text
 +----------------------------------------------------------------------------------------------------+
-| CLIENT MASTER DIRECTORY                                      [ 📥 Export Excel ] [ + Add Client ]  |
+| CLIENT MASTER DIRECTORY                                      [ Export Excel ] [ + Add Client ]     |
 +----------------------------------------------------------------------------------------------------+
-| [ Q Filter by Name / PAN / GSTIN... ]   [ Filter: All Business Types ▼ ]   [ Status: Active Only ▼ ] |
+| [ Q Filter by Name / PAN / GSTIN... ]   [ Filter: All Business Types v ]   [ Status: Active Only v ] |
 +----------------------------------------------------------------------------------------------------+
 | Business Name        | PAN        | GSTIN              | Contact & Phone   | Portal Vault  | Actions |
 |----------------------|------------|--------------------|-------------------|---------------|---------|
-| Acme Enterprises Ltd | AAAAA0000A | 27AAAAA0000A1Z5    | +91 98000 00001   | [🔑 IT / GST] | [✏️] [🗑️] |
-| Bharat Tech Ventures | BBBBB0000B | 29BBBBB0000B1Z2    | +91 98000 00002   | [🔑 IT / MCA] | [✏️] [🗑️] |
-| Zenith Retail LLP    | CCCCC0000C | 24CCCCC0000C1Z8    | +91 98000 00003   | [🔑 GST/TRAC] | [✏️] [🗑️] |
+| Acme Enterprises Ltd | AAAAA0000A | 27AAAAA0000A1Z5    | +91 98000 00001   | [IT / GST]    | [Edit]  |
+| Bharat Tech Ventures | BBBBB0000B | 29BBBBB0000B1Z2    | +91 98000 00002   | [IT / MCA]    | [Edit]  |
+| Zenith Retail LLP    | CCCCC0000C | 24CCCCC0000C1Z8    | +91 98000 00003   | [GST / TRAC]  | [Edit]  |
 +----------------------------------------------------------------------------------------------------+
 
   >>> MODAL DIALOG: CLIENT ONBOARDING & CREDENTIAL VAULT <<<
@@ -539,20 +521,20 @@ The single source of truth for all corporate and individual clients. Stores stat
   | Entity Name:      [ Acme Enterprises Ltd                              ] |
   | PAN (10-Digit):   [ AAAAA0000A       ]  GSTIN: [ 27AAAAA0000A1Z5      ] |
   | Phone Number:     [ +91 98000 00001  ]  Email: [ info@example.com     ] |
-  | Business Type:    [ Private Limited Company                         ▼ ] |
+  | Business Type:    [ Private Limited Company                         v ] |
   +-------------------------------------------------------------------------+
   | STATUTORY PORTAL CREDENTIALS (ENCRYPTED CLIENT-SIDE):                   |
-  | IT Portal Password:    [ ********** ] [👁️] [📋 Copy]                     |
-  | GST Portal Password:   [ ********** ] [👁️] [📋 Copy]                     |
-  | TRACES Portal Password:[ ********** ] [👁️] [📋 Copy]                     |
-  | MCA21 Portal Password: [ ********** ] [👁️] [📋 Copy]                     |
+  | IT Portal Password:    [ ********** ] [View] [Copy]                     |
+  | GST Portal Password:   [ ********** ] [View] [Copy]                     |
+  | TRACES Portal Password:[ ********** ] [View] [Copy]                     |
+  | MCA21 Portal Password: [ ********** ] [View] [Copy]                     |
   +-------------------------------------------------------------------------+
-  |                                        [ Cancel ]  [ 💾 Save Client ]  |
+  |                                        [ Cancel ]  [ Save Client ]     |
   +-------------------------------------------------------------------------+
 ```
 
 * **Statutory Data Guard**: Enforces uppercase alphanumeric regex validation for PAN (`^[A-Z]{5}[0-9]{4}[A-Z]{1}$`) and GSTIN.
-* **Portal Credential Vault**: Allows staff to view with password toggle `[👁️]` and copy credentials with 1-click `[📋 Copy]` during government portal logins without manual transcription errors.
+* **Portal Credential Vault**: Allows staff to view with password toggle `[View]` and copy credentials with 1-click `[Copy]` during government portal logins without manual transcription errors.
 
 ---
 
@@ -562,7 +544,7 @@ Defines the master compliance packages offered by the practice.
 
 ```text
 +----------------------------------------------------------------------------------------------------+
-| SERVICE MASTER CATALOG                                     [ Filter Category ▼ ] [ + New Package ] |
+| SERVICE MASTER CATALOG                                     [ Filter Category v ] [ + New Package ] |
 +----------------------------------------------------------------------------------------------------+
 | Package Name                  | Category        | Base Fee (INR) | Decomposed Sub-Tasks | Status   |
 |-------------------------------|-----------------|----------------|----------------------|----------|
@@ -581,7 +563,7 @@ Breaks down master packages into granular statutory tasks, frequencies, and lega
 
 ```text
 +----------------------------------------------------------------------------------------------------+
-| SUB-SERVICE TASK DECOMPOSITION                            [ Select Package: GST Retainership ▼ ]   |
+| SUB-SERVICE TASK DECOMPOSITION                            [ Select Package: GST Retainership v ]   |
 +----------------------------------------------------------------------------------------------------+
 | Sub-Service Task Name   | Parent Package   | Frequency  | Statutory Due Date  | Checklist Docs     |
 |-------------------------|------------------|------------|---------------------|--------------------|
@@ -600,7 +582,7 @@ Configures mandatory and optional client document checklists for each statutory 
 
 ```text
 +----------------------------------------------------------------------------------------------------+
-| STATUTORY REQUIRED DOCUMENTS MASTER                       [ Select Sub-Service: GSTR-3B ▼ ]        |
+| STATUTORY REQUIRED DOCUMENTS MASTER                       [ Select Sub-Service: GSTR-3B v ]        |
 +----------------------------------------------------------------------------------------------------+
 | # | Document Checklist Name             | Category       | Mandatory?    | Description             |
 |---|-------------------------------------|----------------|---------------|-------------------------|
@@ -622,14 +604,14 @@ Enrolls clients into compliance packages, automatically spawning periodic tasks 
 +----------------------------------------------------------------------------------------------------+
 | COMPLIANCE ASSIGNMENT ENGINE                                                                       |
 +----------------------------------------------------------------------------------------------------+
-| 1. Select Client:       [ Acme Enterprises Ltd (27AAAAA0000A1Z5)                                 ▼ ]|
-| 2. Select Package:      [ GST Monthly Retainership (Indirect Tax)                                ▼ ]|
-| 3. Financial Year:      [ FY 2024-25                                                             ▼ ]|
-| 4. Frequency & Period:  [ Monthly                                ▼ ] Period: [ October 2024      ▼ ]|
-| 5. Assigned Staff:      [ Senior Audit Associate - Rahul S                                       ▼ ]|
+| 1. Select Client:       [ Acme Enterprises Ltd (27AAAAA0000A1Z5)                                 v ]|
+| 2. Select Package:      [ GST Monthly Retainership (Indirect Tax)                                v ]|
+| 3. Financial Year:      [ FY 2024-25                                                             v ]|
+| 4. Frequency & Period:  [ Monthly                                v ] Period: [ October 2024      v ]|
+| 5. Assigned Staff:      [ Senior Audit Associate - Rahul S                                       v ]|
 | 6. Custom Agreed Fee:   [ ₹ 4,000                                                                  ]|
 +----------------------------------------------------------------------------------------------------+
-| [ Reset Selection ]                                                  [ 🚀 Execute Package Assignment ] |
+| [ Reset Selection ]                                                  [ Execute Package Assignment ]|
 +----------------------------------------------------------------------------------------------------+
 ```
 
@@ -641,13 +623,13 @@ Provides a 360-degree cross-tabulated matrix showing which clients are enrolled 
 
 ```text
 +----------------------------------------------------------------------------------------------------+
-| SERVICE-CLIENT ENROLLMENT MATRIX                                   [ Filter: Indirect Tax ▼ ]       |
+| SERVICE-CLIENT ENROLLMENT MATRIX                                   [ Filter: Indirect Tax v ]       |
 +----------------------------------------------------------------------------------------------------+
 | Client Entity Name   | GST Monthly | TDS Quarterly | ROC Annual | Income Tax Audit | Advance Tax   |
 |----------------------|:-----------:|:-------------:|:----------:|:----------------:|:-------------:|
-| Acme Enterprises Ltd |    [ ✅ ]   |     [ ✅ ]    |   [ ✅ ]   |      [ ❌ ]      |     [ ✅ ]    |
-| Bharat Tech Ventures |    [ ✅ ]   |     [ ✅ ]    |   [ ❌ ]   |      [ ✅ ]      |     [ ❌ ]    |
-| Zenith Retail LLP    |    [ ✅ ]   |     [ ❌ ]    |   [ ✅ ]   |      [ ❌ ]      |     [ ✅ ]    |
+| Acme Enterprises Ltd |    [ OK ]   |     [ OK ]    |   [ OK ]   |      [ -- ]      |     [ OK ]    |
+| Bharat Tech Ventures |    [ OK ]   |     [ OK ]    |   [ -- ]   |      [ OK ]      |     [ -- ]    |
+| Zenith Retail LLP    |    [ OK ]   |     [ -- ]    |   [ OK ]   |      [ -- ]      |     [ OK ]    |
 +----------------------------------------------------------------------------------------------------+
 ```
 
@@ -659,15 +641,15 @@ The high-priority compliance control dashboard. Monitors statutory filing dates 
 
 ```text
 +----------------------------------------------------------------------------------------------------+
-| STATUTORY DUE DATE MONITOR                                    [ 📅 View: Current Month (Oct 2024) ▼]|
+| STATUTORY DUE DATE MONITOR                                    [ View: Current Month (Oct 2024) v ] |
 +----------------------------------------------------------------------------------------------------+
-| [ Filter: All Statuses ▼ ]   [ Search Client / Sub-Service... ]            [ 📤 Send Bulk Reminders ] |
+| [ Filter: All Statuses v ]   [ Search Client / Sub-Service... ]            [ Send Bulk Reminders ] |
 +----------------------------------------------------------------------------------------------------+
 | Client Name          | Sub-Service  | Period    | Statutory Due | Countdown | Status    | WhatsApp      |
 |----------------------|--------------|-----------|---------------|-----------|-----------|---------------|
-| Acme Enterprises Ltd | GSTR-3B      | Sep 2024  | 20-Oct-2024   | 2 Days    | [PENDING] | [💬 Send Msg] |
-| Bharat Tech Ventures | TDS 26Q      | Q2 (Sep)  | 31-Oct-2024   | 13 Days   | [IN-PROG] | [💬 Send Msg] |
-| Zenith Retail LLP    | ROC AOC-4    | FY 23-24  | 29-Oct-2024   | 11 Days   | [OVERDUE] | [🚨 Urgent!]  |
+| Acme Enterprises Ltd | GSTR-3B      | Sep 2024  | 20-Oct-2024   | 2 Days    | [PENDING] | [Send Msg]    |
+| Bharat Tech Ventures | TDS 26Q      | Q2 (Sep)  | 31-Oct-2024   | 13 Days   | [IN-PROG] | [Send Msg]    |
+| Zenith Retail LLP    | ROC AOC-4    | FY 23-24  | 29-Oct-2024   | 11 Days   | [OVERDUE] | [Urgent Msg]  |
 +----------------------------------------------------------------------------------------------------+
 ```
 
@@ -707,7 +689,7 @@ Generates statutory GST tax invoices with dual SGST/CGST or IGST calculation, re
   |-------------------------------------------------------------------------|
   | Bank: State Bank of India | A/C: 00000012345678 | IFSC: SBIN0001234     |
   +-------------------------------------------------------------------------+
-  | [ 🖨️ Print Invoice ]  [ 📄 Download Vector PDF ]  [ 🔄 Sync to Banking ] |
+  | [ Print Invoice ]  [ Download Vector PDF ]  [ Sync to Banking ]         |
   +-------------------------------------------------------------------------+
 ```
 
@@ -775,11 +757,11 @@ WYSIWYG statutory drafting workbench for Board Resolutions, Engagement Letters, 
 
 ```text
 +----------------------------------------------------------------------------------------------------+
-| STATUTORY DOCUMENT DRAFTER & TEMPLATE STUDIO                            [ 💾 Save ] [ 📄 PDF Export]|
+| STATUTORY DOCUMENT DRAFTER & TEMPLATE STUDIO                            [ Save ] [ PDF Export ]    |
 +----------------------------------------------------------------------------------------------------+
-| Template: [ Board Resolution for Bank Account Opening ▼ ]  Client: [ Acme Enterprises Ltd         ▼ ]|
+| Template: [ Board Resolution for Bank Account Opening v ]  Client: [ Acme Enterprises Ltd         v ]|
 +----------------------------------------------------------------------------------------------------+
-| [ B ] [ I ] [ U ] [ H1 ] [ H2 ] [ Bullet List ] [ Table ] | Insert Tag: [ {{client_name}} ▼ ]      |
+| [ B ] [ I ] [ U ] [ H1 ] [ H2 ] [ Bullet List ] [ Table ] | Insert Tag: [ {{client_name}} v ]      |
 +----------------------------------------------------------------------------------------------------+
 |                                                                                                    |
 | CERTIFIED TRUE COPY OF THE RESOLUTION PASSED AT THE MEETING OF THE BOARD OF DIRECTORS OF           |
@@ -804,7 +786,7 @@ Manages prospective clients with 1-click conversion into active client directory
 | Prospect Name        | Contact & Phone   | Service Interest | Est. Value | Stage       | Action    |
 |----------------------|-------------------|------------------|------------|-------------|-----------|
 | Orbit Logistics LLP  | +91 98000 00004   | GST & ROC Ret.   | ₹ 60,000   | [PROPOSAL]  | [Convert] |
-| Prime Healthcare     | +91 98000 00005   | Tax Audit        | ₹ 45,000   | [WON]       | [🚀 TO CLIENT]|
+| Prime Healthcare     | +91 98000 00005   | Tax Audit        | ₹ 45,000   | [WON]       | [To Client|
 | Apex Builders        | +91 98000 00006   | TDS Filings      | ₹ 24,000   | [CONTACTED] | [Convert] |
 +----------------------------------------------------------------------------------------------------+
 ```
@@ -852,7 +834,7 @@ Maintains practice details, firm GSTIN/PAN, bank accounts for invoice footers, a
 
 ```text
 +----------------------------------------------------------------------------------------------------+
-| PRACTICE SETTINGS & TAX CONFIGURATION                                       [ 💾 Save Settings ]   |
+| PRACTICE SETTINGS & TAX CONFIGURATION                                       [ Save Settings ]      |
 +----------------------------------------------------------------------------------------------------+
 | Practice Firm Name: [ Premier Practice & Co., Chartered Accountants                              ] |
 | Firm PAN:           [ AAAAA0000A       ]  Firm GSTIN:    [ 27AAAAA0000A1Z5                       ] |
@@ -882,7 +864,7 @@ Omnipresent floating widgets accessible across every page in the CRM.
 +----------------------------------------------------------------------------------------------------+
 
 +----------------------------------------------------+  +--------------------------------------------+
-| 📋 FLOATING PRACTICE SCRATCHPAD                [X] |  | 🤖 AI STATUTORY COPILOT WIDGET         [X] |
+| FLOATING PRACTICE SCRATCHPAD                   [X] |  | AI STATUTORY COPILOT WIDGET            [X] |
 +----------------------------------------------------+  +--------------------------------------------+
 | * Follow up with Acme Ltd for September GSTR-2B.   |  | User: What is the penalty for late GSTR-3B?|
 | * Call ROC office regarding Nova SPICE+ filing.    |  | AI: Under Sec 47 CGST Act, ₹ 50/day (or    |
@@ -957,13 +939,13 @@ The project includes an end-to-end automated testing suite verifying 108 distinc
 
 | Test Suite File | Tested Functional Area | Assertions | Result |
 | :--- | :--- | :---: | :---: |
-| `tests/test_relational_cascade.ts` | Foreign key constraints, CASCADE deletes, and orphan prevention across all 13 tables | 24 | ✅ PASS (100%) |
-| `tests/test_invoice_banking_sync.ts` | Automatic dual-entry banking sync upon invoice generation, edit, and deletion | 18 | ✅ PASS (100%) |
-| `tests/test_cross_device.ts` | Multi-tab synchronization, Phoenix WebSocket real-time broadcast, and state reconciliation | 16 | ✅ PASS (100%) |
-| `tests/test_refresh_persistence.ts` | Local-first store rehydration, local storage fallback, and zero-data-loss page reloads | 14 | ✅ PASS (100%) |
-| `tests/test_services_flow.ts` | Package decomposition into sub-services, document checklist inheritance, and assignment | 16 | ✅ PASS (100%) |
-| `tests/test_direct_delete.ts` | Scoped tenant delete operations and security boundary validation | 10 | ✅ PASS (100%) |
-| `tests/test_anon_delete.ts` | Unauthenticated mutation blocking and RLS policy enforcement | 10 | ✅ PASS (100%) |
+| `tests/test_relational_cascade.ts` | Foreign key constraints, CASCADE deletes, and orphan prevention across all 13 tables | 24 | PASS (100%) |
+| `tests/test_invoice_banking_sync.ts` | Automatic dual-entry banking sync upon invoice generation, edit, and deletion | 18 | PASS (100%) |
+| `tests/test_cross_device.ts` | Multi-tab synchronization, Phoenix WebSocket real-time broadcast, and state reconciliation | 16 | PASS (100%) |
+| `tests/test_refresh_persistence.ts` | Local-first store rehydration, local storage fallback, and zero-data-loss page reloads | 14 | PASS (100%) |
+| `tests/test_services_flow.ts` | Package decomposition into sub-services, document checklist inheritance, and assignment | 16 | PASS (100%) |
+| `tests/test_direct_delete.ts` | Scoped tenant delete operations and security boundary validation | 10 | PASS (100%) |
+| `tests/test_anon_delete.ts` | Unauthenticated mutation blocking and RLS policy enforcement | 10 | PASS (100%) |
 | **TOTAL VERIFIED ASSERTIONS** | **Complete Phase-1 MVP Operational Surface** | **108** | **100% PASS** |
 
 ---
